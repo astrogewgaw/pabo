@@ -1,0 +1,41 @@
+[build-system]
+requires = [
+    "wheel",
+    "setuptools>=42",
+    "pybind11>=2.6.0",
+    "setuptools_scm[toml]>=3.4",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/pabo/_version.py"
+
+[tool.interrogate]
+verbose = 0
+color = true
+quiet = false
+fail-under = 85
+badge-format = "svg"
+whitelist-regex = []
+ignore-magic = true
+ignore-module = false
+ignore-private = false
+ignore-setters = false
+ignore-init-method = true
+ignore-semiprivate = false
+omit-covered-files = false
+ignore-init-module = false
+ignore-nested-classes = true
+badge-style = "for-the-badge"
+ignore-nested-functions = false
+ignore-property-decorators = false
+generate-badge = "assets/doc_cov.svg"
+
+exclude = [
+    "docs",
+    "tests",
+    "build",
+    "assets",
+    "setup.py",
+    "src/pabo/_version.py",
+]
