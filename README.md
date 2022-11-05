@@ -1,5 +1,3 @@
-<div style="font-family:JetBrainsMono Nerd Font">
-
 <div align="center">
 <img 
     alt="pabo: Binary parsing for dummies!"
@@ -21,7 +19,7 @@
 
 <div align="justify">
 
-## What is this?
+<h2>What is this?</h2>
 
 Parsing binary data from Python has always been a bit of a pain, thanks to the
 weirdly designed [**`struct`**][struct] module in Python's standard library.
@@ -75,7 +73,7 @@ For more real examples, check out the [**`priwo`**][priwo] package, which uses
 features are directly motivated by their need in `priwo`!). Documentation is in
 development, so stay tuned!
 
-## Installation
+<h2>Installation</h2>
 
 Installing [**`pabo`**][pabo] is as easy as:
 
@@ -83,7 +81,7 @@ Installing [**`pabo`**][pabo] is as easy as:
 pip install pabo
 ```
 
-## Philosophy
+<h2>Philosophy</h2>
 
 The philosophy behind `pabo` is: be simple, yet be fast and full of features.
 This implies that I deliberately avoid coding in features that are too magical
