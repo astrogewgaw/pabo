@@ -2,7 +2,6 @@
 Byte manipulation.
 """
 
-from typing import IO
 from attrs import define
 from pabo.wrappers import Const
 from pabo.base import Construct
@@ -17,17 +16,13 @@ class Bytes(Construct):
 
     size: int
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.size
 
-    def __build__(
-        self,
-        data: bytes,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         stream.write(data)
 
-    def __parse__(self, stream: IO[bytes]) -> bytes:
+    def __parse__(self, stream):
         return stream.read(self.size)
 
 
@@ -41,14 +36,10 @@ class Flag(Construct):
     def __size__(self) -> int:
         return 1
 
-    def __build__(
-        self,
-        data: bool,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         stream.write(b"\x01" if data else b"\x00")
 
-    def __parse__(self, stream: IO[bytes]) -> bool:
+    def __parse__(self, stream):
         data = stream.read(1)
         return data != b"\x00"
 

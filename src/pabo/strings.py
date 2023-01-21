@@ -2,10 +2,9 @@
 String constructs.
 """
 
-from typing import IO
 from attrs import define
 from pabo.bytes import Bytes
-from pabo.numbers import Int
+from pabo.numeric import Int
 from pabo.base import PaboError, Construct
 from pabo.wrappers import Padded, Prefixed
 
@@ -19,19 +18,15 @@ class CString(Construct):
 
     code: str = "utf-8"
 
-    def __size__(self) -> None:
+    def __size__(self):
         raise PaboError("A CString has no fixed size.")
 
-    def __build__(
-        self,
-        data: str,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         raw = data.encode(self.code)
         raw = b"".join([raw, b"\x00"])
         stream.write(raw)
 
-    def __parse__(self, stream: IO[bytes]) -> str:
+    def __parse__(self, stream):
         data = []
         while True:
             raw = stream.read(1)
@@ -56,18 +51,14 @@ class PascalString(Construct):
     pre: Int
     code: str = "utf-8"
 
-    def __size__(self) -> None:
+    def __size__(self):
         raise PaboError("A PascalString has no fixed size.")
 
-    def __build__(
-        self,
-        data: str,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         raw = data.encode(self.code)
         Prefixed(self.pre, Bytes(-1)).__build__(raw, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> str:
+    def __parse__(self, stream):
         main = Prefixed(self.pre, Bytes(-1))
         raw = main.__parse__(stream)
         data = raw.decode(self.code)
@@ -87,17 +78,12 @@ class PaddedString(Construct):
     def __size__(self):
         return self.size
 
-    def __build__(
-        self,
-        data: str,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         raw = data.encode(self.code)
         pad = self.size - len(raw)
-        main = Padded(pad, Bytes(len(raw)))
-        main.__build__(raw, stream)
+        Padded(pad, Bytes(len(raw))).__build__(raw, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> str:
+    def __parse__(self, stream):
         raw = stream.read(self.size)
         raw = raw.rstrip(b"\x00")
         data = raw.decode(self.code)

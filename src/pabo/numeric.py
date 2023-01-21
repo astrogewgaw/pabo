@@ -6,9 +6,8 @@ import struct
 import numpy as np
 
 from attrs import define
-from numpy.typing import ArrayLike
-from pabo.kernels import pack, unpack
-from typing import IO, Union, Optional
+from typing import Union, Optional
+from pabo.core import pack, unpack
 from pabo.base import PaboError, Construct
 
 
@@ -24,7 +23,7 @@ class Int(Construct):
     endian: str = "little"
 
     @property
-    def __format__(self) -> str:
+    def __format__(self):
         fmt = "".join(
             [
                 ">" if self.endian == "big" else "<",
@@ -38,27 +37,14 @@ class Int(Construct):
         )
         return fmt if self.signed else fmt.upper()
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.width
 
-    def __build__(
-        self,
-        data: int,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         stream.write(struct.pack(self.__format__, data))
 
-    def __parse__(self, stream: IO[bytes]) -> int:
+    def __parse__(self, stream):
         return struct.unpack(self.__format__, stream.read(self.width))[0]
-
-    def __mul__(self, count: int):
-        if isinstance(count, int):
-            return Array(self, count)
-        else:
-            raise PaboError("A Construct may only be multiplied by an integer.")
-
-    def __rmul__(self, count: int):
-        return self.__mul__(count)
 
 
 @define
@@ -72,7 +58,7 @@ class Float(Construct):
     endian: str = "little"
 
     @property
-    def __format__(self) -> str:
+    def __format__(self):
         return "".join(
             [
                 ">" if self.endian == "big" else "<",
@@ -80,27 +66,14 @@ class Float(Construct):
             ]
         )
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.width
 
-    def __build__(
-        self,
-        data: float,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream) -> None:
         stream.write(struct.pack(self.__format__, data))
 
-    def __parse__(self, stream: IO[bytes]) -> float:
+    def __parse__(self, stream):
         return struct.unpack(self.__format__, stream.read(self.width))[0]
-
-    def __mul__(self, count: int):
-        if isinstance(count, int):
-            return Array(self, count)
-        else:
-            raise PaboError("A Construct may only be multiplied by an integer.")
-
-    def __rmul__(self, count: int):
-        return self.__mul__(count)
 
 
 @define
@@ -114,21 +87,22 @@ class Array(Construct):
     count: int = -1
     packing: Optional[int] = None
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.count
 
-    def __build__(
-        self,
-        data: ArrayLike,
-        stream: IO[bytes],
-    ):
+    def __build__(self, data, stream):
+        if len(data) < self.count:
+            raise PaboError("Not enough data to build.")
+        data = data[: self.count] if self.count != -1 else data
         array = np.asarray(data, dtype=self.main.__format__)
         if self.packing is not None:
             array = pack(array.flatten(), nbits=self.packing)
         stream.write(array.tobytes())
 
-    def __parse__(self, stream: IO[bytes]) -> np.ndarray:
+    def __parse__(self, stream):
         data = stream.read(self.count)
+        if len(data) < self.count:
+            raise PaboError("Not enough data to parse.")
         array = np.frombuffer(data, dtype=self.main.__format__)
         if self.packing is not None:
             array = unpack(array, nbits=self.packing)

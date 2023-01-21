@@ -3,6 +3,7 @@ build
 .egg
 .nox
 .vscode
+.clangd
 .coverage
 __pycache__
 .mypy_cache

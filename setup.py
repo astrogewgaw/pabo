@@ -6,8 +6,13 @@ if __name__ == "__main__":
     setup(
         ext_modules=[
             Pybind11Extension(
-                "pabo.kernels",
-                sorted(["src/pabo/kernels/core.cpp"]),
+                "pabo.core",
+                sorted(["src/pabo/core.cpp"]),
+                extra_compile_args=[
+                    "-O3",
+                    "-ffast-math",
+                    "-march=native",
+                ],
             ),
         ],
         cmdclass={"build_ext": build_ext},

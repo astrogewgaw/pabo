@@ -2,12 +2,13 @@
 Wrappers for constructs.
 """
 
-from io import BytesIO
 from attrs import define
-from pabo.numbers import Int
+from pathlib import Path
+from pabo.numeric import Int
+from io import BytesIO, BufferedIOBase
 from pabo.base import PaboError, Construct
-from typing import IO, Any, List, Callable
 from collections.abc import MutableSequence
+from typing import Any, List, Union, Optional, Callable
 
 
 @define
@@ -20,26 +21,41 @@ class Const(Construct):
     value: Any
     wraps: Construct
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.wraps.size
 
-    def __build__(self, stream: IO[bytes]) -> None:
+    def __build__(self, stream):
         self.wraps.__build__(self.value, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> Any:
+    def __parse__(self, stream):
         data = self.wraps.__parse__(stream)
         if data != self.value:
             raise PaboError("Parsed value different from reference.")
         else:
             return data
 
-    def build_stream(self, stream: IO[bytes]) -> None:
-        self.__build__(stream)
-
-    def build(self) -> bytes:
-        stream = BytesIO()
-        self.__build__(stream)
-        return stream.getvalue()
+    def build(
+        self,
+        to_: Optional[
+            Union[
+                str,
+                Path,
+                BytesIO,
+                BufferedIOBase,
+            ]
+        ] = None,
+    ) -> Optional[bytes]:
+        if to_ is None:
+            to_ = BytesIO()
+            self.__build__(to_)
+            return to_.getvalue()
+        if isinstance(to_, (str, Path)):
+            with open(to_, "wb") as f:
+                self.__build__(f)
+            return
+        if isinstance(to_, (BytesIO, BufferedIOBase)):
+            self.__build__(to_)
+            return
 
 
 @define
@@ -54,15 +70,11 @@ class Greedy(Construct):
     def __size__(self):
         return self.wraps.__size__
 
-    def __build__(
-        self,
-        data: List[Any],
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         for element in data:
             self.wraps.__build__(element, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> List[Any]:
+    def __parse__(self, stream):
         data = []
         while True:
             try:
@@ -81,27 +93,23 @@ class Sequential(Construct, MutableSequence):
 
     items: List[Construct]
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self.items)
 
-    def __getitem__(self, ix: int) -> Construct:
+    def __getitem__(self, ix):
         return self.items[ix]
 
-    def __setitem__(self, ix: int, item: Construct) -> None:
+    def __setitem__(self, ix, item):
         self.items[ix] = item
 
-    def __delitem__(self, ix: int) -> None:
+    def __delitem__(self, ix):
         del self.items[ix]
 
-    def __size__(self) -> int:
+    def __size__(self):
         sizes = [_.__size__() for _ in self.items]
         return sum([_ for _ in sizes if _ is not None])
 
-    def __build__(
-        self,
-        data: List[Any],
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         [
             item.__build__(element, stream)
             for (
@@ -110,7 +118,7 @@ class Sequential(Construct, MutableSequence):
             ) in zip(self.items, data)
         ]
 
-    def __parse__(self, stream: IO[bytes]) -> List[Any]:
+    def __parse__(self, stream):
         return [item.__parse__(stream) for item in self.items]
 
     def insert(self, ix: int, item: Construct) -> None:
@@ -127,21 +135,17 @@ class Repeat(Construct):
     wraps: Construct
     count: int
 
-    def __size__(self) -> int:
-        return self.wraps.__size__() * self.count
+    def __size__(self):
+        return self.wraps.size * self.count
 
-    def __build__(
-        self,
-        data: List[Any],
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         if len(data) < self.count:
             raise PaboError(f"Not enough data to build. Need at least {self.count}")
         else:
             for ix in range(self.count):
                 self.wraps.__build__(data[ix], stream)
 
-    def __parse__(self, stream: IO[bytes]) -> List[Any]:
+    def __parse__(self, stream):
         return [self.wraps.__parse__(stream) for _ in range(self.count)]
 
 
@@ -156,17 +160,13 @@ class Adapted(Construct):
     post: Callable
     pre: Callable
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.wraps.size
 
-    def __build__(
-        self,
-        data: Any,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         self.wraps.__build__(self.pre(data), stream)
 
-    def __parse__(self, stream: IO[bytes]) -> Any:
+    def __parse__(self, stream):
         return self.post(self.wraps.__parse__(stream))
 
 
@@ -180,14 +180,10 @@ class Prefixed(Construct):
     pre: Int
     wraps: Construct
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.pre.size + self.wraps.size
 
-    def __build__(
-        self,
-        data: Any,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         try:
             size = len(data)
         except Exception as ERROR:
@@ -195,7 +191,7 @@ class Prefixed(Construct):
         self.pre.__build__(size, stream)
         self.wraps.__build__(data, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> Any:
+    def __parse__(self, stream):
         size = self.pre.__parse__(stream)
         data = stream.read(size)
         return self.wraps.parse(data)
@@ -211,21 +207,15 @@ class Padded(Construct):
     pad: int
     wraps: Construct
 
-    def __size__(self) -> int:
+    def __size__(self):
         return self.wraps.size + self.pad
 
-    def __build__(
-        self,
-        data: Any,
-        stream: IO[bytes],
-    ) -> None:
+    def __build__(self, data, stream):
         if len(data) < self.wraps.size:
             raise PaboError("Not enough data to build.")
-        data = self.wraps.build(data)
-        data = data.ljust(self.size, b"\x00")
-        stream.write(data)
+        self.wraps.__build__(data + b"\x00" * self.pad, stream)
 
-    def __parse__(self, stream: IO[bytes]) -> Any:
+    def __parse__(self, stream):
         data = stream.read(self.size)
         data = data.rstrip(b"\x00")
         return self.wraps.parse(data)

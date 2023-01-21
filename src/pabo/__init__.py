@@ -5,7 +5,7 @@ Binary parsing for dummies!
 from pabo.bits import Bits
 from pabo.base import Construct
 from pabo.specify import Specification
-from pabo.numbers import Int, Float, Array
+from pabo.numeric import Int, Float, Array
 from pabo.bytes import Bytes, Flag, Padding
 from pabo.wrappers import Sequential as Seq
 from pabo.specify import Specification as Spec
