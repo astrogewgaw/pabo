@@ -3,11 +3,10 @@ Base classes.
 """
 
 from abc import ABC
+from io import BytesIO
 from pathlib import Path
 from abc import abstractmethod
 from attrs import define, field
-from io import BytesIO, BufferedIOBase
-from typing import Any, Union, Optional
 
 
 @define
@@ -64,46 +63,20 @@ class Construct(ABC):
             return size
         raise PaboError("No reasonable size was returned.")
 
-    def build(
-        self,
-        data: Any,
-        to_: Optional[
-            Union[
-                str,
-                Path,
-                BytesIO,
-                BufferedIOBase,
-            ]
-        ] = None,
-    ) -> Optional[bytes]:
-        if to_ is None:
-            to_ = BytesIO()
-            self.__build__(data, to_)
-            return to_.getvalue()
-        if isinstance(to_, (str, Path)):
-            with open(to_, "ab") as f:
-                self.__build__(data, f)
-            return
-        if isinstance(to_, (BytesIO, BufferedIOBase)):
-            self.__build__(data, to_)
-            return
+    def build(self, data, src=None):
+        if src is None:
+            src = BytesIO()
+            self.__build__(data, src)
+            return src.getvalue()
+        if isinstance(src, (str, Path)):
+            with open(src, "ab") as f:
+                return self.__build__(data, f)
+        return self.__build__(data, src)
 
-    def parse(
-        self,
-        from_: Union[
-            str,
-            Path,
-            bytes,
-            BytesIO,
-            BufferedIOBase,
-        ],
-    ) -> Any:
-        if isinstance(from_, bytes):
-            return self.__parse__(BytesIO(from_))
-        if isinstance(from_, (str, Path)):
-            with open(from_, "rb") as f:
+    def parse(self, dst):
+        if isinstance(dst, bytes):
+            return self.__parse__(BytesIO(dst))
+        if isinstance(dst, (str, Path)):
+            with open(dst, "rb") as f:
                 return self.__parse__(f)
-        if isinstance(from_, BytesIO):
-            return self.__parse__(from_)
-        if isinstance(from_, BufferedIOBase):
-            return self.__parse__(from_)
+        return self.__parse__(dst)
