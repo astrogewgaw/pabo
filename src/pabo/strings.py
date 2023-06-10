@@ -59,10 +59,7 @@ class PascalString(Construct):
         Prefixed(self.pre, Bytes(-1)).__build__(raw, stream)
 
     def __parse__(self, stream):
-        main = Prefixed(self.pre, Bytes(-1))
-        raw = main.__parse__(stream)
-        data = raw.decode(self.code)
-        return data
+        return Prefixed(self.pre, Bytes(-1)).__parse__(stream).decode(self.code)
 
 
 @define

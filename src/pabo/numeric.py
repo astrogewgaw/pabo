@@ -93,14 +93,14 @@ class Array(Construct):
     def __build__(self, data, stream):
         if len(data) < self.count:
             raise PaboError("Not enough data to build.")
-        data = data[: self.count] if self.count != -1 else data
+        data = data[: self.count] if self.count > 0 else data
         array = np.asarray(data, dtype=self.main.__format__)
         if self.packing is not None:
             array = pack(array.flatten(), nbits=self.packing)
         stream.write(array.tobytes())
 
     def __parse__(self, stream):
-        data = stream.read(self.count)
+        data = stream.read(self.count * self.main.width if self.count > 0 else -1)
         if len(data) < self.count:
             raise PaboError("Not enough data to parse.")
         array = np.frombuffer(data, dtype=self.main.__format__)
