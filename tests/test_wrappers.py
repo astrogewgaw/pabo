@@ -99,3 +99,14 @@ def test_padded_fill_and_side():
         pb.Padded(1, pb.Int(1), fill=b"ab")
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Padded(1, pb.Int(1), side="up")
+
+
+def test_repeat_of_fixed_spec_parses_in_bulk():
+    record = pb.Spec({"a": pb.u16, "b": pb.f32})
+    raw = b"".join(record.build({"a": i, "b": i / 2}) for i in range(5))
+    data = pb.Repeat(record, 5).parse(raw)
+    assert [d.a for d in data] == list(range(5))
+    assert all(isinstance(d, pb.Container) for d in data)
+    with pytest.raises(pb.StreamError) as info:
+        pb.Repeat(record, 6).parse(raw)
+    assert info.value.where == "[5].a"

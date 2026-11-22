@@ -213,3 +213,33 @@ def test_12_bit_packing_layout():
 def test_packed_array_greedy():
     c = pb.Array(pb.Int(1), packing=4)
     np.testing.assert_array_equal(c.parse(b"\x12\x34"), [1, 2, 3, 4])
+
+
+def test_array_reads_into_new_buffer():
+    from io import BytesIO
+
+    stream = BytesIO(np.arange(4, dtype=">u2").tobytes() + b"rest")
+    parsed = pb.Array(pb.Int(2, endian="big"), count=4).parse(stream)
+    np.testing.assert_array_equal(parsed, [0, 1, 2, 3])
+    assert parsed.flags.writeable
+    assert stream.read() == b"rest"
+    with pytest.raises(pb.StreamError):
+        pb.Array(pb.Int(2), count=4).parse(BytesIO(b"\x00" * 7))
+
+
+def test_array_reads_from_short_reads():
+    class Trickle:
+        def __init__(self, raw):
+            self.raw = raw
+
+        def readinto(self, view):
+            n = min(1, len(self.raw), len(view))
+            view[:n] = self.raw[:n]
+            self.raw = self.raw[n:]
+            return n
+
+        def read(self, size=-1):
+            raise AssertionError("read() should not be used")
+
+    parsed = pb.Array(pb.Int(2), count=2).parse(Trickle(b"\x01\x00\x02\x00"))
+    np.testing.assert_array_equal(parsed, [1, 2])

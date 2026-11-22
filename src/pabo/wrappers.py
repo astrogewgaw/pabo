@@ -164,8 +164,14 @@ class Repeat(Construct[list]):
         return built
 
     def _parse(self, stream, ctx):
+        count = _int(self.count, ctx)
+        many = getattr(self.wraps, "_parse_many", None)
+        if many is not None and count > 0:
+            data = many(stream, ctx, count)
+            if data is not None:
+                return data
         data = []
-        for ix in range(_int(self.count, ctx)):
+        for ix in range(count):
             with scope(f"[{ix}]", stream):
                 data.append(self.wraps._parse(stream, ctx))
         return data

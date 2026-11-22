@@ -4,12 +4,16 @@ Specifications for binary data.
 
 from dataclasses import dataclass, field
 
+import struct
 import sys
+from typing import no_type_check
 
 from pabo.base import Construct, Stop, hexdump, scope, tell
 from pabo.context import Container, Context
+from pabo.bytes import Bytes, Flag
 from pabo.errors import PaboError
-from pabo.numeric import Endian, _check_endian
+from pabo.numeric import ENDIANS, INT_CODES, Endian, Float, Int, _check_endian
+from pabo.wrappers import Const
 
 
 @dataclass
@@ -28,18 +32,21 @@ class Specification(Construct[Container]):
 
     fields: dict[str, Construct]
     endian: Endian | None = field(default=None, kw_only=True)
+    _plans: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _check_endian(self.endian)
 
+    @no_type_check
     def _child(self, data, parent) -> Context:
         child = Context(data, parent=parent)
-        child._endian = self.endian
+        child.__dict__["_endian"] = self.endian
         return child
 
     def _size(self, ctx):
         return self._size_fields(self._child(ctx, ctx._))
 
+    @no_type_check
     def _size_fields(self, child: Context) -> int:
         total = 0
         for name, field in self.fields.items():
@@ -51,16 +58,53 @@ class Specification(Construct[Container]):
             total += field._size(sub)
         return total
 
+    @no_type_check
+    def _plan(self, ctx) -> "_Plan | None":
+        """
+        The compiled plan for the endianness in effect, or None if there is none.
+        """
+
+        endian = self.endian or ctx.setting("_endian") or "little"
+        if endian not in self._plans:
+            self._plans[endian] = _Plan.compile(self.fields, endian)
+        return self._plans[endian]
+
+    @no_type_check
+    def _parse_many(self, stream, ctx, count: int) -> list | None:
+        """
+        Parse `count` copies in one go with the compiled plan, or return None.
+        """
+
+        if ctx.setting("_trace"):
+            return None
+        plan = self._plan(self._child((), ctx))
+        if plan is None or plan.consts or tell(stream) is None:
+            return None
+        start = stream.tell()
+        raw = stream.read(plan.struct.size * count)
+        if len(raw) != plan.struct.size * count:
+            stream.seek(start)
+            return None
+        names = plan.names
+        return [Container(zip(names, values)) for values in plan.struct.iter_unpack(raw)]
+
     def _build(self, data, stream, ctx):
         if not isinstance(data, dict):
             raise PaboError(f"Expected a dict of fields, got {type(data).__name__}.")
         child = self._child(data, ctx)
+        plan = self._plan(child)
+        if plan is not None:
+            raw = plan.pack(child)
+            if raw is not None:
+                stream.write(raw)
+                return Container(child)
         try:
             self._build_fields(stream, child)
         except Stop:
             pass
         return Container(child)
 
+    @no_type_check
     def _build_fields(self, stream, child: Context) -> None:
         for name, field in self.fields.items():
             if isinstance(field, Embedded):
@@ -79,12 +123,18 @@ class Specification(Construct[Container]):
 
     def _parse(self, stream, ctx):
         child = self._child((), ctx)
+        if not child.setting("_trace"):
+            plan = self._plan(child)
+            start = tell(stream) if plan is not None else None
+            if start is not None and plan.unpack(stream, child):
+                return Container(child)
         try:
             self._parse_fields(stream, child)
         except Stop:
             pass
         return Container(child)
 
+    @no_type_check
     def _parse_fields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
         for name, field in self.fields.items():
@@ -170,3 +220,89 @@ def _trace_field(trace, stream, ctx: Context, name: str, start: int | None, valu
     print(f"{indent}{name} {where} = {shown}", file=file)
     for line in hexdump(raw[:64], start or 0).splitlines():
         print(f"{indent}    {line}", file=file)
+
+
+class _Plan:
+    """
+    A specification of fixed-size numbers, bytes and constants, compiled into a
+    single `struct.Struct`, so it can be parsed and built in one call.
+
+    `unpack`/`pack` return a false value when anything goes wrong; the caller
+    then rewinds and takes the field-by-field path, which raises the detailed
+    error.
+    """
+
+    def __init__(self, names, layout, struct_, consts, lengths):
+        self.names = names
+        self.layout = layout
+        self.struct = struct_
+        self.consts = consts
+        self.lengths = lengths
+
+    @classmethod
+    def compile(cls, fields: dict, endian: str) -> "_Plan | None":
+        codes, names, consts, lengths = [], [], {}, {}
+        for name, construct in fields.items():
+            if isinstance(construct, Const):
+                consts[name] = construct.value
+                construct = construct.wraps
+            if type(construct) is Int and construct.width in INT_CODES:
+                if (construct.endian or endian) != endian:
+                    return None
+                code = INT_CODES[construct.width]
+                codes.append(code if construct.signed else code.upper())
+            elif type(construct) is Float:
+                if (construct.endian or endian) != endian:
+                    return None
+                codes.append(construct.format_for(endian)[1:])
+            elif type(construct) is Bytes and isinstance(construct.count, int) and construct.count >= 0:
+                codes.append(f"{construct.count}s")
+                lengths[name] = construct.count
+            elif type(construct) is Flag:
+                codes.append("?")
+            else:
+                return None
+            names.append(name)
+        if not names:
+            return None
+        return cls(names, codes, struct.Struct(ENDIANS[endian] + "".join(codes)), consts, lengths)
+
+    @no_type_check
+    def unpack(self, stream, ctx: Context) -> bool:
+        start = stream.tell()
+        raw = stream.read(self.struct.size)
+        if len(raw) != self.struct.size:
+            stream.seek(start)
+            return False
+        values = self.struct.unpack(raw)
+        for name, value in zip(self.names, values):
+            if name in self.consts and value != self.consts[name]:
+                stream.seek(start)
+                return False
+        ctx.update(zip(self.names, values))
+        return True
+
+    @no_type_check
+    def pack(self, ctx: Context) -> bytes | None:
+        values = []
+        for name in self.names:
+            if name in ctx and ctx[name] is not None:
+                value = ctx[name]
+                if name in self.consts and value != self.consts[name]:
+                    return None
+            elif name in self.consts:
+                value = self.consts[name]
+            else:
+                return None
+            if name in self.lengths and (
+                not isinstance(value, (bytes, bytearray)) or len(value) != self.lengths[name]
+            ):
+                return None
+            values.append(value)
+        try:
+            raw = self.struct.pack(*values)
+        except struct.error:
+            return None
+        for name, code, value in zip(self.names, self.layout, values):
+            ctx[name] = bool(value) if code == "?" else value
+        return raw

@@ -3,7 +3,7 @@ Containers, contexts and references to previously parsed fields.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, no_type_check
 
 from pabo.errors import ContextError
 
@@ -17,12 +17,14 @@ class Container(dict):
     ordinary attributes and are never stored as keys.
     """
 
+    @no_type_check
     def __getattr__(self, name: str) -> Any:
         try:
             return self[name]
         except KeyError:
             raise AttributeError(name) from None
 
+    @no_type_check
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_"):
             object.__setattr__(self, name, value)
@@ -52,9 +54,10 @@ class Context(Container):
     that are looked up through the parents with `setting`.
     """
 
+    @no_type_check
     def __init__(self, data: Any = (), parent: "Context | None" = None):
         super().__init__(data)
-        self._ = parent
+        self.__dict__["_"] = parent
 
     @property
     def _root(self) -> "Context":
@@ -63,6 +66,7 @@ class Context(Container):
             ctx = ctx._
         return ctx
 
+    @no_type_check
     def setting(self, name: str, default: Any = None) -> Any:
         """
         Look up an attribute on this context or the nearest parent that has it.
@@ -107,6 +111,7 @@ class This:
     def __setattr__(self, name: str, value: Any) -> None:
         raise AttributeError("References are read-only.")
 
+    @no_type_check
     def __call__(self, ctx: Context) -> Any:
         value: Any = ctx
         for name in self.__path:
@@ -139,6 +144,7 @@ this = This()
 Dynamic = int | Callable[[Context], Any]
 
 
+@no_type_check
 def evaluate(value: Any, ctx: Context) -> Any:
     """
     Return `value`, calling it with the context first if it is callable.

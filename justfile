@@ -29,6 +29,10 @@ default:
 @test: && clean
   pytest -vv tests
 
+# Run benchmarks (needs pytest-benchmark; construct is optional).
+@bench:
+  pytest benchmarks/bench_parse.py --benchmark-group-by=group --benchmark-columns=mean,ops
+
 # Install.
 @install: && clean
     echo "Installing..."

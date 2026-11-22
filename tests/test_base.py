@@ -112,3 +112,17 @@ def test_custom_construct():
     c = Nibbles()
     assert c.parse(b"\x12") == (1, 2)
     assert c.build((1, 2)) == b"\x12"
+
+
+def test_beartype_can_be_disabled():
+    import os
+    import subprocess
+    import sys
+
+    code = "import pabo; pabo.Int('x')"
+    env = {**os.environ, "PABO_BEARTYPE": "0"}
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    assert "Beartype" not in result.stderr
+    env["PABO_BEARTYPE"] = "1"
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    assert "BeartypeCallHintParamViolation" in result.stderr

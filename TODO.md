@@ -201,14 +201,16 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 
 ## 3. Performance
 
-- [ ] Compile fixed-size specs into a single `struct.Struct` format (or a NumPy
+- [x] Compile fixed-size specs into a single `struct.Struct` format (or a NumPy
       structured `dtype`) and parse in one call instead of field by field.
-- [ ] Read fixed-size arrays with `np.frombuffer` / `readinto` without intermediate
+- [x] Read fixed-size arrays with `np.frombuffer` / `readinto` without intermediate
       copies.
-- [ ] Consider making `beartype_this_package()` optional (env var or debug flag). Runtime
+- [x] Consider making `beartype_this_package()` optional (env var or debug flag). Runtime
       type checking on every `_parse` call costs time in tight loops.
-- [ ] Add benchmarks against `construct`, `struct` and NumPy structured dtypes
-      (`pytest-benchmark` or `asv`).
+- [x] Add benchmarks against `construct`, `struct` and NumPy structured dtypes
+      (`pytest-benchmark` or `asv`). (`benchmarks/bench_parse.py`, `just bench`. On
+      one machine: a PNG header in ~2 µs, about as fast as construct's compiled
+      mode; 1000 fixed-size records in ~0.26 ms, ~10× faster than construct.)
 
 ## 4. Testing
 

@@ -1,10 +1,17 @@
 """
 Binary parsing for dummies!
+
+Type hints on pabo's own functions are checked at runtime by beartype. Set
+the environment variable `PABO_BEARTYPE=0` before importing pabo to turn
+this off, which makes parsing in tight loops a little faster.
 """
 
-from beartype.claw import beartype_this_package
+import os
 
-beartype_this_package()
+if os.environ.get("PABO_BEARTYPE", "1") != "0":
+    from beartype.claw import beartype_this_package
+
+    beartype_this_package()
 
 from pabo import aliases
 from pabo.aliases import *  # noqa: F403

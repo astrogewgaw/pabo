@@ -230,7 +230,7 @@ class Construct(ABC, Generic[T]):
         """
 
         ctx = Context()
-        ctx._trace = trace or None
+        ctx.__dict__["_trace"] = trace or None
         if isinstance(dst, (bytes, bytearray, memoryview)):
             return self._parse(BytesIO(dst), ctx)
         if isinstance(dst, (str, Path)):

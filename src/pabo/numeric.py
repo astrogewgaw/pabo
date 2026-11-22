@@ -275,6 +275,21 @@ class Array(Construct):
         stream.seek(start + nbytes)
         return array
 
+    def _parse_into(self, stream, count: int, dtype: np.dtype) -> np.ndarray:
+        """
+        Read straight into a new array, without an intermediate bytes object.
+        """
+
+        array = np.empty(count, dtype=dtype)
+        view = memoryview(array.view(np.uint8))
+        nbytes, got = view.nbytes, 0
+        while got < nbytes:
+            n = stream.readinto(view[got:])
+            if not n:
+                raise StreamError(f"Stream ended early: expected {nbytes} bytes, got {got}.")
+            got += n
+        return array
+
     def _count(self, ctx) -> int:
         count = evaluate(self.count, ctx)
         if not isinstance(count, (int, np.integer)):
@@ -313,6 +328,8 @@ class Array(Construct):
         count = self._count(ctx)
         if self.packing is None and isinstance(stream, mmap.mmap):
             return self._parse_mapped(stream, count, self.dtype_for(ctx))
+        if self.packing is None and count >= 0 and hasattr(stream, "readinto"):
+            return self._parse_into(stream, count, self.dtype_for(ctx))
         if count >= 0:
             raw = read_exactly(stream, self._nbytes(count))
         else:

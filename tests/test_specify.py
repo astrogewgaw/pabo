@@ -161,3 +161,46 @@ def test_describe():
     assert lines[6].split()[:3] == ["7", "?", "data"]
     assert lines[7].split()[:3] == ["?", "4", "crc"]
     assert pb.u16.describe().splitlines()[1].split()[:2] == ["0", "2"]
+
+
+def test_compiled_plan_is_used_and_matches():
+    spec = pb.Spec(
+        {
+            "magic": pb.Const(b"AB", pb.Bytes(2)),
+            "a": pb.u16,
+            "b": pb.i32,
+            "c": pb.f64,
+            "flag": pb.Flag(),
+        },
+        endian="big",
+    )
+    plan = spec._plan(pb.Context())
+    assert plan is not None and plan.struct.format == ">2sHid?"
+    raw = b"AB" + b"\x00\x01" + b"\xff\xff\xff\xfe" + b"\x3f\xf8" + b"\x00" * 6 + b"\x02"
+    data = spec.parse(raw)
+    assert data == {"magic": b"AB", "a": 1, "b": -2, "c": 1.5, "flag": True}
+    assert spec.build(data) == raw[:-1] + b"\x01"
+    assert spec.build({"a": 1, "b": -2, "c": 1.5, "flag": 1}) == raw[:-1] + b"\x01"
+
+
+def test_compiled_plan_falls_back_for_detailed_errors():
+    spec = pb.Spec({"magic": pb.Const(b"AB", pb.Bytes(2)), "a": pb.u16, "d": pb.Bytes(2)})
+    with pytest.raises(pb.ConstError) as info:
+        spec.parse(b"XY\x00\x00ab")
+    assert info.value.where == "magic"
+    with pytest.raises(pb.StreamError) as info:
+        spec.parse(b"AB\x00")
+    assert info.value.where == "a"
+    with pytest.raises(pb.ValidationError) as info:
+        spec.build({"a": 70000, "d": b"ab"})
+    assert info.value.where == "a"
+    with pytest.raises(pb.ValidationError):
+        spec.build({"a": 1, "d": b"abc"})
+    with pytest.raises(pb.ConstError):
+        spec.build({"magic": b"XY", "a": 1, "d": b"ab"})
+
+
+def test_no_plan_for_mixed_or_dynamic_fields():
+    assert pb.Spec({"a": pb.u16le, "b": pb.u16be})._plan(pb.Context()) is None
+    assert pb.Spec({"n": pb.u8, "d": pb.Bytes(pb.this.n)})._plan(pb.Context()) is None
+    assert pb.Spec({})._plan(pb.Context()) is None
