@@ -150,9 +150,9 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Configurable pad byte and pad direction for `Padded`/`PaddedString`.
 
 ### Bit-level structures
-- [ ] `BitStruct` / bit fields: sub-byte integer fields inside a spec (for example a
+- [x] `BitStruct` / bit fields: sub-byte integer fields inside a spec (for example a
       4-bit version and a 4-bit header length), with configurable bit order.
-- [ ] Arbitrary `nbits` (3, 5, 12, ...) in the packer, not just 1, 2 and 4.
+- [x] Arbitrary `nbits` (3, 5, 12, ...) in the packer, not just 1, 2 and 4.
 
 ### Stream positioning
 - [ ] `Seek`, `Tell`, `Pointer` (parse at an absolute offset), `Peek` (look ahead without

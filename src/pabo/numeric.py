@@ -12,7 +12,7 @@ import numpy as np
 from pabo.base import Construct, read_exactly
 from pabo.context import Context, Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
-from pabo.packed import pack, unpack
+from pabo.packing import pack_bits, unpack_bits
 
 Endian = Literal["little", "big", "native"]
 BitOrder = Literal["big", "little"]
@@ -211,9 +211,11 @@ class Array(Construct):
     Represents an array of fixed-width numbers.
 
     A negative `count` reads until the end of the stream. If `packing` is set
-    (1, 2 or 4), each element is stored in that many bits, `bitorder` decides
-    whether the first element sits in the most ("big") or least ("little")
-    significant bits of each byte, and the values are returned as `dtype`.
+    (any number of bits from 1 up to the width of `dtype`), each element is
+    stored in that many bits, `bitorder` decides whether the first element sits
+    in the most ("big") or least ("little") significant bits of each byte, and
+    the values are returned as `dtype`. Packings of 1, 2 and 4 bits use the
+    fast C++ extension. See `pabo.packing` for the exact layout.
     """
 
     dtype: Int | Float
@@ -225,12 +227,13 @@ class Array(Construct):
         if isinstance(self.dtype, Int) and self.dtype.width not in INT_CODES:
             raise PaboError("Array elements must be 1, 2, 4 or 8 bytes wide.")
         if self.packing is not None:
-            if self.packing not in (1, 2, 4):
-                raise PaboError(
-                    f"Unsupported packing {self.packing}. Must be 1, 2 or 4."
-                )
             if not isinstance(self.dtype, Int):
                 raise PaboError("Only integer arrays can be packed.")
+            if not 1 <= self.packing <= 8 * self.dtype.width:
+                raise PaboError(
+                    f"Unsupported packing {self.packing}. Must be from 1 to "
+                    f"{8 * self.dtype.width} bits for {self.dtype.width}-byte elements."
+                )
         _check_bitorder(self.bitorder)
 
     @property
@@ -267,7 +270,10 @@ class Array(Construct):
 
     def _build(self, data, stream, ctx):
         dtype = self.dtype_for(ctx)
-        array = np.asarray(data, dtype=dtype).ravel()
+        try:
+            array = np.asarray(data, dtype=dtype).ravel()
+        except (OverflowError, TypeError, ValueError) as error:
+            raise ValidationError(f"Cannot build {data!r} as {dtype} values: {error}.") from error
         count = self._count(ctx)
         if count >= 0:
             if array.size < count:
@@ -278,12 +284,10 @@ class Array(Construct):
         if self.packing is None:
             stream.write(array.tobytes())
             return array
-        if array.size and (array.min() < 0 or array.max() >= 1 << self.packing):
-            raise ValidationError(f"Values do not fit in {self.packing} bits.")
-        per_byte = 8 // self.packing
-        values = np.zeros(-(-array.size // per_byte) * per_byte, dtype=np.uint8)
-        values[: array.size] = array
-        stream.write(pack(values, nbits=self.packing, bitorder=self.bitorder).tobytes())
+        try:
+            stream.write(pack_bits(array, self.packing, self.bitorder))
+        except PaboError as error:
+            raise ValidationError(error.msg) from None
         return array
 
     def _parse(self, stream, ctx):
@@ -299,11 +303,7 @@ class Array(Construct):
                     f"{self.dtype.width}-byte elements."
                 )
             return np.frombuffer(raw, dtype=self.dtype_for(ctx))
-        values = unpack(
-            np.frombuffer(raw, dtype=np.uint8),
-            nbits=self.packing,
-            bitorder=self.bitorder,
-        )
+        values = unpack_bits(raw, self.packing, self.bitorder)
         if count >= 0:
             values = values[:count]
         return values.astype(self.dtype_for(ctx))

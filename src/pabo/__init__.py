@@ -29,7 +29,7 @@ from pabo.errors import (
     StreamError,
     ValidationError,
 )
-from pabo.bits import Bits
+from pabo.bits import BitFlag, BitInt, BitPadding, Bits, BitStruct
 from pabo.bytes import Bytes, Flag, GreedyBytes, Padding
 from pabo.numeric import Array, Float, Int, VarInt, ZigZag
 from pabo.specify import Specification
@@ -41,7 +41,11 @@ from pabo.wrappers import Sequential as Seq
 __all__ = [
     "Adapted",
     "Array",
+    "BitFlag",
+    "BitInt",
+    "BitPadding",
     "Bits",
+    "BitStruct",
     "Bytes",
     "Check",
     "Computed",

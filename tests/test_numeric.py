@@ -188,7 +188,26 @@ def test_packed_array_validation():
     with pytest.raises(pb.PaboError):
         pb.Array(pb.Float(4), packing=2)
     with pytest.raises(pb.PaboError):
-        pb.Array(pb.Int(1), packing=3)
+        pb.Array(pb.Int(1), packing=9)
+    with pytest.raises(pb.PaboError):
+        pb.Array(pb.Int(1), packing=0)
+
+
+@pytest.mark.parametrize("packing", [3, 5, 12, 16])
+@pytest.mark.parametrize("bitorder", ["big", "little"])
+def test_arbitrary_packing(packing, bitorder):
+    c = pb.Array(pb.Int(2), count=7, packing=packing, bitorder=bitorder)
+    values = [(i * 37) % (1 << packing) for i in range(7)]
+    raw = c.build(values)
+    assert len(raw) == c.size == -(-7 * packing // 8)
+    np.testing.assert_array_equal(c.parse(raw), values)
+    with pytest.raises(pb.ValidationError):
+        c.build([1 << packing] * 7)
+
+
+def test_12_bit_packing_layout():
+    c = pb.Array(pb.Int(2), count=2, packing=12)
+    assert c.build([0xABC, 0x123]) == b"\xab\xc1\x23"
 
 
 def test_packed_array_greedy():

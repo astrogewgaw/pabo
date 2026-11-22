@@ -34,3 +34,53 @@ def test_bits_validation():
         pb.Bits(8).build(b"\x01" * 7)
     with pytest.raises(pb.PaboError):
         pb.Bits(2).build(b"\x01\x02")
+
+
+def test_bitstruct_ipv4_header_byte():
+    c = pb.BitStruct({"version": pb.BitInt(4), "ihl": pb.BitInt(4)})
+    assert c.parse(b"\x45") == {"version": 4, "ihl": 5}
+    assert c.build({"version": 4, "ihl": 5}) == b"\x45"
+    assert c.size == 1
+
+
+def test_bitstruct_flags_padding_and_signed():
+    c = pb.BitStruct(
+        {
+            "a": pb.BitFlag(),
+            "pad": pb.BitPadding(3),
+            "b": pb.BitInt(4, signed=True),
+            "c": pb.BitInt(8),
+        }
+    )
+    raw = c.build({"a": True, "b": -2, "c": 0xAB})
+    assert raw == bytes([0b1000_1110, 0xAB])
+    assert c.parse(raw) == {"a": True, "b": -2, "c": 0xAB}
+
+
+def test_bitstruct_little_bitorder():
+    c = pb.BitStruct({"lo": pb.BitInt(4), "hi": pb.BitInt(12)}, bitorder="little")
+    raw = c.build({"lo": 0x1, "hi": 0xABC})
+    assert int.from_bytes(raw, "little") == 0xABC1
+    assert c.parse(raw) == {"lo": 1, "hi": 0xABC}
+
+
+def test_bitstruct_errors():
+    with pytest.raises(pb.PaboError):
+        pb.BitStruct({"a": pb.BitInt(3)})
+    with pytest.raises(pb.PaboError):
+        pb.BitInt(0)
+    c = pb.BitStruct({"a": pb.BitInt(4), "b": pb.BitInt(4, signed=True)})
+    with pytest.raises(pb.ValidationError):
+        c.build({"a": 16, "b": 0})
+    with pytest.raises(pb.ValidationError):
+        c.build({"a": 0, "b": 8})
+    with pytest.raises(pb.PaboError):
+        c.build({"a": 0})
+    with pytest.raises(pb.StreamError):
+        c.parse(b"")
+
+
+def test_bitstruct_in_spec():
+    spec = pb.Spec({"flags": pb.BitStruct({"x": pb.BitInt(8)}), "n": pb.Int(1)})
+    assert spec.parse(b"\x01\x02") == {"flags": {"x": 1}, "n": 2}
+    assert spec.size == 2
