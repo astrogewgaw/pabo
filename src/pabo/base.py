@@ -4,12 +4,10 @@ Base classes.
 
 import mmap
 from abc import ABC, abstractmethod
-from collections.abc import Generator
-from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, no_type_check
 
 from pabo.context import Context
 from pabo.errors import ContextError, PaboError, SizeofError, StreamError
@@ -61,24 +59,36 @@ def hexdump(raw: bytes, offset: int = 0) -> str:
     return "\n".join(lines)
 
 
-@contextmanager
-def scope(name: str, stream, docs: str = "") -> Generator[None, None, None]:
+class scope:
     """
     Add `name` to the path (and the start offset) of any `PaboError` raised inside.
 
-    `docs` is recorded too, if no field further in already gave one.
+    Use it as `with scope(name, stream):`. `docs` is recorded too, if no field
+    further in already gave one. (A plain class rather than `@contextmanager`,
+    which is faster here and has no generator return hint for beartype to check.)
     """
 
-    start = tell(stream)
-    try:
-        yield
-    except PaboError as error:
-        error.path.insert(0, name)
-        if error.offset is None:
-            error.offset = start
-        if docs and not error.docs:
-            error.docs = docs
-        raise
+    __slots__ = ("docs", "name", "start")
+
+    @no_type_check
+    def __init__(self, name, stream, docs=""):
+        self.name = name
+        self.docs = docs
+        self.start = tell(stream)
+
+    @no_type_check
+    def __enter__(self):
+        return None
+
+    @no_type_check
+    def __exit__(self, kind, error, traceback):
+        if isinstance(error, PaboError):
+            error.path.insert(0, self.name)
+            if error.offset is None:
+                error.offset = self.start
+            if self.docs and not error.docs:
+                error.docs = self.docs
+        return False
 
 
 @dataclass
@@ -226,7 +236,9 @@ class Construct(ABC, Generic[T]):
 
         Files given by path are memory-mapped, so large arrays are read without
         copying (the arrays returned are read-only views of the file), and lazy
-        fields can still be read after `parse` returns.
+        fields can still be read after `parse` returns. While such arrays or
+        lazy values are alive the file stays mapped, and on Windows it then
+        cannot be modified or deleted.
         """
 
         ctx = Context()

@@ -112,9 +112,11 @@ def test_mmapped_arrays_are_zero_copy(tmp_path):
     assert len(data.rest) == 998 * 4
     with pytest.raises(pb.StreamError):
         pb.Spec({"xs": pb.Array(pb.Float(4), count=2000)}).parse(path)
-    path.write_bytes(b"\x00" * 7)
+    # A new file: on Windows, a file cannot be rewritten while it is still mapped.
+    ragged = tmp_path / "ragged.bin"
+    ragged.write_bytes(b"\x00" * 7)
     with pytest.raises(pb.StreamError):
-        pb.Array(pb.Float(4)).parse(path)
+        pb.Array(pb.Float(4)).parse(ragged)
 
 
 def test_parse_empty_file(tmp_path):
