@@ -52,6 +52,10 @@ class Const(Construct):
         return data
 
     def build(self, data=None, src=None, append: bool = False) -> bytes | None:
+        """
+        Build the constant (`data` may be left out).
+        """
+
         return super().build(data, src, append)
 
 
@@ -138,6 +142,10 @@ class Sequential(Construct[list], MutableSequence):
         return data
 
     def insert(self, ix: int, item: Construct) -> None:
+        """
+        Insert a construct before position `ix`.
+        """
+
         self.items.insert(ix, item)
 
 

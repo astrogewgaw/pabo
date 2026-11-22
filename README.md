@@ -60,11 +60,11 @@ which would return a dictionary with the parsed data, like so:
 
 ```python
 {
-     'magic': b'\x89PNG\r\n\x1a\n',
-     'ihdr_size': 13,
-     'ihdr_id': b'IHDR',
-     'width': 602,
-     'height': 172,
+    "magic": b"\x89PNG\r\n\x1a\n",
+    "ihdr_size": 13,
+    "ihdr_id": b"IHDR",
+    "width": 602,
+    "height": 172,
 }
 ```
 

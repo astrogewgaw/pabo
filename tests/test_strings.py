@@ -1,9 +1,9 @@
 import pytest
 from beartype.roar import BeartypeCallHintParamViolation
-
-import pabo as pb
 from hypothesis import given
 from hypothesis import strategies as st
+
+import pabo as pb
 
 
 def test_cstring():
@@ -92,7 +92,9 @@ def test_padded_string_pad_and_side():
 
 
 text = st.text(st.characters(blacklist_categories=["Cs"]))
-no_nulls = st.text(st.characters(blacklist_categories=["Cs"], blacklist_characters="\x00"))
+no_nulls = st.text(
+    st.characters(blacklist_categories=["Cs"], blacklist_characters="\x00")
+)
 
 
 @given(no_nulls, st.sampled_from(["utf-8", "utf-16-le", "utf-16-be", "utf-32-le"]))

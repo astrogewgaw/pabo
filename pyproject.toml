@@ -46,6 +46,7 @@ Documentation = "https://pabo.readthedocs.io/en/latest"
 wheel.py-api = "cp312"
 cmake.build-type = "Release"
 wheel.packages = ["src/pabo"]
+wheel.exclude = ["pabo/*.cpp"]
 build-dir = "build/{wheel_tag}"
 minimum-version = "build-system.requires"
 
@@ -54,6 +55,44 @@ version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.setuptools_scm]
 write_to = "src/pabo/_version.py"
+
+[tool.cibuildwheel]
+# Python 3.12 and later share one stable-ABI (abi3) wheel.
+build = ["cp310-*", "cp311-*", "cp312-*"]
+skip = ["pp*", "*-win32", "*-manylinux_i686", "*-musllinux_i686"]
+test-extras = ["test"]
+test-command = "pytest {project}/tests -p no:cacheprovider"
+build-verbosity = 1
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = ["src/pabo/_version.py", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+  "E501",    # Long lines are left to the formatter.
+  "B905",    # zip() without strict= is fine where lengths are already checked.
+  "RUF001",  # The Korean in error messages is intentional.
+  "RUF012",  # Mutable class attributes are fine on dataclasses here.
+  "SIM105",  # try/except/pass is clearer than contextlib.suppress in hot paths.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pabo/__init__.py" = ["E402", "F401", "F403"]
+"tests/*" = ["B018", "E731"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pabo"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["src/pabo/_version.py"]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportPrivateImportUsage = false
+reportMissingModuleSource = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -81,7 +120,7 @@ ignore-module = false
 ignore-private = true
 ignore-setters = false
 ignore-init-method = true
-ignore-semiprivate = false
+ignore-semiprivate = true
 omit-covered-files = false
 ignore-init-module = false
 ignore-nested-classes = true

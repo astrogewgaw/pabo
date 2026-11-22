@@ -2,7 +2,13 @@ import pytest
 
 import pabo as pb
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0d" + b"IHDR" + b"\x00\x00\x02\x5a" + b"\x00\x00\x00\xac"
+PNG = (
+    b"\x89PNG\r\n\x1a\n"
+    + b"\x00\x00\x00\x0d"
+    + b"IHDR"
+    + b"\x00\x00\x02\x5a"
+    + b"\x00\x00\x00\xac"
+)
 
 
 @pytest.fixture
@@ -110,7 +116,14 @@ def test_embedded():
 
 def test_nested_specs_roundtrip_deeply():
     spec = pb.Spec(
-        {"a": pb.Spec({"b": pb.Spec({"c": pb.Int(2)}), "d": pb.Seq([pb.Int(1), pb.Spec({"e": pb.Int(1)})])})}
+        {
+            "a": pb.Spec(
+                {
+                    "b": pb.Spec({"c": pb.Int(2)}),
+                    "d": pb.Seq([pb.Int(1), pb.Spec({"e": pb.Int(1)})]),
+                }
+            )
+        }
     )
     raw = b"\x01\x00\x02\x03"
     data = spec.parse(raw)
@@ -155,7 +168,9 @@ def test_describe():
     )
     lines = spec.describe().splitlines()
     assert lines[0].split() == ["offset", "size", "field", "type", "docs"]
-    assert lines[1].split()[:3] == ["0", "2", "magic"] and lines[1].endswith("Magic number")
+    assert lines[1].split()[:3] == ["0", "2", "magic"] and lines[1].endswith(
+        "Magic number"
+    )
     assert lines[3].split()[:4] == ["3", "4", "hdr", "Specification(endian='big')"]
     assert lines[4].split()[:3] == ["3", "2", "w"]
     assert lines[6].split()[:3] == ["7", "?", "data"]
@@ -176,7 +191,9 @@ def test_compiled_plan_is_used_and_matches():
     )
     plan = spec._plan(pb.Context())
     assert plan is not None and plan.struct.format == ">2sHid?"
-    raw = b"AB" + b"\x00\x01" + b"\xff\xff\xff\xfe" + b"\x3f\xf8" + b"\x00" * 6 + b"\x02"
+    raw = (
+        b"AB" + b"\x00\x01" + b"\xff\xff\xff\xfe" + b"\x3f\xf8" + b"\x00" * 6 + b"\x02"
+    )
     data = spec.parse(raw)
     assert data == {"magic": b"AB", "a": 1, "b": -2, "c": 1.5, "flag": True}
     assert spec.build(data) == raw[:-1] + b"\x01"
@@ -184,7 +201,9 @@ def test_compiled_plan_is_used_and_matches():
 
 
 def test_compiled_plan_falls_back_for_detailed_errors():
-    spec = pb.Spec({"magic": pb.Const(b"AB", pb.Bytes(2)), "a": pb.u16, "d": pb.Bytes(2)})
+    spec = pb.Spec(
+        {"magic": pb.Const(b"AB", pb.Bytes(2)), "a": pb.u16, "d": pb.Bytes(2)}
+    )
     with pytest.raises(pb.ConstError) as info:
         spec.parse(b"XY\x00\x00ab")
     assert info.value.where == "magic"
@@ -210,10 +229,15 @@ def test_no_plan_for_mixed_or_dynamic_fields():
 
 
 def test_wav_file(tmp_path):
-    chunk = lambda tag, body: pb.Spec(  # noqa: E731
+    chunk = lambda tag, body: pb.Spec(
         {
             "id": pb.Const(tag, pb.Bytes(4)),
-            "size": pb.Rebuild(pb.u32, lambda ctx: body.sizeof(ctx) if tag == b"fmt " else 2 * len(ctx.samples)),
+            "size": pb.Rebuild(
+                pb.u32,
+                lambda ctx: (
+                    body.sizeof(ctx) if tag == b"fmt " else 2 * len(ctx.samples)
+                ),
+            ),
             "_": pb.Embedded(body),
         }
     )
@@ -222,7 +246,9 @@ def test_wav_file(tmp_path):
             "audio_format": pb.u16,
             "channels": pb.u16,
             "rate": pb.u32,
-            "byte_rate": pb.Rebuild(pb.u32, lambda ctx: ctx.rate * ctx.channels * ctx.bits // 8),
+            "byte_rate": pb.Rebuild(
+                pb.u32, lambda ctx: ctx.rate * ctx.channels * ctx.bits // 8
+            ),
             "block_align": pb.Rebuild(pb.u16, lambda ctx: ctx.channels * ctx.bits // 8),
             "bits": pb.u16,
         }
@@ -231,7 +257,9 @@ def test_wav_file(tmp_path):
     wav = pb.Spec(
         {
             "riff": pb.Const(b"RIFF", pb.Bytes(4)),
-            "size": pb.Rebuild(pb.u32, lambda ctx: 4 + 24 + 8 + 2 * len(ctx.data.samples)),
+            "size": pb.Rebuild(
+                pb.u32, lambda ctx: 4 + 24 + 8 + 2 * len(ctx.data.samples)
+            ),
             "wave": pb.Const(b"WAVE", pb.Bytes(4)),
             "fmt": chunk(b"fmt ", fmt),
             "data": chunk(b"data", data),
@@ -252,7 +280,9 @@ def test_wav_file(tmp_path):
         f.writeframes(samples.tobytes())
 
     parsed = wav.parse(path)
-    assert parsed.fmt.channels == 1 and parsed.fmt.rate == 8000 and parsed.fmt.bits == 16
+    assert (
+        parsed.fmt.channels == 1 and parsed.fmt.rate == 8000 and parsed.fmt.bits == 16
+    )
     np.testing.assert_array_equal(parsed.data.samples, samples)
     built = wav.build(
         {
@@ -265,7 +295,7 @@ def test_wav_file(tmp_path):
 
 def _elf_spec():
     def body(endian):
-        word = lambda ctx: ctx._.ident.cls == 2  # noqa: E731
+        word = lambda ctx: ctx._.ident.cls == 2
         addr = pb.If(word, pb.u64, pb.u32)
         return pb.Spec(
             {
@@ -299,7 +329,9 @@ def _elf_spec():
                     "pad": pb.Padding(7),
                 }
             ),
-            "header": pb.Switch(lambda ctx: ctx.ident.data, {1: body("little"), 2: body("big")}),
+            "header": pb.Switch(
+                lambda ctx: ctx.ident.data, {1: body("little"), 2: body("big")}
+            ),
         }
     )
 
@@ -307,8 +339,11 @@ def _elf_spec():
 def test_elf_header_of_running_python():
     import sys
 
-    if not sys.executable or not open(sys.executable, "rb").read(4) == b"\x7fELF":
-        pytest.skip("Not running from an ELF binary.")
+    if not sys.executable:
+        pytest.skip("No Python executable.")
+    with open(sys.executable, "rb") as f:
+        if f.read(4) != b"\x7fELF":
+            pytest.skip("Not running from an ELF binary.")
     elf = _elf_spec()
     data = elf.parse(sys.executable)
     assert data.ident.cls in (1, 2) and data.ident.data in (1, 2)
@@ -318,9 +353,19 @@ def test_elf_header_of_running_python():
 def test_elf_header_both_endians():
     elf = _elf_spec()
     values = {
-        "type": 2, "machine": 62, "version": 1, "entry": 0x401000, "phoff": 64,
-        "shoff": 4096, "flags": 0, "ehsize": 64, "phentsize": 56, "phnum": 2,
-        "shentsize": 64, "shnum": 5, "shstrndx": 4,
+        "type": 2,
+        "machine": 62,
+        "version": 1,
+        "entry": 0x401000,
+        "phoff": 64,
+        "shoff": 4096,
+        "flags": 0,
+        "ehsize": 64,
+        "phentsize": 56,
+        "phnum": 2,
+        "shentsize": 64,
+        "shnum": 5,
+        "shstrndx": 4,
     }
     for data_byte in (1, 2):
         ident = {"cls": 2, "data": data_byte, "version": 1, "osabi": 0, "abiversion": 0}
@@ -358,9 +403,14 @@ def test_sigproc_filterbank_header():
     filterbank = pb.Spec(
         {
             "header": header,
-            "meta": pb.Computed(lambda ctx: {e.key: e.value for e in ctx.header.entries}),
+            "meta": pb.Computed(
+                lambda ctx: {e.key: e.value for e in ctx.header.entries}
+            ),
             "data": pb.Array(
-                pb.u8, count=lambda ctx: ctx.meta["nchans"] * 2, packing=2, bitorder="little"
+                pb.u8,
+                count=lambda ctx: ctx.meta["nchans"] * 2,
+                packing=2,
+                bitorder="little",
             ),
         }
     )
@@ -378,7 +428,9 @@ def test_sigproc_filterbank_header():
     assert raw_header.startswith(b"\x0c\x00\x00\x00HEADER_START")
     assert raw_header.endswith(b"\x0a\x00\x00\x00HEADER_END")
     samples = [i % 4 for i in range(16)]
-    raw = raw_header + pb.Array(pb.u8, count=16, packing=2, bitorder="little").build(samples)
+    raw = raw_header + pb.Array(pb.u8, count=16, packing=2, bitorder="little").build(
+        samples
+    )
     data = filterbank.parse(raw)
     assert data.meta["source_name"] == "J0437-4715"
     assert data.meta["tsamp"] == 6.4e-5 and data.meta["nchans"] == 8

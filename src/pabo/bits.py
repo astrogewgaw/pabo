@@ -122,13 +122,10 @@ class BitStruct(Construct[Container]):
         Yield (name, spec, shift) for every field.
         """
 
-        total = self._size(None) * 8
+        total = sum(spec.nbits for spec in self.fields.values())
         used = 0
         for name, spec in self.fields.items():
-            if self.bitorder == "big":
-                shift = total - used - spec.nbits
-            else:
-                shift = used
+            shift = total - used - spec.nbits if self.bitorder == "big" else used
             used += spec.nbits
             yield name, spec, shift
 
@@ -143,7 +140,11 @@ class BitStruct(Construct[Container]):
             if name not in data:
                 raise PaboError(f"Missing bit field {name!r}.")
             field_value = int(data[name])
-            lo, hi = (-(1 << (spec.nbits - 1)), 1 << (spec.nbits - 1)) if spec.signed else (0, 1 << spec.nbits)
+            lo, hi = (
+                (-(1 << (spec.nbits - 1)), 1 << (spec.nbits - 1))
+                if spec.signed
+                else (0, 1 << spec.nbits)
+            )
             if not lo <= field_value < hi:
                 raise ValidationError(
                     f"The value {field_value} of bit field {name!r} does not fit in {spec.nbits} bits."

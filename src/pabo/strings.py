@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pabo.base import Construct, read_exactly
+from pabo.bytes import Bytes
 from pabo.context import Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
-from pabo.bytes import Bytes
 from pabo.numeric import Int
 from pabo.wrappers import Prefixed
 

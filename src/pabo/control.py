@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pabo.base import Construct, Stop, scope, tell
-from pabo.context import Dynamic, evaluate
+from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
 
 
@@ -182,7 +182,9 @@ class RepeatUntil(Construct[list]):
             built.append(value)
             if self.predicate(value, ctx):
                 return built
-        raise ValidationError("No element satisfies the predicate, so nothing ends the list.")
+        raise ValidationError(
+            "No element satisfies the predicate, so nothing ends the list."
+        )
 
     def _parse(self, stream, ctx):
         data = []
@@ -238,7 +240,9 @@ class Terminated(Construct):
 
     def _parse(self, stream, ctx):
         if stream.read(1):
-            raise StreamError(f"Expected the end of the stream, at offset {tell(stream)}.")
+            raise StreamError(
+                f"Expected the end of the stream, at offset {tell(stream)}."
+            )
         return None
 
 

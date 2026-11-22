@@ -13,10 +13,9 @@ import numpy as np
 from pabo.base import Construct, read_exactly
 from pabo.context import Context, Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
-from pabo.packing import pack_bits, unpack_bits
+from pabo.packing import BitOrder, pack_bits, unpack_bits
 
 Endian = Literal["little", "big", "native"]
-BitOrder = Literal["big", "little"]
 
 ENDIANS = {"little": "<", "big": ">", "native": "="}
 INT_CODES = {1: "b", 2: "h", 4: "i", 8: "q"}
@@ -77,7 +76,9 @@ class _Fixed(Construct):
         try:
             stream.write(struct.pack(fmt, data))
         except struct.error as error:
-            raise ValidationError(f"Cannot build {data!r} as {self!r}: {error}.") from error
+            raise ValidationError(
+                f"Cannot build {data!r} as {self!r}: {error}."
+            ) from error
         return data
 
     def _parse(self, stream, ctx):
@@ -100,18 +101,28 @@ class Int(_Fixed):
 
     def __post_init__(self):
         if self.width < 1:
-            raise PaboError(f"Unsupported integer width {self.width}. Must be positive.")
+            raise PaboError(
+                f"Unsupported integer width {self.width}. Must be positive."
+            )
         _check_endian(self.endian)
 
     def format_for(self, endian: str) -> str:
+        """
+        The `struct` format for the given endianness (only for 1, 2, 4 or 8 bytes).
+        """
+
         if self.width not in INT_CODES:
-            raise PaboError(f"There is no struct format for {self.width}-byte integers.")
+            raise PaboError(
+                f"There is no struct format for {self.width}-byte integers."
+            )
         code = INT_CODES[self.width]
         return ENDIANS[endian] + (code if self.signed else code.upper())
 
-    def _byteorder(self, ctx) -> str:
+    def _byteorder(self, ctx) -> Literal["little", "big"]:
         endian = resolve_endian(self.endian, ctx)
-        return sys.byteorder if endian == "native" else endian
+        if endian == "native":
+            return sys.byteorder
+        return "big" if endian == "big" else "little"
 
     def _build(self, data, stream, ctx):
         if self.width in INT_CODES:
@@ -119,7 +130,9 @@ class Int(_Fixed):
         try:
             raw = data.to_bytes(self.width, self._byteorder(ctx), signed=self.signed)
         except (AttributeError, OverflowError) as error:
-            raise ValidationError(f"Cannot build {data!r} as {self!r}: {error}.") from error
+            raise ValidationError(
+                f"Cannot build {data!r} as {self!r}: {error}."
+            ) from error
         stream.write(raw)
         return data
 
@@ -147,6 +160,10 @@ class Float(_Fixed):
         _check_endian(self.endian)
 
     def format_for(self, endian: str) -> str:
+        """
+        The `struct` format for the given endianness.
+        """
+
         return ENDIANS[endian] + FLOAT_CODES[self.width]
 
 
@@ -257,7 +274,9 @@ class Array(Construct):
             return count * self.dtype.width
         return -(-count * self.packing // 8)
 
-    def _parse_mapped(self, stream: mmap.mmap, count: int, dtype: np.dtype) -> np.ndarray:
+    def _parse_mapped(
+        self, stream: mmap.mmap, count: int, dtype: np.dtype
+    ) -> np.ndarray:
         """
         Return a read-only view of the memory-mapped file, without copying.
         """
@@ -266,12 +285,16 @@ class Array(Construct):
         available = len(stream) - start
         nbytes = self._nbytes(count) if count >= 0 else available
         if nbytes > available:
-            raise StreamError(f"Stream ended early: expected {nbytes} bytes, got {available}.")
+            raise StreamError(
+                f"Stream ended early: expected {nbytes} bytes, got {available}."
+            )
         if nbytes % dtype.itemsize:
             raise StreamError(
                 f"{nbytes} bytes is not a whole number of {dtype.itemsize}-byte elements."
             )
-        array = np.frombuffer(stream, dtype=dtype, count=nbytes // dtype.itemsize, offset=start)
+        array = np.frombuffer(
+            stream, dtype=dtype, count=nbytes // dtype.itemsize, offset=start
+        )
         stream.seek(start + nbytes)
         return array
 
@@ -286,7 +309,9 @@ class Array(Construct):
         while got < nbytes:
             n = stream.readinto(view[got:])
             if not n:
-                raise StreamError(f"Stream ended early: expected {nbytes} bytes, got {got}.")
+                raise StreamError(
+                    f"Stream ended early: expected {nbytes} bytes, got {got}."
+                )
             got += n
         return array
 
@@ -307,7 +332,9 @@ class Array(Construct):
         try:
             array = np.asarray(data, dtype=dtype).ravel()
         except (OverflowError, TypeError, ValueError) as error:
-            raise ValidationError(f"Cannot build {data!r} as {dtype} values: {error}.") from error
+            raise ValidationError(
+                f"Cannot build {data!r} as {dtype} values: {error}."
+            ) from error
         count = self._count(ctx)
         if count >= 0:
             if array.size < count:
@@ -330,10 +357,7 @@ class Array(Construct):
             return self._parse_mapped(stream, count, self.dtype_for(ctx))
         if self.packing is None and count >= 0 and hasattr(stream, "readinto"):
             return self._parse_into(stream, count, self.dtype_for(ctx))
-        if count >= 0:
-            raw = read_exactly(stream, self._nbytes(count))
-        else:
-            raw = stream.read()
+        raw = read_exactly(stream, self._nbytes(count)) if count >= 0 else stream.read()
         if self.packing is None:
             if len(raw) % self.dtype.width:
                 raise StreamError(

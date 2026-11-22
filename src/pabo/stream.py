@@ -24,7 +24,9 @@ def _seek(stream, offset: int, whence: int = 0) -> int:
         stream.seek(offset, whence)
         return stream.tell()
     except (AttributeError, OSError, ValueError) as error:
-        raise StreamError(f"Cannot seek to {offset} (whence={whence}): {error}.") from error
+        raise StreamError(
+            f"Cannot seek to {offset} (whence={whence}): {error}."
+        ) from error
 
 
 @dataclass

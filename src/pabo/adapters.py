@@ -2,9 +2,10 @@
 Adapters that turn raw values into richer Python objects.
 """
 
-import enum
-from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum as PyEnum
+from enum import IntFlag
 from typing import Any
 
 from pabo.base import Construct
@@ -27,12 +28,12 @@ class Enum(Construct):
     """
 
     wraps: Construct
-    enum: type[enum.Enum]
+    enum: type[PyEnum]
 
     def _size(self, ctx):
         return self.wraps._size(ctx)
 
-    def _member(self, data) -> enum.Enum:
+    def _member(self, data) -> PyEnum:
         try:
             if isinstance(data, str) and not isinstance(data, self.enum):
                 return self.enum[data]
@@ -60,7 +61,7 @@ class FlagsEnum(Construct):
     """
 
     wraps: Construct
-    flags: type[enum.IntFlag]
+    flags: type[IntFlag]
 
     def _size(self, ctx):
         return self.wraps._size(ctx)
@@ -96,7 +97,9 @@ class Timestamp(Construct[datetime]):
                 f"Unknown epoch {self.epoch!r}. Must be one of {list(EPOCHS)} or a datetime."
             )
         if not isinstance(self.epoch, (str, datetime)):
-            raise PaboError(f"The epoch must be a str or a datetime, got {self.epoch!r}.")
+            raise PaboError(
+                f"The epoch must be a str or a datetime, got {self.epoch!r}."
+            )
 
     def _origin(self) -> tuple[datetime, float]:
         if isinstance(self.epoch, str):

@@ -43,7 +43,9 @@ class Transformed(Construct):
     def _size(self, ctx):
         size = evaluate(self.length, ctx)
         if size < 0:
-            raise SizeofError("A Transformed construct without a length has no fixed size.")
+            raise SizeofError(
+                "A Transformed construct without a length has no fixed size."
+            )
         return size
 
     def _build(self, data, stream, ctx):
@@ -69,7 +71,9 @@ class Transformed(Construct):
         return self.wraps._parse(BytesIO(decoded), ctx)
 
 
-def Compressed(wraps: Construct, codec: str = "zlib", length: Dynamic = -1) -> Transformed:
+def Compressed(
+    wraps: Construct, codec: str = "zlib", length: Dynamic = -1
+) -> Transformed:
     """
     `wraps`, compressed with "zlib", "gzip", "bz2" or "lzma".
 

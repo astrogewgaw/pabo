@@ -104,10 +104,10 @@ class This:
     def __getattr__(self, name: str) -> "This":
         if name.startswith("__"):
             raise AttributeError(name)
-        return This(self.__path + (name,))
+        return This((*self.__path, name))
 
     def __getitem__(self, name: str) -> "This":
-        return This(self.__path + (name,))
+        return This((*self.__path, name))
 
     def __setattr__(self, name: str, value: Any) -> None:
         raise AttributeError("References are read-only.")
@@ -130,7 +130,7 @@ class This:
         return value
 
     def __repr__(self) -> str:
-        return ".".join(("this",) + self.__path)
+        return ".".join(("this", *self.__path))
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, This) and self.__path == other.__path

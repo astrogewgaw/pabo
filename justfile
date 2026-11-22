@@ -29,6 +29,13 @@ default:
 @test: && clean
   pytest -vv tests
 
+# Lint, check formatting, type-check and check docstring coverage.
+@lint:
+  ruff check .
+  ruff format --check .
+  pyright src
+  interrogate src
+
 # Run tests with a coverage report.
 @cov: && clean
   pytest --cov --cov-report=term tests

@@ -8,7 +8,9 @@ from pabo import this
 
 
 def test_seek_and_tell():
-    spec = pb.Spec({"a": pb.Int(1), "pos": pb.Tell(), "skip": pb.Seek(3), "b": pb.Int(1)})
+    spec = pb.Spec(
+        {"a": pb.Int(1), "pos": pb.Tell(), "skip": pb.Seek(3), "b": pb.Int(1)}
+    )
     assert spec.parse(b"\x01\x00\x00\x02") == {"a": 1, "pos": 1, "skip": 3, "b": 2}
     stream = BytesIO(b"\x00" * 4)
     spec.build({"a": 1, "b": 2}, stream)
@@ -66,7 +68,9 @@ def test_aligned_spec():
 
 
 def test_lazy():
-    spec = pb.Spec({"n": pb.Int(1), "data": pb.Lazy(pb.Bytes(this.n)), "end": pb.Int(1)})
+    spec = pb.Spec(
+        {"n": pb.Int(1), "data": pb.Lazy(pb.Bytes(this.n)), "end": pb.Int(1)}
+    )
     data = spec.parse(b"\x03abc\x09")
     assert isinstance(data.data, pb.LazyValue)
     assert "not parsed" in repr(data.data)
@@ -96,7 +100,13 @@ def test_mmapped_arrays_are_zero_copy(tmp_path):
     np.testing.assert_array_equal(data.xs, values)
     assert not data.xs.flags.writeable
     assert not data.xs.flags.owndata
-    counted = pb.Spec({"tag": pb.Int(1), "xs": pb.Array(pb.Float(4), count=2), "rest": pb.GreedyBytes()})
+    counted = pb.Spec(
+        {
+            "tag": pb.Int(1),
+            "xs": pb.Array(pb.Float(4), count=2),
+            "rest": pb.GreedyBytes(),
+        }
+    )
     data = counted.parse(path)
     np.testing.assert_array_equal(data.xs, [0, 1])
     assert len(data.rest) == 998 * 4

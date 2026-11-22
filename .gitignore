@@ -16,3 +16,6 @@ src/pabo/_version.py
 *.so
 *.egg
 *.egg-info
+.hypothesis
+.benchmarks
+coverage.xml

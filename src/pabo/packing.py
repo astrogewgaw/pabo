@@ -2,10 +2,14 @@
 Packing and unpacking of integers narrower than a byte (or not byte-aligned).
 """
 
+from typing import Literal
+
 import numpy as np
 
 from pabo import packed
 from pabo.errors import PaboError
+
+BitOrder = Literal["big", "little"]
 
 
 def _check(nbits: int, bitorder: str) -> None:
@@ -15,7 +19,7 @@ def _check(nbits: int, bitorder: str) -> None:
         raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
 
 
-def unpack_bits(raw, nbits: int, bitorder: str = "big") -> np.ndarray:
+def unpack_bits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
     """
     Unpack every `nbits`-bit integer from the bytes in `raw`.
 
@@ -46,7 +50,7 @@ def unpack_bits(raw, nbits: int, bitorder: str = "big") -> np.ndarray:
     return values
 
 
-def pack_bits(values, nbits: int, bitorder: str = "big") -> bytes:
+def pack_bits(values, nbits: int, bitorder: BitOrder = "big") -> bytes:
     """
     Pack non-negative integers into `nbits` bits each (the inverse of `unpack_bits`).
 
@@ -55,7 +59,9 @@ def pack_bits(values, nbits: int, bitorder: str = "big") -> bytes:
 
     _check(nbits, bitorder)
     values = np.asarray(values).ravel()
-    if values.size and (values.min() < 0 or (nbits < 64 and values.max() >= 1 << nbits)):
+    if values.size and (
+        values.min() < 0 or (nbits < 64 and values.max() >= 1 << nbits)
+    ):
         raise PaboError(f"Values do not fit in {nbits} bits.")
     values = values.astype(np.uint64)
     if nbits in (1, 2, 4):

@@ -2,15 +2,14 @@
 Specifications for binary data.
 """
 
-from dataclasses import dataclass, field
-
 import struct
 import sys
+from dataclasses import dataclass, field
 from typing import no_type_check
 
 from pabo.base import Construct, Stop, hexdump, scope, tell
-from pabo.context import Container, Context
 from pabo.bytes import Bytes, Flag
+from pabo.context import Container, Context
 from pabo.errors import PaboError
 from pabo.numeric import ENDIANS, INT_CODES, Endian, Float, Int, _check_endian
 from pabo.wrappers import Const
@@ -49,13 +48,13 @@ class Specification(Construct[Container]):
     @no_type_check
     def _size_fields(self, child: Context) -> int:
         total = 0
-        for name, field in self.fields.items():
-            if isinstance(field, Embedded):
-                total += field.wraps._size_fields(child)
+        for name, member in self.fields.items():
+            if isinstance(member, Embedded):
+                total += member.wraps._size_fields(child)
                 continue
             value = child.get(name)
             sub = Context(value, parent=child) if isinstance(value, dict) else child
-            total += field._size(sub)
+            total += member._size(sub)
         return total
 
     @no_type_check
@@ -86,7 +85,9 @@ class Specification(Construct[Container]):
             stream.seek(start)
             return None
         names = plan.names
-        return [Container(zip(names, values)) for values in plan.struct.iter_unpack(raw)]
+        return [
+            Container(zip(names, values)) for values in plan.struct.iter_unpack(raw)
+        ]
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, dict):
@@ -106,27 +107,30 @@ class Specification(Construct[Container]):
 
     @no_type_check
     def _build_fields(self, stream, child: Context) -> None:
-        for name, field in self.fields.items():
-            if isinstance(field, Embedded):
-                field.wraps._build_fields(stream, child)
+        for name, member in self.fields.items():
+            if isinstance(member, Embedded):
+                member.wraps._build_fields(stream, child)
                 continue
-            with scope(name, stream, field.docs):
+            with scope(name, stream, member.docs):
                 if name in child:
                     value = child[name]
-                elif field._omittable():
+                elif member._omittable():
                     value = None
                 else:
                     raise PaboError(
                         f"Missing field {name!r}. Data not according to specification."
                     )
-                child[name] = field._build(value, stream, child)
+                child[name] = member._build(value, stream, child)
 
     def _parse(self, stream, ctx):
         child = self._child((), ctx)
         if not child.setting("_trace"):
             plan = self._plan(child)
-            start = tell(stream) if plan is not None else None
-            if start is not None and plan.unpack(stream, child):
+            if (
+                plan is not None
+                and tell(stream) is not None
+                and plan.unpack(stream, child)
+            ):
                 return Container(child)
         try:
             self._parse_fields(stream, child)
@@ -137,13 +141,13 @@ class Specification(Construct[Container]):
     @no_type_check
     def _parse_fields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
-        for name, field in self.fields.items():
-            if isinstance(field, Embedded):
-                field.wraps._parse_fields(stream, child)
+        for name, member in self.fields.items():
+            if isinstance(member, Embedded):
+                member.wraps._parse_fields(stream, child)
                 continue
             start = tell(stream) if trace else None
-            with scope(name, stream, field.docs):
-                child[name] = field._parse(stream, child)
+            with scope(name, stream, member.docs):
+                child[name] = member._parse(stream, child)
             if trace:
                 _trace_field(trace, stream, child, name, start, child[name])
 
@@ -161,18 +165,18 @@ class Specification(Construct[Container]):
         yield from rows
 
     def _field_rows(self, depth, offset):
-        for name, field in self.fields.items():
-            if isinstance(field, Embedded):
-                rows = list(field.wraps._field_rows(depth, offset))
+        for name, member in self.fields.items():
+            if isinstance(member, Embedded):
+                rows = list(member.wraps._field_rows(depth, offset))
             else:
-                rows = list(field._rows(name, depth, offset))
+                rows = list(member._rows(name, depth, offset))
             yield from rows
             top = [row for row in rows if row[3] == depth]
             sizes = [row[1] for row in top]
             if offset is None or any(size is None for size in sizes):
                 offset = None
             else:
-                offset += sum(sizes)
+                offset += sum(size or 0 for size in sizes)
 
 
 @dataclass
@@ -197,9 +201,11 @@ class Embedded(Construct[Container]):
         return self.wraps._parse(stream, ctx)
 
 
-def _trace_field(trace, stream, ctx: Context, name: str, start: int | None, value) -> None:
+def _trace_field(
+    trace, stream, ctx: Context, name: str, start: int | None, value
+) -> None:
     """
-    Print a parsed field, with the bytes it came from, for `parse(..., trace=True)`.
+    Print a parsed member, with the bytes it came from, for `parse(..., trace=True)`.
     """
 
     file = trace if hasattr(trace, "write") else sys.stderr
@@ -255,7 +261,11 @@ class _Plan:
                 if (construct.endian or endian) != endian:
                     return None
                 codes.append(construct.format_for(endian)[1:])
-            elif type(construct) is Bytes and isinstance(construct.count, int) and construct.count >= 0:
+            elif (
+                type(construct) is Bytes
+                and isinstance(construct.count, int)
+                and construct.count >= 0
+            ):
                 codes.append(f"{construct.count}s")
                 lengths[name] = construct.count
             elif type(construct) is Flag:
@@ -265,7 +275,13 @@ class _Plan:
             names.append(name)
         if not names:
             return None
-        return cls(names, codes, struct.Struct(ENDIANS[endian] + "".join(codes)), consts, lengths)
+        return cls(
+            names,
+            codes,
+            struct.Struct(ENDIANS[endian] + "".join(codes)),
+            consts,
+            lengths,
+        )
 
     @no_type_check
     def unpack(self, stream, ctx: Context) -> bool:
@@ -295,7 +311,8 @@ class _Plan:
             else:
                 return None
             if name in self.lengths and (
-                not isinstance(value, (bytes, bytearray)) or len(value) != self.lengths[name]
+                not isinstance(value, (bytes, bytearray))
+                or len(value) != self.lengths[name]
             ):
                 return None
             values.append(value)

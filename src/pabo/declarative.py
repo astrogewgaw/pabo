@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 
 from pabo.base import Construct
 from pabo.context import Container
+from pabo.numeric import Endian
 from pabo.specify import Specification
 from pabo.wrappers import Const
 
@@ -39,7 +40,7 @@ class Struct:
     __pabo_fields__: ClassVar[dict[str, Construct]] = {}
     __pabo_spec__: ClassVar[Specification]
 
-    def __init_subclass__(cls, endian: str | None = None, **kwargs: Any):
+    def __init_subclass__(cls, endian: Endian | None = None, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         inherited = getattr(cls, "__pabo_spec__", None)
         fields = dict(cls.__pabo_fields__)

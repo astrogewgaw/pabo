@@ -4,7 +4,13 @@ import pytest
 
 import pabo as pb
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0d" + b"IHDR" + b"\x00\x00\x02\x5a" + b"\x00\x00\x00\xac"
+PNG = (
+    b"\x89PNG\r\n\x1a\n"
+    + b"\x00\x00\x00\x0d"
+    + b"IHDR"
+    + b"\x00\x00\x02\x5a"
+    + b"\x00\x00\x00\xac"
+)
 
 
 class PNGHeader(pb.Struct, endian="big"):

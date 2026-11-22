@@ -11,7 +11,9 @@ def test_pack_unpack_roundtrip(nbits, bitorder):
     values = rng.integers(0, 2**nbits, size=64, dtype=np.uint8)
     packed = pack(values, nbits=nbits, bitorder=bitorder)
     assert packed.size == values.size * nbits // 8
-    np.testing.assert_array_equal(unpack(packed, nbits=nbits, bitorder=bitorder), values)
+    np.testing.assert_array_equal(
+        unpack(packed, nbits=nbits, bitorder=bitorder), values
+    )
 
 
 @pytest.mark.parametrize("bitorder", ["big", "little"])

@@ -225,9 +225,9 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 
 ## 5. Packaging and CI
 
-- [ ] **Add a CI workflow** that runs tests and lint on push and PR, across a
+- [x] **Add a CI workflow** that runs tests and lint on push and PR, across a
       Python × OS matrix. Currently only a release workflow exists.
-- [ ] Modernise `release.yml`:
+- [x] Modernise `release.yml`:
       - `actions/upload-artifact@v3` and `download-artifact@v3` have been shut down, so
         move to `@v4`. With v4, artifact names must be unique per matrix job, so download
         with `pattern:` and `merge-multiple: true`.
@@ -236,14 +236,17 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       - `actions/checkout@v3` → `@v4`, and `gh-action-pypi-publish@v1.5.1` → `release/v1`
         with **trusted publishing** instead of `PYPI_PASSWORD`.
       - Add `fetch-depth: 0` to the checkout so `setuptools-scm` sees tags.
-- [ ] Configure `[tool.cibuildwheel]` (skip PyPy/musl if unsupported, run tests in the
+- [x] Configure `[tool.cibuildwheel]` (skip PyPy/musl if unsupported, run tests in the
       wheels).
-- [ ] Add `[project.optional-dependencies]` groups for `docs` and `dev` (`test` exists).
-- [ ] Ship `py.typed` and type the public API properly (`parse` return types, generics on
+- [x] Add `[project.optional-dependencies]` groups for `docs` and `dev` (`test` exists).
+- [x] Ship `py.typed` and type the public API properly (`parse` return types, generics on
       `Construct[T]`).
-- [ ] Expose `pabo.__version__`.
-- [ ] Add `ruff` (lint and format) and `mypy`/`pyright` config, plus `pre-commit`.
-- [ ] Add a `.pyi` stub for the `packed` extension.
+- [x] Expose `pabo.__version__`.
+- [x] Add `ruff` (lint and format) and `mypy`/`pyright` config, plus `pre-commit`.
+      (ruff, pyright in basic mode, and interrogate all pass; `ignore-semiprivate` is
+      now on, since the `_size`/`_parse`/`_build` hooks are documented once on
+      `Construct`.)
+- [x] Add a `.pyi` stub for the `packed` extension.
 
 ## 6. Documentation
 

@@ -121,8 +121,12 @@ def test_beartype_can_be_disabled():
 
     code = "import pabo; pabo.Int('x')"
     env = {**os.environ, "PABO_BEARTYPE": "0"}
-    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True
+    )
     assert "Beartype" not in result.stderr
     env["PABO_BEARTYPE"] = "1"
-    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True
+    )
     assert "BeartypeCallHintParamViolation" in result.stderr

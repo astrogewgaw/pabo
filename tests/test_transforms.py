@@ -30,7 +30,11 @@ def test_compressed_inside_prefixed():
 def test_compressed_with_size():
     payload = zlib.compress(b"abc")
     spec = pb.Spec(
-        {"n": pb.Int(1), "body": pb.Compressed(pb.GreedyBytes(), length=pb.this.n), "x": pb.Int(1)}
+        {
+            "n": pb.Int(1),
+            "body": pb.Compressed(pb.GreedyBytes(), length=pb.this.n),
+            "x": pb.Int(1),
+        }
     )
     raw = bytes([len(payload)]) + payload + b"\x05"
     assert spec.parse(raw) == {"n": len(payload), "body": b"abc", "x": 5}
@@ -49,7 +53,7 @@ def test_transform_errors():
 
 
 def test_transformed_custom():
-    xor = lambda raw: bytes(b ^ 0xFF for b in raw)  # noqa: E731
+    xor = lambda raw: bytes(b ^ 0xFF for b in raw)
     c = pb.Transformed(pb.Int(2), xor, xor, length=2)
     assert c.build(1) == b"\xfe\xff"
     assert c.parse(b"\xfe\xff") == 1

@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 from beartype.roar import BeartypeCallHintParamViolation
-
-import pabo as pb
 from hypothesis import given
 from hypothesis import strategies as st
+
+import pabo as pb
 
 
 @pytest.mark.parametrize("width", [1, 2, 4, 8])
@@ -63,7 +63,13 @@ def test_half_float():
 
 @pytest.mark.parametrize(
     "value, raw",
-    [(0, b"\x00"), (1, b"\x01"), (127, b"\x7f"), (128, b"\x80\x01"), (300, b"\xac\x02")],
+    [
+        (0, b"\x00"),
+        (1, b"\x01"),
+        (127, b"\x7f"),
+        (128, b"\x80\x01"),
+        (300, b"\xac\x02"),
+    ],
 )
 def test_varint(value, raw):
     assert pb.VarInt().build(value) == raw
@@ -107,7 +113,14 @@ def test_endianness_inherited_from_spec():
         },
         endian="big",
     )
-    raw = b"\x00\x01" + b"\x01\x00" + b"\x3f\x80\x00\x00" + b"\x00\x00\x01" + b"\x00\x01" + b"\x00\x01"
+    raw = (
+        b"\x00\x01"
+        + b"\x01\x00"
+        + b"\x3f\x80\x00\x00"
+        + b"\x00\x00\x01"
+        + b"\x00\x01"
+        + b"\x00\x01"
+    )
     data = spec.parse(raw)
     assert (data.a, data.b, data.c, data.d, data.inner.f) == (1, 1, 1.0, 1, 1)
     assert data.e.dtype == np.dtype(">u2")
@@ -245,7 +258,6 @@ def test_array_reads_from_short_reads():
 
     parsed = pb.Array(pb.Int(2), count=2).parse(Trickle(b"\x01\x00\x02\x00"))
     np.testing.assert_array_equal(parsed, [1, 2])
-
 
 
 @given(
