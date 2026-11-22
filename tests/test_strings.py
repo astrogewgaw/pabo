@@ -2,6 +2,8 @@ import pytest
 from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 def test_cstring():
@@ -87,3 +89,31 @@ def test_padded_string_pad_and_side():
         pb.PaddedString(5, pad="ab")
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.PaddedString(5, side="middle")
+
+
+text = st.text(st.characters(blacklist_categories=["Cs"]))
+no_nulls = st.text(st.characters(blacklist_categories=["Cs"], blacklist_characters="\x00"))
+
+
+@given(no_nulls, st.sampled_from(["utf-8", "utf-16-le", "utf-16-be", "utf-32-le"]))
+def test_cstring_roundtrip_property(value, code):
+    c = pb.CString(code)
+    assert c.parse(c.build(value) + b"rest") == value
+
+
+@given(text, st.sampled_from(["utf-8", "utf-16-le"]))
+def test_pascal_string_roundtrip_property(value, code):
+    c = pb.PascalString(pb.Int(4), code)
+    assert c.parse(c.build(value)) == value
+
+
+@given(no_nulls.filter(lambda s: len(s.encode()) <= 32))
+def test_padded_string_roundtrip_property(value):
+    c = pb.PaddedString(32)
+    assert c.parse(c.build(value)) == value
+
+
+@given(text.filter(lambda s: "\r\n" not in s and not s.endswith("\r")))
+def test_line_roundtrip_property(value):
+    c = pb.Line()
+    assert c.parse(c.build(value)) == value

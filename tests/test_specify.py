@@ -204,3 +204,182 @@ def test_no_plan_for_mixed_or_dynamic_fields():
     assert pb.Spec({"a": pb.u16le, "b": pb.u16be})._plan(pb.Context()) is None
     assert pb.Spec({"n": pb.u8, "d": pb.Bytes(pb.this.n)})._plan(pb.Context()) is None
     assert pb.Spec({})._plan(pb.Context()) is None
+
+
+# Real-world formats.
+
+
+def test_wav_file(tmp_path):
+    chunk = lambda tag, body: pb.Spec(  # noqa: E731
+        {
+            "id": pb.Const(tag, pb.Bytes(4)),
+            "size": pb.Rebuild(pb.u32, lambda ctx: body.sizeof(ctx) if tag == b"fmt " else 2 * len(ctx.samples)),
+            "_": pb.Embedded(body),
+        }
+    )
+    fmt = pb.Spec(
+        {
+            "audio_format": pb.u16,
+            "channels": pb.u16,
+            "rate": pb.u32,
+            "byte_rate": pb.Rebuild(pb.u32, lambda ctx: ctx.rate * ctx.channels * ctx.bits // 8),
+            "block_align": pb.Rebuild(pb.u16, lambda ctx: ctx.channels * ctx.bits // 8),
+            "bits": pb.u16,
+        }
+    )
+    data = pb.Spec({"samples": pb.Array(pb.i16, count=lambda ctx: ctx.size // 2)})
+    wav = pb.Spec(
+        {
+            "riff": pb.Const(b"RIFF", pb.Bytes(4)),
+            "size": pb.Rebuild(pb.u32, lambda ctx: 4 + 24 + 8 + 2 * len(ctx.data.samples)),
+            "wave": pb.Const(b"WAVE", pb.Bytes(4)),
+            "fmt": chunk(b"fmt ", fmt),
+            "data": chunk(b"data", data),
+            "end": pb.Terminated(),
+        },
+        endian="little",
+    )
+    import wave
+
+    import numpy as np
+
+    path = tmp_path / "tone.wav"
+    samples = (np.sin(np.arange(100) / 5) * 1000).astype("<i2")
+    with wave.open(str(path), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(8000)
+        f.writeframes(samples.tobytes())
+
+    parsed = wav.parse(path)
+    assert parsed.fmt.channels == 1 and parsed.fmt.rate == 8000 and parsed.fmt.bits == 16
+    np.testing.assert_array_equal(parsed.data.samples, samples)
+    built = wav.build(
+        {
+            "fmt": {"audio_format": 1, "channels": 1, "rate": 8000, "bits": 16},
+            "data": {"samples": samples},
+        }
+    )
+    assert built == path.read_bytes()
+
+
+def _elf_spec():
+    def body(endian):
+        word = lambda ctx: ctx._.ident.cls == 2  # noqa: E731
+        addr = pb.If(word, pb.u64, pb.u32)
+        return pb.Spec(
+            {
+                "type": pb.u16,
+                "machine": pb.u16,
+                "version": pb.u32,
+                "entry": addr,
+                "phoff": addr,
+                "shoff": addr,
+                "flags": pb.u32,
+                "ehsize": pb.u16,
+                "phentsize": pb.u16,
+                "phnum": pb.u16,
+                "shentsize": pb.u16,
+                "shnum": pb.u16,
+                "shstrndx": pb.u16,
+            },
+            endian=endian,
+        )
+
+    return pb.Spec(
+        {
+            "ident": pb.Spec(
+                {
+                    "magic": pb.Const(b"\x7fELF", pb.Bytes(4)),
+                    "cls": pb.u8,
+                    "data": pb.u8,
+                    "version": pb.u8,
+                    "osabi": pb.u8,
+                    "abiversion": pb.u8,
+                    "pad": pb.Padding(7),
+                }
+            ),
+            "header": pb.Switch(lambda ctx: ctx.ident.data, {1: body("little"), 2: body("big")}),
+        }
+    )
+
+
+def test_elf_header_of_running_python():
+    import sys
+
+    if not sys.executable or not open(sys.executable, "rb").read(4) == b"\x7fELF":
+        pytest.skip("Not running from an ELF binary.")
+    elf = _elf_spec()
+    data = elf.parse(sys.executable)
+    assert data.ident.cls in (1, 2) and data.ident.data in (1, 2)
+    assert data.header.ehsize == (64 if data.ident.cls == 2 else 52)
+
+
+def test_elf_header_both_endians():
+    elf = _elf_spec()
+    values = {
+        "type": 2, "machine": 62, "version": 1, "entry": 0x401000, "phoff": 64,
+        "shoff": 4096, "flags": 0, "ehsize": 64, "phentsize": 56, "phnum": 2,
+        "shentsize": 64, "shnum": 5, "shstrndx": 4,
+    }
+    for data_byte in (1, 2):
+        ident = {"cls": 2, "data": data_byte, "version": 1, "osabi": 0, "abiversion": 0}
+        raw = elf.build({"ident": ident, "header": values})
+        assert len(raw) == 64
+        assert elf.parse(raw).header == values
+    ident32 = {"cls": 1, "data": 1, "version": 1, "osabi": 0, "abiversion": 0}
+    assert len(elf.build({"ident": ident32, "header": {**values, "ehsize": 52}})) == 52
+
+
+def test_sigproc_filterbank_header():
+    key = pb.PascalString(pb.i32)
+    values = {
+        "telescope_id": pb.i32,
+        "machine_id": pb.i32,
+        "data_type": pb.i32,
+        "nchans": pb.i32,
+        "nbits": pb.i32,
+        "nifs": pb.i32,
+        "tsamp": pb.f64,
+        "tstart": pb.f64,
+        "fch1": pb.f64,
+        "foff": pb.f64,
+        "source_name": pb.PascalString(pb.i32),
+        "HEADER_END": pb.Computed(None),
+    }
+    entry = pb.Spec({"key": key, "value": pb.Switch(pb.this.key, values)})
+    header = pb.Spec(
+        {
+            "start": pb.Const("HEADER_START", key),
+            "entries": pb.RepeatUntil(lambda e, ctx: e.key == "HEADER_END", entry),
+        },
+        endian="little",
+    )
+    filterbank = pb.Spec(
+        {
+            "header": header,
+            "meta": pb.Computed(lambda ctx: {e.key: e.value for e in ctx.header.entries}),
+            "data": pb.Array(
+                pb.u8, count=lambda ctx: ctx.meta["nchans"] * 2, packing=2, bitorder="little"
+            ),
+        }
+    )
+    entries = [
+        {"key": "source_name", "value": "J0437-4715"},
+        {"key": "telescope_id", "value": 4},
+        {"key": "nchans", "value": 8},
+        {"key": "nbits", "value": 2},
+        {"key": "tsamp", "value": 6.4e-5},
+        {"key": "fch1", "value": 1500.0},
+        {"key": "foff", "value": -0.5},
+        {"key": "HEADER_END", "value": None},
+    ]
+    raw_header = header.build({"entries": entries})
+    assert raw_header.startswith(b"\x0c\x00\x00\x00HEADER_START")
+    assert raw_header.endswith(b"\x0a\x00\x00\x00HEADER_END")
+    samples = [i % 4 for i in range(16)]
+    raw = raw_header + pb.Array(pb.u8, count=16, packing=2, bitorder="little").build(samples)
+    data = filterbank.parse(raw)
+    assert data.meta["source_name"] == "J0437-4715"
+    assert data.meta["tsamp"] == 6.4e-5 and data.meta["nchans"] == 8
+    assert list(data.data) == samples

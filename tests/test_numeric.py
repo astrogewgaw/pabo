@@ -3,6 +3,8 @@ import pytest
 from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 @pytest.mark.parametrize("width", [1, 2, 4, 8])
@@ -243,3 +245,47 @@ def test_array_reads_from_short_reads():
 
     parsed = pb.Array(pb.Int(2), count=2).parse(Trickle(b"\x01\x00\x02\x00"))
     np.testing.assert_array_equal(parsed, [1, 2])
+
+
+
+@given(
+    width=st.integers(1, 16),
+    signed=st.booleans(),
+    endian=st.sampled_from(["little", "big"]),
+    data=st.data(),
+)
+def test_int_roundtrip_property(width, signed, endian, data):
+    bits = 8 * width
+    lo, hi = (-(2 ** (bits - 1)), 2 ** (bits - 1) - 1) if signed else (0, 2**bits - 1)
+    value = data.draw(st.integers(lo, hi))
+    c = pb.Int(width, signed=signed, endian=endian)
+    raw = c.build(value)
+    assert raw == value.to_bytes(width, endian, signed=signed)
+    assert c.parse(raw) == value
+
+
+@given(st.floats(width=32, allow_nan=False), st.sampled_from(["little", "big"]))
+def test_float_roundtrip_property(value, endian):
+    c = pb.Float(4, endian=endian)
+    assert c.parse(c.build(value)) == value
+
+
+@given(st.integers(min_value=0, max_value=2**100))
+def test_varint_roundtrip_property(value):
+    assert pb.VarInt().parse(pb.VarInt().build(value)) == value
+
+
+@given(st.integers(min_value=-(2**100), max_value=2**100))
+def test_zigzag_roundtrip_property(value):
+    assert pb.ZigZag().parse(pb.ZigZag().build(value)) == value
+
+
+@given(
+    packing=st.integers(1, 16),
+    bitorder=st.sampled_from(["big", "little"]),
+    data=st.data(),
+)
+def test_packed_array_roundtrip_property(packing, bitorder, data):
+    values = data.draw(st.lists(st.integers(0, 2**packing - 1), max_size=50))
+    c = pb.Array(pb.Int(2), count=len(values), packing=packing, bitorder=bitorder)
+    np.testing.assert_array_equal(c.parse(c.build(values)), values)

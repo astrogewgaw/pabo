@@ -1,6 +1,8 @@
 import pytest
 
 import pabo as pb
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 def test_bits_size_in_bytes():
@@ -84,3 +86,21 @@ def test_bitstruct_in_spec():
     spec = pb.Spec({"flags": pb.BitStruct({"x": pb.BitInt(8)}), "n": pb.Int(1)})
     assert spec.parse(b"\x01\x02") == {"flags": {"x": 1}, "n": 2}
     assert spec.size == 2
+
+
+
+@given(st.lists(st.integers(0, 1), max_size=100), st.sampled_from(["big", "little"]))
+def test_bits_roundtrip_property(bits, bitorder):
+    c = pb.Bits(len(bits), bitorder)
+    assert list(c.parse(c.build(bits))) == bits
+
+
+@given(st.lists(st.integers(1, 12), min_size=1, max_size=8), st.data())
+def test_bitstruct_roundtrip_property(widths, data):
+    total = sum(widths)
+    widths = widths + ([8 - total % 8] if total % 8 else [])
+    fields = {f"f{ix}": pb.BitInt(n) for ix, n in enumerate(widths)}
+    for bitorder in ("big", "little"):
+        c = pb.BitStruct(fields, bitorder)
+        values = {name: data.draw(st.integers(0, 2**f.nbits - 1)) for name, f in fields.items()}
+        assert c.parse(c.build(values)) == values

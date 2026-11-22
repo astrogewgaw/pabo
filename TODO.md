@@ -214,14 +214,14 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 
 ## 4. Testing
 
-- [ ] Unit tests per construct: parse, build and **round-trip**
+- [x] Unit tests per construct: parse, build and **round-trip**
       (`parse(build(x)) == x`).
-- [ ] Property-based tests with `hypothesis` for numerics, strings and bit packing.
-- [ ] Tests for the C++ packer against `np.packbits`/`np.unpackbits` (both bit orders,
+- [x] Property-based tests with `hypothesis` for numerics, strings and bit packing.
+- [x] Tests for the C++ packer against `np.packbits`/`np.unpackbits` (both bit orders,
       parallel and serial).
-- [ ] Error-path tests: short reads, bad constants, wrong lengths.
-- [ ] Real-world fixtures: PNG header, WAV/RIFF, ELF header, a SIGPROC filterbank header.
-- [ ] Coverage reporting.
+- [x] Error-path tests: short reads, bad constants, wrong lengths.
+- [x] Real-world fixtures: PNG header, WAV/RIFF, ELF header, a SIGPROC filterbank header.
+- [x] Coverage reporting. (`pytest --cov`; about 95% with branches.)
 
 ## 5. Packaging and CI
 

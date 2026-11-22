@@ -62,3 +62,8 @@ def test_evaluate():
 def test_parse_returns_container():
     data = pb.Spec({"a": pb.Int(1)}).parse(b"\x07")
     assert isinstance(data, pb.Container) and data.a == 7
+
+
+def test_nested_plain_dicts_get_attribute_access():
+    c = pb.Container(inner={"x": 1})
+    assert c.inner.x == 1

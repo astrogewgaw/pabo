@@ -3,6 +3,8 @@ import pytest
 
 from pabo.errors import PaboError
 from pabo.packing import pack_bits, unpack_bits
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 @pytest.mark.parametrize("nbits", [1, 2, 3, 4, 5, 7, 8, 12, 16, 33, 64])
@@ -42,3 +44,12 @@ def test_errors():
         unpack_bits(b"\x00", 0)
     with pytest.raises(PaboError):
         unpack_bits(b"\x00", 3, "middle")
+
+
+
+@given(nbits=st.integers(1, 64), bitorder=st.sampled_from(["big", "little"]), data=st.data())
+def test_roundtrip_property(nbits, bitorder, data):
+    values = data.draw(st.lists(st.integers(0, 2**nbits - 1), max_size=40))
+    raw = pack_bits(np.array(values, dtype=np.uint64), nbits, bitorder)
+    assert len(raw) == -(-len(values) * nbits // 8)
+    np.testing.assert_array_equal(unpack_bits(raw, nbits, bitorder)[: len(values)], values)

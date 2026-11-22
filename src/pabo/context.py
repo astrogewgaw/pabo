@@ -20,9 +20,10 @@ class Container(dict):
     @no_type_check
     def __getattr__(self, name: str) -> Any:
         try:
-            return self[name]
+            value = self[name]
         except KeyError:
             raise AttributeError(name) from None
+        return Container(value) if type(value) is dict else value
 
     @no_type_check
     def __setattr__(self, name: str, value: Any) -> None:

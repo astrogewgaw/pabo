@@ -163,7 +163,9 @@ class RepeatUntil(Construct[list]):
     """
     Repeat `wraps` until `predicate(element, ctx)` holds for an element.
 
-    The element that satisfies the predicate is included in the result.
+    The element that satisfies the predicate is included in the result. When
+    building, the predicate sees each element as built (so a specification's
+    elements are `Container`s, with attribute access).
     """
 
     predicate: Callable
@@ -176,8 +178,9 @@ class RepeatUntil(Construct[list]):
         built = []
         for ix, element in enumerate(data):
             with scope(f"[{ix}]", stream):
-                built.append(self.wraps._build(element, stream, ctx))
-            if self.predicate(element, ctx):
+                value = self.wraps._build(element, stream, ctx)
+            built.append(value)
+            if self.predicate(value, ctx):
                 return built
         raise ValidationError("No element satisfies the predicate, so nothing ends the list.")
 
