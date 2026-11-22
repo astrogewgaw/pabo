@@ -47,6 +47,20 @@ def tell(stream) -> int | None:
         return None
 
 
+def hexdump(raw: bytes, offset: int = 0) -> str:
+    """
+    Format bytes as a hex dump: offset, 16 hex bytes, and their ASCII.
+    """
+
+    lines = []
+    for start in range(0, len(raw), 16):
+        chunk = raw[start : start + 16]
+        hexed = " ".join(f"{byte:02x}" for byte in chunk)
+        text = "".join(chr(byte) if 32 <= byte < 127 else "." for byte in chunk)
+        lines.append(f"{offset + start:08x}  {hexed:<47}  {text}")
+    return "\n".join(lines)
+
+
 @contextmanager
 def scope(name: str, stream, docs: str = "") -> Generator[None, None, None]:
     """
@@ -137,6 +151,49 @@ class Construct(ABC, Generic[T]):
             return size
         raise SizeofError(f"No reasonable size was returned (got {size!r}).")
 
+    def _label(self) -> str:
+        """
+        A short description of this construct, for `describe`.
+        """
+
+        return repr(self)
+
+    def _rows(self, name: str, depth: int, offset: int | None):
+        """
+        Yield the (offset, size, name, depth, label, docs) rows for `describe`.
+        """
+
+        try:
+            size: int | None = self.size
+        except PaboError:
+            size = None
+        yield offset, size, name, depth, self._label(), self.docs
+
+    def describe(self) -> str:
+        """
+        A table of the layout: offsets, sizes, names, types and docs.
+
+        Offsets and sizes that depend on the data are shown as "?".
+        """
+
+        rows = [
+            (
+                "?" if offset is None else str(offset),
+                "?" if size is None else str(size),
+                "  " * depth + name,
+                label,
+                docs,
+            )
+            for offset, size, name, depth, label, docs in self._rows("", 0, 0)
+        ]
+        header = ("offset", "size", "field", "type", "docs")
+        widths = [max(len(row[ix]) for row in [header, *rows]) for ix in range(5)]
+        lines = []
+        for row in [header, *rows]:
+            line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths))
+            lines.append(line.rstrip())
+        return "\n".join(lines)
+
     def build(self, data: Any, src=None, append: bool = False) -> bytes | None:
         """
         Build `data` into bytes.
@@ -159,24 +216,30 @@ class Construct(ABC, Generic[T]):
             return None
         raise PaboError(f"Cannot build into an object of type {type(src).__name__}.")
 
-    def parse(self, dst) -> T:
+    def parse(self, dst, trace: Any = False) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
+
+        With `trace=True`, every field of every specification is printed to
+        stderr as it is parsed, with a hex dump of its bytes. `trace` may also
+        be a writable text stream to print to.
 
         Files given by path are memory-mapped, so large arrays are read without
         copying (the arrays returned are read-only views of the file), and lazy
         fields can still be read after `parse` returns.
         """
 
+        ctx = Context()
+        ctx._trace = trace or None
         if isinstance(dst, (bytes, bytearray, memoryview)):
-            return self._parse(BytesIO(dst), Context())
+            return self._parse(BytesIO(dst), ctx)
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
                 try:
                     stream = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
                 except (OSError, ValueError):
-                    return self._parse(f, Context())
-            return self._parse(stream, Context())
+                    return self._parse(f, ctx)
+            return self._parse(stream, ctx)
         if hasattr(dst, "read"):
-            return self._parse(dst, Context())
+            return self._parse(dst, ctx)
         raise PaboError(f"Cannot parse from an object of type {type(dst).__name__}.")

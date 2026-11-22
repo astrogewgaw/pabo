@@ -124,3 +124,40 @@ def test_docs_in_errors():
         spec.parse(b"\x00")
     assert info.value.docs == "Image width"
     assert "'Image width'" in str(info.value)
+
+
+def test_trace(capsys):
+    spec = pb.Spec({"a": pb.Int(1), "inner": pb.Spec({"b": pb.Int(2)})})
+    spec.parse(b"\x01\x02\x00", trace=True)
+    err = capsys.readouterr().err
+    assert "a [0:1] = 1" in err
+    assert "  b [1:3] = 2" in err
+    assert "00000001  02 00" in err
+
+
+def test_trace_to_stream():
+    import io
+
+    out = io.StringIO()
+    pb.Spec({"a": pb.Int(1)}).parse(b"\x07", trace=out)
+    assert "a [0:1] = 7" in out.getvalue()
+
+
+def test_describe():
+    spec = pb.Spec(
+        {
+            "magic": pb.Const(b"PB", pb.Bytes(2)) / "Magic number",
+            "n": pb.u8,
+            "hdr": pb.Spec({"w": pb.u16, "h": pb.u16}, endian="big"),
+            "data": pb.Bytes(pb.this.n),
+            "crc": pb.u32,
+        }
+    )
+    lines = spec.describe().splitlines()
+    assert lines[0].split() == ["offset", "size", "field", "type", "docs"]
+    assert lines[1].split()[:3] == ["0", "2", "magic"] and lines[1].endswith("Magic number")
+    assert lines[3].split()[:4] == ["3", "4", "hdr", "Specification(endian='big')"]
+    assert lines[4].split()[:3] == ["3", "2", "w"]
+    assert lines[6].split()[:3] == ["7", "?", "data"]
+    assert lines[7].split()[:3] == ["?", "4", "crc"]
+    assert pb.u16.describe().splitlines()[1].split()[:2] == ["0", "2"]

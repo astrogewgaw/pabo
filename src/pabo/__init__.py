@@ -23,6 +23,7 @@ from pabo.control import (
     Validated,
 )
 from pabo.context import Container, Context, this
+from pabo.debug import Probe
 from pabo.declarative import Struct, StructConstruct
 from pabo.errors import (
     ConstError,
@@ -45,6 +46,7 @@ from pabo.transforms import Checksummed, Compressed, Transformed
 from pabo.wrappers import Sequential as Seq
 
 __all__ = [
+    "Probe",
     "Adapted",
     "Aligned",
     "AlignedSpec",

@@ -188,7 +188,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 ### Debugging and diagnostics
 - [x] Errors that include the **field path** (`png.ihdr.width`), the **stream offset**,
       and expected versus actual values.
-- [ ] `Probe` / a debug mode that hex-dumps each field as it is parsed.
+- [x] `Probe` / a debug mode that hex-dumps each field as it is parsed.
 - [x] Consistent error message style (some are SHOUTING, some aren't).
 - [x] A specific exception hierarchy (`StreamError`, `ConstError`, `SizeError`,
       `ValidationError`) under `PaboError`.
@@ -197,7 +197,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Separate the static size (known at definition) from the dynamic size (known after
       parsing). Return `None` or raise a clear `SizeofError` for variable-size
       constructs.
-- [ ] `spec.describe()` / pretty `repr` showing the layout table (offsets, sizes, types).
+- [x] `spec.describe()` / pretty `repr` showing the layout table (offsets, sizes, types).
 
 ## 3. Performance
 
