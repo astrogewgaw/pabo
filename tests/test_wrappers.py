@@ -1,4 +1,5 @@
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 
@@ -87,3 +88,14 @@ def test_const_build():
     assert c.build(b"AB") == b"AB"
     with pytest.raises(pb.PaboError):
         c.build(b"XY")
+
+
+def test_padded_fill_and_side():
+    c = pb.Padded(2, pb.Int(1), fill=b"\xff", side="left")
+    assert c.build(1) == b"\xff\xff\x01"
+    assert c.parse(b"\xff\xff\x01") == 1
+    assert pb.Padded(1, pb.Int(1), fill=b" ").build(1) == b"\x01 "
+    with pytest.raises(pb.PaboError):
+        pb.Padded(1, pb.Int(1), fill=b"ab")
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Padded(1, pb.Int(1), side="up")

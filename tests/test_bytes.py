@@ -35,3 +35,15 @@ def test_padding():
     assert pb.Padding(3).size == 3
     with pytest.raises(pb.PaboError):
         pb.Padding(3).parse(b"\x00\x01\x00")
+
+
+def test_greedy_bytes():
+    assert pb.GreedyBytes().parse(b"abc") == b"abc"
+    assert pb.GreedyBytes().build(b"abc") == b"abc"
+
+
+def test_dynamic_count():
+    spec = pb.Spec({"n": pb.Int(1), "data": pb.Bytes(pb.this.n)})
+    assert spec.parse(b"\x02ab") == {"n": 2, "data": b"ab"}
+    with pytest.raises(pb.PaboError):
+        pb.Bytes(lambda ctx: "x").parse(b"")

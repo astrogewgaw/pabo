@@ -6,6 +6,7 @@ from beartype.claw import beartype_this_package
 
 beartype_this_package()
 
+from pabo.adapters import Enum, FlagsEnum, Timestamp
 from pabo.base import Construct
 from pabo.control import (
     Check,
@@ -29,11 +30,11 @@ from pabo.errors import (
     ValidationError,
 )
 from pabo.bits import Bits
-from pabo.bytes import Bytes, Flag, Padding
-from pabo.numeric import Array, Float, Int
+from pabo.bytes import Bytes, Flag, GreedyBytes, Padding
+from pabo.numeric import Array, Float, Int, VarInt, ZigZag
 from pabo.specify import Specification
 from pabo.specify import Specification as Spec
-from pabo.strings import CString, Line, PaddedString, PascalString
+from pabo.strings import CString, GreedyString, Line, PaddedString, PascalString
 from pabo.wrappers import Adapted, Const, Greedy, Padded, Prefixed, Repeat, Sequential
 from pabo.wrappers import Sequential as Seq
 
@@ -51,9 +52,13 @@ __all__ = [
     "Context",
     "ContextError",
     "CString",
+    "Enum",
     "Flag",
+    "FlagsEnum",
     "Float",
     "Greedy",
+    "GreedyBytes",
+    "GreedyString",
     "If",
     "Int",
     "Line",
@@ -77,6 +82,9 @@ __all__ = [
     "Switch",
     "Terminated",
     "this",
+    "Timestamp",
     "Validated",
     "ValidationError",
+    "VarInt",
+    "ZigZag",
 ]

@@ -3,6 +3,7 @@ Numerical constructs.
 """
 
 import struct
+import sys
 from dataclasses import dataclass
 from typing import Literal
 
@@ -18,11 +19,11 @@ BitOrder = Literal["big", "little"]
 
 ENDIANS = {"little": "<", "big": ">", "native": "="}
 INT_CODES = {1: "b", 2: "h", 4: "i", 8: "q"}
-FLOAT_CODES = {4: "f", 8: "d"}
+FLOAT_CODES = {2: "e", 4: "f", 8: "d"}
 
 
-def _check_endian(endian: str) -> None:
-    if endian not in ENDIANS:
+def _check_endian(endian: str | None) -> None:
+    if endian is not None and endian not in ENDIANS:
         raise PaboError(
             f"Invalid endianness {endian!r}. Must be one of {list(ENDIANS)}."
         )
@@ -33,60 +34,109 @@ def _check_bitorder(bitorder: str) -> None:
         raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
 
 
+def resolve_endian(endian: str | None, ctx: Context) -> str:
+    """
+    Return `endian`, or the default set by an enclosing specification, or "little".
+    """
+
+    return endian or ctx.setting("_endian") or "little"
+
+
 class _Fixed(Construct):
     """
-    Shared implementation for fixed-width numbers backed by `struct`.
+    Shared implementation for fixed-width numbers.
+
+    If `endian` is None, the default of the enclosing specification is used
+    (little-endian if there is none).
     """
+
+    width: int
+    endian: "Endian | None"
+
+    def format_for(self, endian: str) -> str:
+        """
+        The `struct` format for the given endianness.
+        """
+
+        raise NotImplementedError
 
     @property
     def format(self) -> str:
-        raise NotImplementedError
+        """
+        The `struct` format (little-endian if no endianness was given).
+        """
+
+        return self.format_for(self.endian or "little")
 
     def _size(self, ctx):
         return self.width
 
     def _build(self, data, stream, ctx):
+        fmt = self.format_for(resolve_endian(self.endian, ctx))
         try:
-            stream.write(struct.pack(self.format, data))
+            stream.write(struct.pack(fmt, data))
         except struct.error as error:
             raise ValidationError(f"Cannot build {data!r} as {self!r}: {error}.") from error
         return data
 
     def _parse(self, stream, ctx):
-        return struct.unpack(self.format, read_exactly(stream, self.width))[0]
+        fmt = self.format_for(resolve_endian(self.endian, ctx))
+        return struct.unpack(fmt, read_exactly(stream, self.width))[0]
 
 
 @dataclass
 class Int(_Fixed):
     """
-    Represents a fixed-width integer.
+    Represents a fixed-width integer, of any whole number of bytes.
+
+    Widths of 1, 2, 4 and 8 bytes use `struct`; any other width (3, 16, ...)
+    uses `int.from_bytes`.
     """
 
     width: int
     signed: bool = False
-    endian: Endian = "little"
+    endian: Endian | None = None
 
     def __post_init__(self):
-        if self.width not in INT_CODES:
-            raise PaboError(
-                f"Unsupported integer width {self.width}. Must be one of {list(INT_CODES)}."
-            )
+        if self.width < 1:
+            raise PaboError(f"Unsupported integer width {self.width}. Must be positive.")
         _check_endian(self.endian)
 
-    @property
-    def format(self) -> str:
+    def format_for(self, endian: str) -> str:
+        if self.width not in INT_CODES:
+            raise PaboError(f"There is no struct format for {self.width}-byte integers.")
         code = INT_CODES[self.width]
-        return ENDIANS[self.endian] + (code if self.signed else code.upper())
+        return ENDIANS[endian] + (code if self.signed else code.upper())
+
+    def _byteorder(self, ctx) -> str:
+        endian = resolve_endian(self.endian, ctx)
+        return sys.byteorder if endian == "native" else endian
+
+    def _build(self, data, stream, ctx):
+        if self.width in INT_CODES:
+            return super()._build(data, stream, ctx)
+        try:
+            raw = data.to_bytes(self.width, self._byteorder(ctx), signed=self.signed)
+        except (AttributeError, OverflowError) as error:
+            raise ValidationError(f"Cannot build {data!r} as {self!r}: {error}.") from error
+        stream.write(raw)
+        return data
+
+    def _parse(self, stream, ctx):
+        if self.width in INT_CODES:
+            return super()._parse(stream, ctx)
+        raw = read_exactly(stream, self.width)
+        return int.from_bytes(raw, self._byteorder(ctx), signed=self.signed)
 
 
 @dataclass
 class Float(_Fixed):
     """
-    Represents a fixed-width floating point number.
+    Represents a fixed-width floating point number (2, 4 or 8 bytes).
     """
 
     width: int
-    endian: Endian = "little"
+    endian: Endian | None = None
 
     def __post_init__(self):
         if self.width not in FLOAT_CODES:
@@ -95,9 +145,64 @@ class Float(_Fixed):
             )
         _check_endian(self.endian)
 
-    @property
-    def format(self) -> str:
-        return ENDIANS[self.endian] + FLOAT_CODES[self.width]
+    def format_for(self, endian: str) -> str:
+        return ENDIANS[endian] + FLOAT_CODES[self.width]
+
+
+@dataclass
+class VarInt(Construct[int]):
+    """
+    Represents an unsigned variable-length integer (LEB128, as in protobuf).
+
+    Each byte holds 7 bits of the value, least significant first, and its
+    top bit is set when more bytes follow.
+    """
+
+    def _size(self, ctx):
+        raise SizeofError("A VarInt has no fixed size.")
+
+    def _build(self, data, stream, ctx):
+        if not isinstance(data, int) or data < 0:
+            raise ValidationError(f"A VarInt must be a non-negative int, got {data!r}.")
+        value, out = data, bytearray()
+        while True:
+            byte, value = value & 0x7F, value >> 7
+            out.append(byte | (0x80 if value else 0))
+            if not value:
+                break
+        stream.write(bytes(out))
+        return data
+
+    def _parse(self, stream, ctx):
+        value = shift = 0
+        while True:
+            byte = read_exactly(stream, 1)[0]
+            value |= (byte & 0x7F) << shift
+            shift += 7
+            if not byte & 0x80:
+                return value
+
+
+@dataclass
+class ZigZag(Construct[int]):
+    """
+    Represents a signed variable-length integer (ZigZag-encoded LEB128).
+
+    0, -1, 1, -2, ... are stored as the VarInts 0, 1, 2, 3, ...
+    """
+
+    def _size(self, ctx):
+        raise SizeofError("A ZigZag integer has no fixed size.")
+
+    def _build(self, data, stream, ctx):
+        if not isinstance(data, int):
+            raise ValidationError(f"A ZigZag integer must be an int, got {data!r}.")
+        VarInt()._build(2 * data if data >= 0 else -2 * data - 1, stream, ctx)
+        return data
+
+    def _parse(self, stream, ctx):
+        value = VarInt()._parse(stream, ctx)
+        return value >> 1 if not value & 1 else -((value + 1) >> 1)
 
 
 @dataclass
@@ -117,6 +222,8 @@ class Array(Construct):
     bitorder: BitOrder = "big"
 
     def __post_init__(self):
+        if isinstance(self.dtype, Int) and self.dtype.width not in INT_CODES:
+            raise PaboError("Array elements must be 1, 2, 4 or 8 bytes wide.")
         if self.packing is not None:
             if self.packing not in (1, 2, 4):
                 raise PaboError(
@@ -128,7 +235,18 @@ class Array(Construct):
 
     @property
     def numpy_dtype(self) -> np.dtype:
+        """
+        The numpy dtype of the elements (little-endian if no endianness was given).
+        """
+
         return np.dtype(self.dtype.format)
+
+    def dtype_for(self, ctx) -> np.dtype:
+        """
+        The numpy dtype of the elements, with the endianness resolved from `ctx`.
+        """
+
+        return np.dtype(self.dtype.format_for(resolve_endian(self.dtype.endian, ctx)))
 
     def _nbytes(self, count: int) -> int:
         if self.packing is None:
@@ -148,7 +266,8 @@ class Array(Construct):
         return self._nbytes(count)
 
     def _build(self, data, stream, ctx):
-        array = np.asarray(data, dtype=self.numpy_dtype).ravel()
+        dtype = self.dtype_for(ctx)
+        array = np.asarray(data, dtype=dtype).ravel()
         count = self._count(ctx)
         if count >= 0:
             if array.size < count:
@@ -179,7 +298,7 @@ class Array(Construct):
                     f"{len(raw)} bytes is not a whole number of "
                     f"{self.dtype.width}-byte elements."
                 )
-            return np.frombuffer(raw, dtype=self.numpy_dtype)
+            return np.frombuffer(raw, dtype=self.dtype_for(ctx))
         values = unpack(
             np.frombuffer(raw, dtype=np.uint8),
             nbits=self.packing,
@@ -187,4 +306,4 @@ class Array(Construct):
         )
         if count >= 0:
             values = values[:count]
-        return values.astype(self.numpy_dtype)
+        return values.astype(self.dtype_for(ctx))

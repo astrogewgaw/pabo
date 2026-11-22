@@ -3,10 +3,11 @@ String constructs.
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pabo.base import Construct, read_exactly
 from pabo.context import Dynamic, evaluate
-from pabo.errors import SizeofError, ValidationError
+from pabo.errors import PaboError, SizeofError, ValidationError
 from pabo.bytes import Bytes
 from pabo.numeric import Int
 from pabo.wrappers import Prefixed
@@ -84,14 +85,30 @@ class PascalString(Construct[str]):
         return _decode(Prefixed(self.pre, Bytes(-1))._parse(stream, ctx), self.code)
 
 
+Side = Literal["right", "left"]
+
+
 @dataclass
 class PaddedString(Construct[str]):
     """
-    Represents a string padded by null bytes (\x00) to a fixed length.
+    Represents a string padded to a fixed length in bytes.
+
+    `pad` is the padding character (null by default), encoded like the rest
+    of the string, so it is two bytes for UTF-16. With `side="right"` the
+    padding follows the text; with `side="left"` it comes before it. Padding
+    is stripped when parsing.
     """
 
     length: Dynamic
     code: str = "utf-8"
+    pad: str = "\x00"
+    side: Side = "right"
+
+    def __post_init__(self):
+        if len(self.pad) != 1:
+            raise PaboError("The padding must be a single character.")
+        if self.side not in ("right", "left"):
+            raise PaboError(f"Invalid side {self.side!r}. Must be 'right' or 'left'.")
 
     def _size(self, ctx):
         return evaluate(self.length, ctx)
@@ -103,17 +120,44 @@ class PaddedString(Construct[str]):
             raise ValidationError(
                 f"String too long: {len(raw)} bytes encoded, but only {length} available."
             )
-        stream.write(raw + b"\x00" * (length - len(raw)))
+        unit = _fragment(self.pad, self.code)
+        missing = length - len(raw)
+        padding = (unit * -(-missing // len(unit)))[:missing]
+        stream.write(raw + padding if self.side == "right" else padding + raw)
         return data
 
     def _parse(self, stream, ctx):
         raw = read_exactly(stream, evaluate(self.length, ctx))
-        null = _fragment("\x00", self.code)
-        unit = len(null)
-        raw = raw[: len(raw) - len(raw) % unit]
-        while raw.endswith(null):
-            raw = raw[:-unit]
+        unit = _fragment(self.pad, self.code)
+        size = len(unit)
+        if self.side == "right":
+            raw = raw[: len(raw) - len(raw) % size]
+            while raw.endswith(unit):
+                raw = raw[:-size]
+        else:
+            raw = raw[len(raw) % size :]
+            while raw.startswith(unit):
+                raw = raw[size:]
         return _decode(raw, self.code)
+
+
+@dataclass
+class GreedyString(Construct[str]):
+    """
+    Represents a string running to the end of the stream.
+    """
+
+    code: str = "utf-8"
+
+    def _size(self, ctx):
+        raise SizeofError("A GreedyString has no fixed size.")
+
+    def _build(self, data, stream, ctx):
+        stream.write(data.encode(self.code))
+        return data
+
+    def _parse(self, stream, ctx):
+        return _decode(stream.read(), self.code)
 
 
 @dataclass

@@ -5,7 +5,7 @@ Wrappers for constructs.
 from collections.abc import Callable, MutableSequence
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 
 from pabo.base import Construct, Stop, read_exactly, scope
 from pabo.context import Dynamic, evaluate
@@ -223,11 +223,23 @@ class Prefixed(Construct):
 @dataclass
 class Padded(Construct):
     """
-    Represents a binary construct followed by `pad` null bytes (\\x00).
+    Represents a binary construct with `pad` bytes of padding.
+
+    The padding is `fill` (a null byte by default) repeated, and goes after
+    the construct (`side="right"`) or before it (`side="left"`). It is
+    skipped when parsing.
     """
 
     pad: Dynamic
     wraps: Construct
+    fill: bytes = b"\x00"
+    side: Literal["right", "left"] = "right"
+
+    def __post_init__(self):
+        if len(self.fill) != 1:
+            raise PaboError("The fill must be a single byte.")
+        if self.side not in ("right", "left"):
+            raise PaboError(f"Invalid side {self.side!r}. Must be 'right' or 'left'.")
 
     def _omittable(self):
         return self.wraps._omittable()
@@ -236,11 +248,18 @@ class Padded(Construct):
         return self.wraps._size(ctx) + _int(self.pad, ctx, "padding")
 
     def _build(self, data, stream, ctx):
+        padding = self.fill * _int(self.pad, ctx, "padding")
+        if self.side == "left":
+            stream.write(padding)
         built = self.wraps._build(data, stream, ctx)
-        stream.write(b"\x00" * _int(self.pad, ctx, "padding"))
+        if self.side == "right":
+            stream.write(padding)
         return built
 
     def _parse(self, stream, ctx):
+        if self.side == "left":
+            read_exactly(stream, _int(self.pad, ctx, "padding"))
         data = self.wraps._parse(stream, ctx)
-        read_exactly(stream, _int(self.pad, ctx, "padding"))
+        if self.side == "right":
+            read_exactly(stream, _int(self.pad, ctx, "padding"))
         return data

@@ -64,6 +64,14 @@ class Flag(Construct[bool]):
         return read_exactly(stream, 1) != b"\x00"
 
 
+def GreedyBytes() -> Bytes:
+    """
+    Represents all the bytes up to the end of the stream.
+    """
+
+    return Bytes(-1)
+
+
 def Padding(size: int) -> Const:
     """
     Represents padding via zero bytes (b"\\x00").

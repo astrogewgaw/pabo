@@ -1,4 +1,5 @@
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 
@@ -61,3 +62,28 @@ def test_line_errors():
         pb.Line().parse(b"no crlf")
     with pytest.raises(pb.PaboError):
         pb.Line().build("a\r\nb")
+
+
+def test_greedy_string():
+    c = pb.GreedyString()
+    assert c.parse("héllo".encode()) == "héllo"
+    assert c.build("héllo") == "héllo".encode()
+    with pytest.raises(pb.SizeofError):
+        c.size
+    with pytest.raises(pb.ValidationError):
+        c.parse(b"\xff")
+
+
+def test_padded_string_pad_and_side():
+    c = pb.PaddedString(5, pad=" ")
+    assert c.build("ab") == b"ab   "
+    assert c.parse(b"ab   ") == "ab"
+    c = pb.PaddedString(5, pad=" ", side="left")
+    assert c.build("ab") == b"   ab"
+    assert c.parse(b"   ab") == "ab"
+    c = pb.PaddedString(5, "utf-16-le", side="left")
+    assert c.parse(c.build("A")) == "A"
+    with pytest.raises(pb.PaboError):
+        pb.PaddedString(5, pad="ab")
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.PaddedString(5, side="middle")

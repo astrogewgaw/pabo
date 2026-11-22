@@ -141,13 +141,13 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] `Check` / validation hooks, generalising `Const`.
 
 ### Types
-- [ ] More integer types: 24-bit and other odd widths (`Int(3)`), 128-bit, variable-length
+- [x] More integer types: 24-bit and other odd widths (`Int(3)`), 128-bit, variable-length
       integers (LEB128/VarInt, ZigZag), and `native` endianness.
-- [ ] Half-precision floats (`Float(2)`, struct format `"e"`).
-- [ ] `Enum` / `FlagsEnum` mapping integers to Python `enum.Enum`/`IntFlag`.
-- [ ] `Timestamp` (Unix, MJD, and so on), which matters for astronomy formats.
-- [ ] `GreedyBytes` / `GreedyString`.
-- [ ] Configurable pad byte and pad direction for `Padded`/`PaddedString`.
+- [x] Half-precision floats (`Float(2)`, struct format `"e"`).
+- [x] `Enum` / `FlagsEnum` mapping integers to Python `enum.Enum`/`IntFlag`.
+- [x] `Timestamp` (Unix, MJD, and so on), which matters for astronomy formats.
+- [x] `GreedyBytes` / `GreedyString`.
+- [x] Configurable pad byte and pad direction for `Padded`/`PaddedString`.
 
 ### Bit-level structures
 - [ ] `BitStruct` / bit fields: sub-byte integer fields inside a spec (for example a
@@ -175,7 +175,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       ```
       Parse into a typed dataclass instance instead of a plain `dict`.
 - [ ] Attribute access on results (`data.width`), or return dataclasses.
-- [ ] A spec-level default endianness so you don't repeat `endian="big"` on every field.
+- [x] A spec-level default endianness so you don't repeat `endian="big"` on every field.
 - [ ] Short aliases: `pb.u8`, `pb.u16be`, `pb.i32le`, `pb.f64`, and so on.
 - [ ] Nested `Specification`s should round-trip, and an "embedded"/flattened variant
       should be available.
