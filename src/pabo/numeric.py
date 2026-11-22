@@ -2,6 +2,7 @@
 Numerical constructs.
 """
 
+import mmap
 import struct
 import sys
 from dataclasses import dataclass
@@ -256,6 +257,24 @@ class Array(Construct):
             return count * self.dtype.width
         return -(-count * self.packing // 8)
 
+    def _parse_mapped(self, stream: mmap.mmap, count: int, dtype: np.dtype) -> np.ndarray:
+        """
+        Return a read-only view of the memory-mapped file, without copying.
+        """
+
+        start = stream.tell()
+        available = len(stream) - start
+        nbytes = self._nbytes(count) if count >= 0 else available
+        if nbytes > available:
+            raise StreamError(f"Stream ended early: expected {nbytes} bytes, got {available}.")
+        if nbytes % dtype.itemsize:
+            raise StreamError(
+                f"{nbytes} bytes is not a whole number of {dtype.itemsize}-byte elements."
+            )
+        array = np.frombuffer(stream, dtype=dtype, count=nbytes // dtype.itemsize, offset=start)
+        stream.seek(start + nbytes)
+        return array
+
     def _count(self, ctx) -> int:
         count = evaluate(self.count, ctx)
         if not isinstance(count, (int, np.integer)):
@@ -292,6 +311,8 @@ class Array(Construct):
 
     def _parse(self, stream, ctx):
         count = self._count(ctx)
+        if self.packing is None and isinstance(stream, mmap.mmap):
+            return self._parse_mapped(stream, count, self.dtype_for(ctx))
         if count >= 0:
             raw = read_exactly(stream, self._nbytes(count))
         else:

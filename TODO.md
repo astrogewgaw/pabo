@@ -155,11 +155,11 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Arbitrary `nbits` (3, 5, 12, ...) in the packer, not just 1, 2 and 4.
 
 ### Stream positioning
-- [ ] `Seek`, `Tell`, `Pointer` (parse at an absolute offset), `Peek` (look ahead without
+- [x] `Seek`, `Tell`, `Pointer` (parse at an absolute offset), `Peek` (look ahead without
       consuming).
-- [ ] `Aligned(n, ...)` / `AlignedSpec` for word-aligned layouts.
-- [ ] `Lazy` fields and lazy arrays (offset recorded, data read on access).
-- [ ] Zero-copy `mmap`/`np.memmap` parsing for large arrays. This is important for the
+- [x] `Aligned(n, ...)` / `AlignedSpec` for word-aligned layouts.
+- [x] `Lazy` fields and lazy arrays (offset recorded, data read on access).
+- [x] Zero-copy `mmap`/`np.memmap` parsing for large arrays. This is important for the
       `priwo` use case of multi-GB pulsar data files.
 
 ### Transforms

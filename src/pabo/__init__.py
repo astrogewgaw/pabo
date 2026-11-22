@@ -34,12 +34,15 @@ from pabo.bytes import Bytes, Flag, GreedyBytes, Padding
 from pabo.numeric import Array, Float, Int, VarInt, ZigZag
 from pabo.specify import Specification
 from pabo.specify import Specification as Spec
+from pabo.stream import Aligned, AlignedSpec, Lazy, LazyValue, Peek, Pointer, Seek, Tell
 from pabo.strings import CString, GreedyString, Line, PaddedString, PascalString
 from pabo.wrappers import Adapted, Const, Greedy, Padded, Prefixed, Repeat, Sequential
 from pabo.wrappers import Sequential as Seq
 
 __all__ = [
     "Adapted",
+    "Aligned",
+    "AlignedSpec",
     "Array",
     "BitFlag",
     "BitInt",
@@ -65,6 +68,8 @@ __all__ = [
     "GreedyString",
     "If",
     "Int",
+    "Lazy",
+    "LazyValue",
     "Line",
     "Optional",
     "PaboError",
@@ -72,10 +77,13 @@ __all__ = [
     "PaddedString",
     "Padding",
     "PascalString",
+    "Peek",
+    "Pointer",
     "Prefixed",
     "Rebuild",
     "Repeat",
     "RepeatUntil",
+    "Seek",
     "Seq",
     "Sequential",
     "SizeofError",
@@ -84,6 +92,7 @@ __all__ = [
     "StopIf",
     "StreamError",
     "Switch",
+    "Tell",
     "Terminated",
     "this",
     "Timestamp",

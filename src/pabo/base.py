@@ -2,6 +2,7 @@
 Base classes.
 """
 
+import mmap
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -157,13 +158,21 @@ class Construct(ABC, Generic[T]):
     def parse(self, dst) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
+
+        Files given by path are memory-mapped, so large arrays are read without
+        copying (the arrays returned are read-only views of the file), and lazy
+        fields can still be read after `parse` returns.
         """
 
         if isinstance(dst, (bytes, bytearray, memoryview)):
             return self._parse(BytesIO(dst), Context())
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
-                return self._parse(f, Context())
+                try:
+                    stream = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+                except (OSError, ValueError):
+                    return self._parse(f, Context())
+            return self._parse(stream, Context())
         if hasattr(dst, "read"):
             return self._parse(dst, Context())
         raise PaboError(f"Cannot parse from an object of type {type(dst).__name__}.")

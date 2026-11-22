@@ -30,12 +30,16 @@ src/pabo/
   base.py       Construct ABC, read_exactly(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
   context.py    Container, Context, `this` references, evaluate()
-  numeric.py    Int, Float (struct-backed), Array (numpy-backed, optional bit packing)
-  bits.py       Bits (bit-level fields, one 0/1 byte per bit)
+  numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional packing)
+  bits.py       Bits (one 0/1 byte per bit), BitStruct with BitInt/BitFlag/BitPadding
   bytes.py      Bytes, Flag, Padding
   strings.py    CString, Line, PaddedString, PascalString
   wrappers.py   Const, Greedy, Sequential, Repeat, Adapted, Prefixed, Padded
-  specify.py    Specification (ordered dict of named fields -> dict)
+  specify.py    Specification (ordered dict of named fields -> Container)
+  control.py    Computed, Rebuild, If, Optional, Switch, RepeatUntil, StopIf, Check, ...
+  adapters.py   Enum, FlagsEnum, Timestamp
+  stream.py     Seek, Tell, Pointer, Peek, Aligned, Lazy/LazyValue
+  packing.py    pack_bits/unpack_bits: any nbits (C++ fast path for 1/2/4, else numpy)
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
 tests/          one test_<module>.py per source module (incl. test_packed.py)
 docs/           Sphinx (furo) docs; still largely unwritten
@@ -66,6 +70,10 @@ or any `lambda ctx: ...`. Parameters that may depend on other fields are typed
 `Dynamic` and resolved with `evaluate(value, ctx)`. When building, the context
 starts as a copy of the full input dict. Composite constructs wrap each child in
 `with scope(name, stream):` so errors carry the field path and offset.
+
+`parse(path)` memory-maps the file, so the stream may be an `mmap.mmap`; `Array`
+uses that to return zero-copy views, and `Lazy` values stay readable after
+`parse` returns. Don't assume the stream is a regular file object.
 
 The public `parse()`, `build()` and `size` live on the base class and handle the
 input/output types: `bytes`/`bytearray`/`memoryview`, a `str`/`Path`, or a file-like
