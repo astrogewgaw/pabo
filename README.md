@@ -1,7 +1,7 @@
 <div align="center">
 <img 
     alt="pabo: Binary parsing for dummies!"
-    src="https://raw.githubusercontent.com/astrogewgaw/logos/main/rasters/pabo.png"
+    src="https://raw.githubusercontent.com/astrogewgaw/logos/refs/heads/main/pabo/pabo.png"
 />
 </div>
 <br/><br/>
