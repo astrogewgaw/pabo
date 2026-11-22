@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
 
-from pabo.base import Construct, read_exactly, scope
+from pabo.base import Construct, Stop, read_exactly, scope
 from pabo.context import Dynamic, evaluate
 from pabo.errors import ConstError, PaboError, SizeofError, ValidationError
 from pabo.numeric import Int
@@ -119,16 +119,22 @@ class Sequential(Construct[list], MutableSequence):
                 f"Expected {len(self.items)} elements, got {len(data)}."
             )
         built = []
-        for ix, (item, element) in enumerate(zip(self.items, data, strict=True)):
-            with scope(f"[{ix}]", stream):
-                built.append(item._build(element, stream, ctx))
+        try:
+            for ix, (item, element) in enumerate(zip(self.items, data, strict=True)):
+                with scope(f"[{ix}]", stream):
+                    built.append(item._build(element, stream, ctx))
+        except Stop:
+            pass
         return built
 
     def _parse(self, stream, ctx):
         data = []
-        for ix, item in enumerate(self.items):
-            with scope(f"[{ix}]", stream):
-                data.append(item._parse(stream, ctx))
+        try:
+            for ix, item in enumerate(self.items):
+                with scope(f"[{ix}]", stream):
+                    data.append(item._parse(stream, ctx))
+        except Stop:
+            pass
         return data
 
     def insert(self, ix: int, item: Construct) -> None:

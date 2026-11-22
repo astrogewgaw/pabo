@@ -16,6 +16,12 @@ from pabo.errors import ContextError, PaboError, SizeofError, StreamError
 T = TypeVar("T")
 
 
+class Stop(Exception):
+    """
+    Raised by `StopIf` to end a `Specification` or `Sequential` early.
+    """
+
+
 def read_exactly(stream, size: int) -> bytes:
     """
     Read exactly `size` bytes from a stream, or raise a `StreamError`.

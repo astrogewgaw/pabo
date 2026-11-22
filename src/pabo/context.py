@@ -86,6 +86,8 @@ class This:
     level. Calling a reference with a context returns the referenced value. A
     reference is just a callable taking the context, so anything more involved
     (`this.n * 2`, say) is written as a function: `lambda ctx: ctx.n * 2`.
+    In particular, `this.n == 0` compares two references and gives a plain
+    bool; write `lambda ctx: ctx.n == 0` instead.
     """
 
     __slots__ = ("__path",)

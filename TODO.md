@@ -129,16 +129,16 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       `Array(Int(4), count=this.n)`. Most real formats need this. Thread a context (a
       dict of already-parsed values plus a parent pointer for nested specs) through
       `_parse`/`_build`.
-- [ ] **Rebuild**: compute dependent fields automatically when building, for example a
+- [x] **Rebuild**: compute dependent fields automatically when building, for example a
       length prefix computed from `len(payload)`.
-- [ ] `Computed` for derived fields that occupy no bytes.
+- [x] `Computed` for derived fields that occupy no bytes.
 
 ### Control flow
-- [ ] `If` / `IfThenElse` / `Optional`.
-- [ ] `Switch` (tagged unions keyed on a previously parsed field).
-- [ ] `RepeatUntil(predicate, ...)`, and a context-driven count for `Repeat`.
-- [ ] `StopIf` / `Terminated` (assert EOF).
-- [ ] `Check` / validation hooks, generalising `Const`.
+- [x] `If` / `IfThenElse` / `Optional`.
+- [x] `Switch` (tagged unions keyed on a previously parsed field).
+- [x] `RepeatUntil(predicate, ...)`, and a context-driven count for `Repeat`.
+- [x] `StopIf` / `Terminated` (assert EOF).
+- [x] `Check` / validation hooks, generalising `Const`.
 
 ### Types
 - [ ] More integer types: 24-bit and other odd widths (`Int(3)`), 128-bit, variable-length

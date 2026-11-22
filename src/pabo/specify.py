@@ -4,7 +4,7 @@ Specifications for binary data.
 
 from dataclasses import dataclass
 
-from pabo.base import Construct, scope
+from pabo.base import Construct, Stop, scope
 from pabo.context import Container, Context
 from pabo.errors import PaboError
 
@@ -35,22 +35,28 @@ class Specification(Construct[Container]):
         if not isinstance(data, dict):
             raise PaboError(f"Expected a dict of fields, got {type(data).__name__}.")
         child = Context(data, parent=ctx)
-        for name, field in self.fields.items():
-            with scope(name, stream):
-                if name in child:
-                    value = child[name]
-                elif field._omittable():
-                    value = None
-                else:
-                    raise PaboError(
-                        f"Missing field {name!r}. Data not according to specification."
-                    )
-                child[name] = field._build(value, stream, child)
+        try:
+            for name, field in self.fields.items():
+                with scope(name, stream):
+                    if name in child:
+                        value = child[name]
+                    elif field._omittable():
+                        value = None
+                    else:
+                        raise PaboError(
+                            f"Missing field {name!r}. Data not according to specification."
+                        )
+                    child[name] = field._build(value, stream, child)
+        except Stop:
+            pass
         return Container(child)
 
     def _parse(self, stream, ctx):
         child = Context(parent=ctx)
-        for name, field in self.fields.items():
-            with scope(name, stream):
-                child[name] = field._parse(stream, child)
+        try:
+            for name, field in self.fields.items():
+                with scope(name, stream):
+                    child[name] = field._parse(stream, child)
+        except Stop:
+            pass
         return Container(child)
