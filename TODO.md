@@ -250,21 +250,21 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 
 ## 6. Documentation
 
-- [ ] `.readthedocs.yaml` uses `ubuntu-20.04` and Python 3.9, but the package requires
+- [x] `.readthedocs.yaml` uses `ubuntu-20.04` and Python 3.9, but the package requires
       Python 3.10 or later. Update to `ubuntu-24.04` / Python 3.12 or later, and install
       the package so autodoc works.
-- [ ] `conf.py` sets `html_static_path = ["static"]` and `templates_path = ["templates"]`,
+- [x] `conf.py` sets `html_static_path = ["static"]` and `templates_path = ["templates"]`,
       but neither directory exists. Update the copyright year.
-- [ ] `docs/requirements.txt` lists `sphinx_rtd_theme`, which is unused (the docs use
+- [x] `docs/requirements.txt` lists `sphinx_rtd_theme`, which is unused (the docs use
       `furo`).
-- [ ] Write real docs: a tutorial, an API reference (autodoc), a cookbook of real formats,
+- [x] Write real docs: a tutorial, an API reference (autodoc), a cookbook of real formats,
       a "pabo vs construct" comparison, and a guide to writing custom constructs.
-- [ ] README:
+- [x] README:
       - The doc-coverage badge points to `assets/doc_cov.svg`, which this refactor
         deletes. Point it at `assets/interrogate.svg`.
       - Remove the dangling `[attrs]` / `[numpy]` link refs if unused.
       - Show `build()` as well as `parse()`.
       - The "Code style: black" badge should match whatever formatter is actually used.
-- [ ] Docstrings: most constructs have one-line docstrings with no parameter docs. Fix the
+- [x] Docstrings: most constructs have one-line docstrings with no parameter docs. Fix the
       typo "functinality" in `base.py`.
-- [ ] Add a `CHANGELOG.md`.
+- [x] Add a `CHANGELOG.md`.

@@ -20,7 +20,11 @@ def _count(value, ctx) -> int:
 @dataclass
 class Bytes(Construct[bytes]):
     """
-    Represents bytes. A negative `count` reads until the end of the stream.
+    Represents `count` raw bytes.
+
+    `count` may depend on other fields (`Bytes(this.length)`). A negative
+    `count` reads until the end of the stream. Building checks that the data
+    has exactly `count` bytes.
     """
 
     count: Dynamic
@@ -51,6 +55,9 @@ class Bytes(Construct[bytes]):
 class Flag(Construct[bool]):
     """
     Represents a single byte as a boolean.
+
+    Any non-zero byte parses as True. Building writes 1 for a true value and 0
+    for a false one.
     """
 
     def _size(self, ctx) -> int:

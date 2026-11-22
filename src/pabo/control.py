@@ -165,7 +165,7 @@ class RepeatUntil(Construct[list]):
 
     The element that satisfies the predicate is included in the result. When
     building, the predicate sees each element as built (so a specification's
-    elements are `Container`s, with attribute access).
+    elements are `Container` objects, with attribute access).
     """
 
     predicate: Callable

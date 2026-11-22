@@ -26,24 +26,31 @@ state, or operator overloading beyond what already exists.
 
 ```
 src/pabo/
-  __init__.py   public API re-exports, plus beartype_this_package()
+  __init__.py   public API re-exports; beartype_this_package() unless PABO_BEARTYPE=0
   base.py       Construct ABC, read_exactly(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
   context.py    Container, Context, `this` references, evaluate()
   numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional packing)
   bits.py       Bits (one 0/1 byte per bit), BitStruct with BitInt/BitFlag/BitPadding
-  bytes.py      Bytes, Flag, Padding
-  strings.py    CString, Line, PaddedString, PascalString
+  bytes.py      Bytes, GreedyBytes, Flag, Padding
+  strings.py    CString, Line, PaddedString, PascalString, GreedyString
   wrappers.py   Const, Greedy, Sequential, Repeat, Adapted, Prefixed, Padded
-  specify.py    Specification (ordered dict of named fields -> Container)
+  specify.py    Specification (named fields -> Container), Embedded, _Plan (compiled
+                fixed-size specs: one struct call, bulk parsing in Repeat)
+  declarative.py Struct (class-based specs -> dataclasses), StructConstruct
+  aliases.py    u8, u16be, i32le, f64, ... (unsuffixed ones inherit endianness)
+  transforms.py Transformed, Compressed, Checksummed
+  debug.py      Probe
   control.py    Computed, Rebuild, If, Optional, Switch, RepeatUntil, StopIf, Check, ...
   adapters.py   Enum, FlagsEnum, Timestamp
   stream.py     Seek, Tell, Pointer, Peek, Aligned, Lazy/LazyValue
   packing.py    pack_bits/unpack_bits: any nbits (C++ fast path for 1/2/4, else numpy)
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
+  packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
 tests/          one test_<module>.py per source module (incl. test_packed.py)
-docs/           Sphinx (furo) docs; still largely unwritten
-TODO.md         roadmap: blockers, bugs, missing features vs construct, perf, CI, docs
+benchmarks/     pytest-benchmark comparisons with struct, numpy and construct
+docs/source/    Sphinx (furo + MyST) docs: tutorial, cookbook, custom, comparison, api
+TODO.md         roadmap (all items currently done); CHANGELOG.md for user-facing changes
 ```
 
 Aliases exported from `pabo`: `Spec = Specification` and `Seq = Sequential`. Code
@@ -126,9 +133,17 @@ Uses [`just`](https://github.com/casey/just) (see `justfile`):
 ```bash
 just install    # pip install --no-build-isolation -Ceditable.rebuild=true -ve .
 just test       # pytest -vv tests   (then runs `just clean`)
+just cov        # tests with a coverage report
+just lint       # ruff check, ruff format --check, pyright src, interrogate src
+just bench      # benchmarks (needs the `bench` extra)
 just clean      # remove caches/build junk (uses `fd`)
-just docs       # sphinx-reload docs
+just docs       # sphinx-reload docs (or `just docs-build` for a one-off build)
 ```
+
+Extras: `test` (pytest, pytest-cov, hypothesis), `bench`, `docs`, and `dev` (all
+of them plus ruff, pyright, pre-commit, interrogate). CI (`.github/workflows/ci.yml`)
+runs lint and the test matrix; `release.yml` builds wheels with cibuildwheel and
+publishes with trusted publishing.
 
 The editable install uses `--no-build-isolation`, so the build dependencies must
 already be in the environment: `pip install scikit-build-core nanobind setuptools-scm`.
@@ -136,7 +151,7 @@ Run a single test with `pytest tests/test_numeric.py::test_name -vv`.
 
 The version comes from git tags via setuptools-scm (written to `src/pabo/_version.py`,
 which is not committed). Docstring coverage is checked by `interrogate`
-(`fail-under = 85`, badge at `assets/interrogate.svg`). Python >= 3.10, so
+(`fail-under = 85`, semiprivate names ignored, badge at `assets/interrogate.svg`). Python >= 3.10, so
 `X | Y` unions, `match` and `zip(strict=True)` are all fine.
 
 ## Testing
@@ -149,22 +164,26 @@ which is not committed). Docstring coverage is checked by `interrogate`
 - Known-but-unfixed bugs may be marked `pytest.mark.xfail(strict=True)`, so a fix
   turns the test red until the marker is removed.
 - Test the C++ packer against `np.packbits`/`np.unpackbits` for both bit orders.
+- Property-based tests use hypothesis; real-world formats (WAV, ELF, SIGPROC) live
+  in `test_specify.py`.
+- When asserting on bad constructor arguments, accept both `pb.PaboError` and
+  `BeartypeCallHintParamViolation`, since beartype may reject a bad `Literal` first
+  (and may be turned off).
 
 ## Style
 
-- Code style: black-compatible formatting, with module and class docstrings on
-  everything public (interrogate enforces this).
+- Code style: `ruff format` and `ruff check` (config in `pyproject.toml`), pyright in
+  basic mode, and docstrings on everything public (interrogate enforces this).
+- Hot internal paths (`Context`, `Specification._parse_fields`, ...) are marked
+  `@typing.no_type_check` so beartype skips them; keep it that way for speed.
 - Commits use [gitmoji](https://gitmoji.dev) prefixes in `:code:` form, for example
   `:bug: Fix bug when reading in arrays.` or `:recycle: Refactoring.`.
 - When you fix a bug or implement a feature listed in `TODO.md`, tick it off there.
 
-## Roadmap context
+## Gotchas
 
-See `TODO.md`. The biggest gap relative to construct is **context and dependent
-fields**: referencing earlier fields (`Bytes(this.length)`), rebuilding computed
-fields, `Computed`, `Switch`, `If`, `RepeatUntil`, and so on. Also planned: a
-class-based declarative syntax, compiling fixed-size specs to a single `struct` or
-numpy structured dtype for speed, and mmap/lazy parsing for multi-GB files. Design
-new features with these in mind, for example by threading a context through
-`_parse`/`_build` in the future, but don't build speculative infrastructure ahead of
-the feature that needs it.
+- Don't name a construct's dataclass field `size`: it would shadow the `size`
+  property (use `length`, as `Transformed` does).
+- `this.n == 0` is a plain bool (references compare by path), not an expression.
+- `Specification._plan` must give exactly the same results as the field-by-field
+  path; when unsure, return None from `_Plan.compile` and let the slow path run.

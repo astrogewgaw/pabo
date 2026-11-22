@@ -68,7 +68,10 @@ class CString(Construct[str]):
 @dataclass
 class PascalString(Construct[str]):
     """
-    Represents a Pascal-style string.
+    Represents a Pascal-style string: its length in bytes, then the text.
+
+    `pre` is the integer construct holding the length (such as `pb.u8`), and
+    `code` the text encoding.
     """
 
     pre: Int
@@ -163,7 +166,7 @@ class GreedyString(Construct[str]):
 @dataclass
 class Line(Construct[str]):
     """
-    Represents a string ending with a CRLF (b'\r\n').
+    Represents a string ending with a CRLF (``\\r\\n``).
     """
 
     code: str = "utf-8"

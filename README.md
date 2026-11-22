@@ -13,7 +13,7 @@
 ![Stars][stars-badge]
 
 [![Gitmoji][gitmoji-badge]][gitmoji]
-[![Code style: black][black-badge]][black]
+[![Ruff][ruff-badge]][ruff]
 
 </div>
 
@@ -70,8 +70,9 @@ which would return a dictionary with the parsed data, like so:
 
 For more real examples, check out the [**`priwo`**][priwo] package, which uses
 `pabo` to parse pulsar data from binary files (in fact, many of `pabo`'s
-features are directly motivated by their need in `priwo`!). Documentation is in
-development, so stay tuned!
+features are directly motivated by their need in `priwo`!). The
+[**documentation**][docs] has a tutorial, a cookbook of real formats, and a
+comparison with `construct`.
 
 <h2>Installation</h2>
 
@@ -91,10 +92,9 @@ clean and easy-to-understand.
 
 </div>
 
-[numpy]: https://numpy.org
-[attrs]: https://www.attrs.org
+[docs]: https://pabo.readthedocs.io
+[ruff]: https://github.com/astral-sh/ruff
 [gitmoji]: https://gitmoji.dev
-[black]: https://github.com/psf/black
 [bread]: https://github.com/alexras/bread
 [pabo]: https://github.com/astrogewgaw/pabo
 [priwo]: https://github.com/astrogewgaw/priwo
@@ -103,8 +103,8 @@ clean and easy-to-understand.
 [structures]: https://github.com/malinoff/structures
 [interrogate]: https://github.com/econchick/interrogate
 [struct]: https://docs.python.org/3/library/struct.html
-[doc_cov]: https://raw.githubusercontent.com/astrogewgaw/pabo/main/assets/doc_cov.svg
+[doc_cov]: https://raw.githubusercontent.com/astrogewgaw/pabo/main/assets/interrogate.svg
 [license]: https://img.shields.io/github/license/astrogewgaw/pabo?style=for-the-badge
 [stars-badge]: https://img.shields.io/github/stars/astrogewgaw/pabo?style=for-the-badge
-[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
+[ruff-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge
 [gitmoji-badge]: https://img.shields.io/badge/gitmoji-%20😜%20😍-FFDD67.svg?style=for-the-badge

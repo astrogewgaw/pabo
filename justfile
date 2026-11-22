@@ -61,3 +61,7 @@ default:
 @docs:
     echo "Building docs for {{pkg}}..."
     sphinx-reload docs
+
+# Build the docs once into docs/build.
+@docs-build:
+    sphinx-build -b html docs/source docs/build

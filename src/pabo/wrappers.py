@@ -97,7 +97,9 @@ class Greedy(Construct[list]):
 @dataclass
 class Sequential(Construct[list], MutableSequence):
     """
-    Represents a sequence of binary constructs.
+    Represents a sequence of unnamed binary constructs, parsed into a list.
+
+    It behaves like a list of constructs, so items can be added or removed.
     """
 
     items: list[Construct]
@@ -152,7 +154,10 @@ class Sequential(Construct[list], MutableSequence):
 @dataclass
 class Repeat(Construct[list]):
     """
-    Represents a binary construct repeated `count` times.
+    Represents a binary construct repeated `count` times, as a list.
+
+    `count` may depend on other fields (`Repeat(pb.u16, this.n)`). For numbers,
+    `Array` is faster and gives a numpy array instead.
     """
 
     wraps: Construct
@@ -213,6 +218,10 @@ class Adapted(Construct):
 class Prefixed(Construct):
     """
     Represents a binary construct prefixed by its length in bytes.
+
+    `pre` is the integer construct holding the length. When parsing, exactly
+    that many bytes are read and `wraps` is parsed from them, so `wraps` may be
+    greedy (`Bytes(-1)`, `Array(...)`). When building, the length is computed.
     """
 
     pre: Int

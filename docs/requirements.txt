@@ -1,6 +1,6 @@
+sphinx
 furo
-myst_parser
-sphinx_sitemap
-sphinx_rtd_theme
-sphinx_copybutton
-sphinx_autodoc_typehints
+myst-parser
+sphinx-sitemap
+sphinx-copybutton
+sphinx-autodoc-typehints
