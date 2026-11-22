@@ -2,48 +2,67 @@
 String constructs.
 """
 
-from attrs import define
+from dataclasses import dataclass
+
+from pabo.base import Construct, PaboError, read_exactly
 from pabo.bytes import Bytes
 from pabo.numeric import Int
-from pabo.base import PaboError, Construct
-from pabo.wrappers import Padded, Prefixed
+from pabo.wrappers import Prefixed
 
 
-@define
-class CString(Construct):
-
+def _fragment(text: str, code: str) -> bytes:
     """
-    Represents a C-style string.
+    Encode `text` as it appears in the middle of a string, i.e. without a BOM.
+    """
+
+    return ("a" + text).encode(code)[len("a".encode(code)) :]
+
+
+def _decode(raw: bytes, code: str) -> str:
+    try:
+        return raw.decode(code)
+    except UnicodeDecodeError as error:
+        raise PaboError(f"Cannot decode {raw!r} as {code}: {error}.") from error
+
+
+def _read_until(stream, terminator: bytes, unit: int) -> bytes:
+    """
+    Read whole code units until `terminator`, and return what came before it.
+    """
+
+    data = bytearray()
+    while True:
+        data += read_exactly(stream, unit)
+        if data.endswith(terminator):
+            return bytes(data[: -len(terminator)])
+
+
+@dataclass
+class CString(Construct):
+    """
+    Represents a C-style (null-terminated) string.
+
+    The terminator is one null code unit in the given encoding, so it is
+    two bytes for UTF-16 and four bytes for UTF-32.
     """
 
     code: str = "utf-8"
 
-    def __size__(self):
+    def _size(self):
         raise PaboError("A CString has no fixed size.")
 
-    def __build__(self, data, stream) -> None:
-        raw = data.encode(self.code)
-        raw = b"".join([raw, b"\x00"])
-        stream.write(raw)
+    def _build(self, data, stream) -> None:
+        if "\x00" in data:
+            raise PaboError("A CString cannot contain a null character.")
+        stream.write(data.encode(self.code) + _fragment("\x00", self.code))
 
-    def __parse__(self, stream):
-        data = []
-        while True:
-            raw = stream.read(1)
-            if not raw:
-                raise PaboError("Premature end of stream.")
-            if raw != b"\x00":
-                data.append(raw)
-            else:
-                break
-        data = b"".join(data)
-        data = data.decode(self.code)
-        return data
+    def _parse(self, stream):
+        null = _fragment("\x00", self.code)
+        return _decode(_read_until(stream, null, len(null)), self.code)
 
 
-@define
+@dataclass
 class PascalString(Construct):
-
     """
     Represents a Pascal-style string.
     """
@@ -51,68 +70,63 @@ class PascalString(Construct):
     pre: Int
     code: str = "utf-8"
 
-    def __size__(self):
+    def _size(self):
         raise PaboError("A PascalString has no fixed size.")
 
-    def __build__(self, data, stream) -> None:
-        raw = data.encode(self.code)
-        Prefixed(self.pre, Bytes(-1)).__build__(raw, stream)
+    def _build(self, data, stream) -> None:
+        Prefixed(self.pre, Bytes(-1))._build(data.encode(self.code), stream)
 
-    def __parse__(self, stream):
-        return Prefixed(self.pre, Bytes(-1)).__parse__(stream).decode(self.code)
+    def _parse(self, stream):
+        return _decode(Prefixed(self.pre, Bytes(-1))._parse(stream), self.code)
 
 
-@define
+@dataclass
 class PaddedString(Construct):
-
     """
-    Represents a string padded by null bytes (\x00).
+    Represents a string padded by null bytes (\x00) to a fixed length.
     """
 
-    size: int
+    length: int
     code: str = "utf-8"
 
-    def __size__(self):
-        return self.size
+    def _size(self):
+        return self.length
 
-    def __build__(self, data, stream) -> None:
+    def _build(self, data, stream) -> None:
         raw = data.encode(self.code)
-        pad = self.size - len(raw)
-        Padded(pad, Bytes(len(raw))).__build__(raw, stream)
+        if len(raw) > self.length:
+            raise PaboError(
+                f"String too long: {len(raw)} bytes encoded, but only {self.length} available."
+            )
+        stream.write(raw + b"\x00" * (self.length - len(raw)))
 
-    def __parse__(self, stream):
-        raw = stream.read(self.size)
-        raw = raw.rstrip(b"\x00")
-        data = raw.decode(self.code)
-        return data
+    def _parse(self, stream):
+        raw = read_exactly(stream, self.length)
+        null = _fragment("\x00", self.code)
+        unit = len(null)
+        raw = raw[: len(raw) - len(raw) % unit]
+        while raw.endswith(null):
+            raw = raw[:-unit]
+        return _decode(raw, self.code)
 
 
-@define
+@dataclass
 class Line(Construct):
-
     """
     Represents a string ending with a CRLF (b'\r\n').
     """
 
     code: str = "utf-8"
 
-    def __size__(self):
-        raise PaboError("A Line has no fixed size!")
+    def _size(self):
+        raise PaboError("A Line has no fixed size.")
 
-    def __build__(self, data, stream):
-        raw = data.encode(self.code)
-        stream.write(b"".join([raw, b"\r\n"]))
+    def _build(self, data, stream):
+        if "\r\n" in data:
+            raise PaboError("A Line cannot contain a CRLF.")
+        stream.write(data.encode(self.code) + _fragment("\r\n", self.code))
 
-    def __parse__(self, stream):
-        data = []
-        while True:
-            raw = stream.read(1)
-            if not raw:
-                raise PaboError("Premature end of stream.")
-            if data[-2:] != b"\r\n":
-                data.append(raw)
-            else:
-                break
-        data = b"".join(data[:-2])
-        data = data.decode(self.code)
-        return data
+    def _parse(self, stream):
+        crlf = _fragment("\r\n", self.code)
+        unit = len(_fragment("\x00", self.code))
+        return _decode(_read_until(stream, crlf, unit), self.code)

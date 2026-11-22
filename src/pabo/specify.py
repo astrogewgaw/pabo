@@ -2,38 +2,34 @@
 Specifications for binary data.
 """
 
-from typing import Dict
-from attrs import define
-from pabo.base import PaboError, Construct
+from dataclasses import dataclass
+
+from pabo.base import Construct, PaboError
+from pabo.wrappers import Const
 
 
-@define
+@dataclass
 class Specification(Construct):
-
     """
     Represents a specification for binary data.
     """
 
-    fields: Dict[str, Construct]
+    fields: dict[str, Construct]
 
-    def __size__(self):
+    def _size(self):
         return sum(field.size for field in self.fields.values())
 
-    def __build__(self, data, stream):
-        try:
-            for (
-                name,
-                field,
-            ) in self.fields.items():
-                field.__build__(data[name], stream)
-        except KeyError:
-            raise PaboError("Data not according to specification.")
+    def _build(self, data, stream):
+        for name, field in self.fields.items():
+            if name in data:
+                value = data[name]
+            elif isinstance(field, Const):
+                value = None
+            else:
+                raise PaboError(
+                    f"Missing field {name!r}. Data not according to specification."
+                )
+            field._build(value, stream)
 
-    def __parse__(self, stream):
-        return {
-            name: field.__parse__(stream)
-            for (
-                name,
-                field,
-            ) in self.fields.items()
-        }
+    def _parse(self, stream):
+        return {name: field._parse(stream) for name, field in self.fields.items()}

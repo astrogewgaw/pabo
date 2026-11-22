@@ -2,38 +2,42 @@
 Binary parsing for dummies!
 """
 
-from pabo.bits import Bits
-from pabo.base import Construct
-from pabo.specify import Specification
-from pabo.numeric import Int, Float, Array
-from pabo.bytes import Bytes, Flag, Padding
-from pabo.wrappers import Sequential as Seq
-from pabo.specify import Specification as Spec
-from pabo.strings import Line, CString, PascalString, PaddedString
-from pabo.wrappers import Const, Greedy, Repeat, Sequential, Adapted, Padded, Prefixed
+from beartype.claw import beartype_this_package
 
+beartype_this_package()
+
+from pabo.base import Construct, PaboError
+from pabo.bits import Bits
+from pabo.bytes import Bytes, Flag, Padding
+from pabo.numeric import Array, Float, Int
+from pabo.specify import Specification
+from pabo.specify import Specification as Spec
+from pabo.strings import CString, Line, PaddedString, PascalString
+from pabo.wrappers import Adapted, Const, Greedy, Padded, Prefixed, Repeat, Sequential
+from pabo.wrappers import Sequential as Seq
 
 __all__ = [
-    "Int",
-    "Seq",
-    "Bits",
-    "Spec",
-    "Line",
-    "Flag",
-    "Const",
-    "Bytes",
+    "Adapted",
     "Array",
+    "Bits",
+    "Bytes",
+    "CString",
+    "Const",
+    "Construct",
+    "Flag",
     "Float",
     "Greedy",
-    "Repeat",
+    "Int",
+    "Line",
+    "PaboError",
     "Padded",
-    "CString",
-    "Padding",
-    "Adapted",
-    "Prefixed",
-    "Construct",
-    "Sequential",
-    "PascalString",
     "PaddedString",
+    "Padding",
+    "PascalString",
+    "Prefixed",
+    "Repeat",
+    "Seq",
+    "Sequential",
+    "Spec",
     "Specification",
 ]

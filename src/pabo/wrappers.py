@@ -2,96 +2,85 @@
 Wrappers for constructs.
 """
 
-from attrs import define
-from pathlib import Path
+from collections.abc import Callable, MutableSequence
+from dataclasses import dataclass
+from typing import Any
+
+from pabo.base import Construct, PaboError, read_exactly
 from pabo.numeric import Int
-from io import BytesIO, BufferedIOBase
-from pabo.base import PaboError, Construct
-from collections.abc import MutableSequence
-from typing import Any, List, Union, Optional, Callable
 
 
-@define
+@dataclass
 class Const(Construct):
-
     """
     Represents a binary construct that is constant.
+
+    When building, the value may be omitted (None); it is filled in automatically.
     """
 
     value: Any
     wraps: Construct
 
-    def __size__(self):
+    def _size(self):
         return self.wraps.size
 
-    def __build__(self, stream):
-        self.wraps.__build__(self.value, stream)
+    def _build(self, data, stream):
+        if data is not None and data != self.value:
+            raise PaboError(f"Cannot build {data!r}: the constant is {self.value!r}.")
+        self.wraps._build(self.value, stream)
 
-    def __parse__(self, stream):
-        data = self.wraps.__parse__(stream)
+    def _parse(self, stream):
+        data = self.wraps._parse(stream)
         if data != self.value:
-            raise PaboError("Parsed value different from reference.")
-        else:
-            return data
+            raise PaboError(
+                f"Parsed {data!r}, but expected the constant {self.value!r}."
+            )
+        return data
 
-    def build(
-        self,
-        to_: Optional[
-            Union[
-                str,
-                Path,
-                BytesIO,
-                BufferedIOBase,
-            ]
-        ] = None,
-    ) -> Optional[bytes]:
-        if to_ is None:
-            to_ = BytesIO()
-            self.__build__(to_)
-            return to_.getvalue()
-        if isinstance(to_, (str, Path)):
-            with open(to_, "wb") as f:
-                self.__build__(f)
-            return
-        if isinstance(to_, (BytesIO, BufferedIOBase)):
-            self.__build__(to_)
-            return
+    def build(self, data=None, src=None, append: bool = False) -> bytes | None:
+        return super().build(data, src, append)
 
 
-@define
+@dataclass
 class Greedy(Construct):
-
     """
     Represents a binary construct that builds/parses greedily.
+
+    Parsing stops at the first element that fails to parse, and the stream is
+    rewound to where that element started.
     """
 
     wraps: Construct
 
-    def __size__(self):
-        return self.wraps.__size__
+    def _size(self):
+        raise PaboError("A Greedy construct has no fixed size.")
 
-    def __build__(self, data, stream):
+    def _build(self, data, stream):
         for element in data:
-            self.wraps.__build__(element, stream)
+            self.wraps._build(element, stream)
 
-    def __parse__(self, stream):
+    def _parse(self, stream):
         data = []
         while True:
+            start = stream.tell()
             try:
-                data.append(self.wraps.__parse__(stream))
-            except Exception:
+                element = self.wraps._parse(stream)
+            except PaboError:
+                stream.seek(start)
                 break
+            if stream.tell() == start:
+                break
+            data.append(element)
         return data
 
 
-@define
+@dataclass
 class Sequential(Construct, MutableSequence):
-
     """
     Represents a sequence of binary constructs.
     """
 
-    items: List[Construct]
+    items: list[Construct]
 
     def __len__(self):
         return len(self.items)
@@ -105,29 +94,24 @@ class Sequential(Construct, MutableSequence):
     def __delitem__(self, ix):
         del self.items[ix]
 
-    def __size__(self):
-        sizes = [_.__size__() for _ in self.items]
-        return sum([_ for _ in sizes if _ is not None])
+    def _size(self):
+        return sum(item.size for item in self.items)
 
-    def __build__(self, data, stream):
-        [
-            item.__build__(element, stream)
-            for (
-                item,
-                element,
-            ) in zip(self.items, data)
-        ]
+    def _build(self, data, stream):
+        if len(data) != len(self.items):
+            raise PaboError(f"Expected {len(self.items)} elements, got {len(data)}.")
+        for item, element in zip(self.items, data, strict=True):
+            item._build(element, stream)
 
-    def __parse__(self, stream):
-        return [item.__parse__(stream) for item in self.items]
+    def _parse(self, stream):
+        return [item._parse(stream) for item in self.items]
 
     def insert(self, ix: int, item: Construct) -> None:
         self.items.insert(ix, item)
 
 
-@define
+@dataclass
 class Repeat(Construct):
-
     """
     Represents a binary construct repeated.
     """
@@ -135,87 +119,81 @@ class Repeat(Construct):
     wraps: Construct
     count: int
 
-    def __size__(self):
+    def _size(self):
         return self.wraps.size * self.count
 
-    def __build__(self, data, stream):
+    def _build(self, data, stream):
         if len(data) < self.count:
-            raise PaboError(f"Not enough data to build. Need at least {self.count}")
-        else:
-            for ix in range(self.count):
-                self.wraps.__build__(data[ix], stream)
+            raise PaboError(f"Not enough data. Need at least {self.count} elements.")
+        for ix in range(self.count):
+            self.wraps._build(data[ix], stream)
 
-    def __parse__(self, stream):
-        return [self.wraps.__parse__(stream) for _ in range(self.count)]
+    def _parse(self, stream):
+        return [self.wraps._parse(stream) for _ in range(self.count)]
 
 
-@define
+@dataclass
 class Adapted(Construct):
-
     """
     Represents a binary construct that is adaptable.
+
+    `decode` is applied to the parsed value, and `encode` to the value before
+    it is built.
     """
 
     wraps: Construct
-    post: Callable
-    pre: Callable
+    decode: Callable
+    encode: Callable
 
-    def __size__(self):
+    def _size(self):
         return self.wraps.size
 
-    def __build__(self, data, stream):
-        self.wraps.__build__(self.pre(data), stream)
+    def _build(self, data, stream):
+        self.wraps._build(self.encode(data), stream)
 
-    def __parse__(self, stream):
-        return self.post(self.wraps.__parse__(stream))
+    def _parse(self, stream):
+        return self.decode(self.wraps._parse(stream))
 
 
-@define
+@dataclass
 class Prefixed(Construct):
-
     """
-    Represents a binary construct with a prefix for its length.
+    Represents a binary construct prefixed by its length in bytes.
     """
 
     pre: Int
     wraps: Construct
 
-    def __size__(self):
+    def _size(self):
         return self.pre.size + self.wraps.size
 
-    def __build__(self, data, stream):
-        try:
-            size = len(data)
-        except Exception as ERROR:
-            raise PaboError("Data has no determinable size.") from ERROR
-        self.pre.__build__(size, stream)
-        self.wraps.__build__(data, stream)
+    def _build(self, data, stream):
+        payload = self.wraps.build(data)
+        self.pre._build(len(payload), stream)
+        stream.write(payload)
 
-    def __parse__(self, stream):
-        size = self.pre.__parse__(stream)
-        data = stream.read(size)
-        return self.wraps.parse(data)
+    def _parse(self, stream):
+        size = self.pre._parse(stream)
+        return self.wraps.parse(read_exactly(stream, size))
 
 
-@define
+@dataclass
 class Padded(Construct):
-
     """
-    Represents a binary construct padded with null bytes (\x00).
+    Represents a binary construct followed by `pad` null bytes (\x00).
     """
 
     pad: int
     wraps: Construct
 
-    def __size__(self):
+    def _size(self):
         return self.wraps.size + self.pad
 
-    def __build__(self, data, stream):
-        if len(data) < self.wraps.size:
-            raise PaboError("Not enough data to build.")
-        self.wraps.__build__(data + b"\x00" * self.pad, stream)
+    def _build(self, data, stream):
+        self.wraps._build(data, stream)
+        stream.write(b"\x00" * self.pad)
 
-    def __parse__(self, stream):
-        data = stream.read(self.size)
-        data = data.rstrip(b"\x00")
-        return self.wraps.parse(data)
+    def _parse(self, stream):
+        data = self.wraps._parse(stream)
+        read_exactly(stream, self.pad)
+        return data

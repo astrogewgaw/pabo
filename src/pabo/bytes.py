@@ -2,50 +2,55 @@
 Byte manipulation.
 """
 
-from attrs import define
+from dataclasses import dataclass
+
+from pabo.base import Construct, PaboError, read_exactly
 from pabo.wrappers import Const
-from pabo.base import Construct
 
 
-@define
+@dataclass
 class Bytes(Construct):
-
     """
-    Represents bytes.
+    Represents bytes. A negative `count` reads until the end of the stream.
     """
 
-    size: int
+    count: int
 
-    def __size__(self):
-        return self.size
+    def _size(self):
+        if self.count < 0:
+            raise PaboError("Greedy bytes have no fixed size.")
+        return self.count
 
-    def __build__(self, data, stream) -> None:
+    def _build(self, data, stream) -> None:
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise PaboError(f"Expected bytes, got {type(data).__name__}.")
+        if self.count >= 0 and len(data) != self.count:
+            raise PaboError(f"Expected {self.count} bytes, got {len(data)}.")
         stream.write(data)
 
-    def __parse__(self, stream):
-        return stream.read(self.size)
+    def _parse(self, stream) -> bytes:
+        if self.count < 0:
+            return stream.read()
+        return read_exactly(stream, self.count)
 
 
-@define
+@dataclass
 class Flag(Construct):
-
     """
     Represents a single byte as a boolean.
     """
 
-    def __size__(self) -> int:
+    def _size(self) -> int:
         return 1
 
-    def __build__(self, data, stream) -> None:
+    def _build(self, data, stream) -> None:
         stream.write(b"\x01" if data else b"\x00")
 
-    def __parse__(self, stream):
-        data = stream.read(1)
-        return data != b"\x00"
+    def _parse(self, stream) -> bool:
+        return read_exactly(stream, 1) != b"\x00"
 
 
 def Padding(size):
-
     """
     Represents padding via zero bytes (b"\x00").
     """
