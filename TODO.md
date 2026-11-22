@@ -153,6 +153,8 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] `BitStruct` / bit fields: sub-byte integer fields inside a spec (for example a
       4-bit version and a 4-bit header length), with configurable bit order.
 - [x] Arbitrary `nbits` (3, 5, 12, ...) in the packer, not just 1, 2 and 4.
+      (Other widths go through numpy in `pabo.packing`; the C++ fast path is still
+      only for 1, 2 and 4 bits.)
 
 ### Stream positioning
 - [x] `Seek`, `Tell`, `Pointer` (parse at an absolute offset), `Peek` (look ahead without
