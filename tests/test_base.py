@@ -58,3 +58,57 @@ def test_error_is_not_a_dataclass():
     import dataclasses
 
     assert not dataclasses.is_dataclass(pb.PaboError)
+
+
+def test_docs_operator_returns_a_copy():
+    c = pb.Int(4)
+    d = c / "doc"
+    assert c.docs == "" and d.docs == "doc"
+
+
+def test_docs_operator_rejects_non_str():
+    with pytest.raises(pb.PaboError):
+        pb.Int(4) / 3
+
+
+def test_sizeof_static_and_dynamic():
+    assert pb.Int(4).sizeof() == 4
+    c = pb.Bytes(pb.this.n)
+    with pytest.raises(pb.SizeofError):
+        c.size
+    assert c.sizeof({"n": 3}) == 3
+
+
+def test_sizeof_of_spec_after_parsing():
+    spec = pb.Spec({"n": pb.Int(1), "data": pb.Bytes(pb.this.n)})
+    data = spec.parse(b"\x03abc")
+    with pytest.raises(pb.SizeofError):
+        spec.size
+    assert spec.sizeof(data) == 4
+
+
+def test_nested_sizeof():
+    inner = pb.Spec({"n": pb.Int(1), "data": pb.Bytes(pb.this.n)})
+    outer = pb.Spec({"a": pb.Int(2), "inner": inner})
+    assert outer.sizeof({"inner": {"n": 5}}) == 8
+
+
+def test_custom_construct():
+    from dataclasses import dataclass
+
+    @dataclass
+    class Nibbles(pb.Construct):
+        def _size(self, ctx):
+            return 1
+
+        def _parse(self, stream, ctx):
+            byte = pb.base.read_exactly(stream, 1)[0]
+            return byte >> 4, byte & 15
+
+        def _build(self, data, stream, ctx):
+            stream.write(bytes([data[0] << 4 | data[1]]))
+            return data
+
+    c = Nibbles()
+    assert c.parse(b"\x12") == (1, 2)
+    assert c.build((1, 2)) == b"\x12"

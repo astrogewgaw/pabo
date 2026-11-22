@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from pabo.base import Construct, PaboError, read_exactly
+from pabo.base import Construct, read_exactly
+from pabo.errors import PaboError, ValidationError
 from pabo.numeric import BitOrder, _check_bitorder
 from pabo.packed import pack, unpack
 
@@ -30,23 +31,24 @@ class Bits(Construct):
             raise PaboError("The number of bits cannot be negative.")
         _check_bitorder(self.bitorder)
 
-    def _size(self):
+    def _size(self, ctx):
         return -(-self.count // 8)
 
-    def _build(self, bits, stream):
+    def _build(self, bits, stream, ctx):
         if isinstance(bits, (bytes, bytearray, memoryview)):
             values = np.frombuffer(bits, dtype=np.uint8)
         else:
             values = np.asarray(bits, dtype=np.uint8).ravel()
         if values.size != self.count:
-            raise PaboError(f"Expected {self.count} bits, got {values.size}.")
+            raise ValidationError(f"Expected {self.count} bits, got {values.size}.")
         if (values > 1).any():
-            raise PaboError("Bits must be 0 or 1.")
+            raise ValidationError("Bits must be 0 or 1.")
         padded = np.zeros(self.size * 8, dtype=np.uint8)
         padded[: self.count] = values
         stream.write(pack(padded, nbits=1, bitorder=self.bitorder).tobytes())
+        return bits
 
-    def _parse(self, stream):
+    def _parse(self, stream, ctx):
         raw = read_exactly(stream, self.size)
         bits = unpack(np.frombuffer(raw, dtype=np.uint8), nbits=1, bitorder=self.bitorder)
         return bits[: self.count].tobytes()

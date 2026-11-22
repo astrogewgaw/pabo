@@ -6,7 +6,16 @@ from beartype.claw import beartype_this_package
 
 beartype_this_package()
 
-from pabo.base import Construct, PaboError
+from pabo.base import Construct
+from pabo.context import Container, Context, this
+from pabo.errors import (
+    ConstError,
+    ContextError,
+    PaboError,
+    SizeofError,
+    StreamError,
+    ValidationError,
+)
 from pabo.bits import Bits
 from pabo.bytes import Bytes, Flag, Padding
 from pabo.numeric import Array, Float, Int
@@ -23,7 +32,11 @@ __all__ = [
     "Bytes",
     "CString",
     "Const",
+    "ConstError",
     "Construct",
+    "Container",
+    "Context",
+    "ContextError",
     "Flag",
     "Float",
     "Greedy",
@@ -38,6 +51,10 @@ __all__ = [
     "Repeat",
     "Seq",
     "Sequential",
+    "SizeofError",
     "Spec",
     "Specification",
+    "StreamError",
+    "ValidationError",
+    "this",
 ]

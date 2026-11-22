@@ -1,0 +1,73 @@
+"""
+Errors raised by pabo.
+"""
+
+
+class PaboError(Exception):
+    """
+    Base class for all errors in pabo.
+
+    `path` lists the fields being parsed or built when the error happened, from
+    the outermost inwards, and `offset` is the stream position where the
+    innermost of those fields started (None if unknown).
+    """
+
+    def __init__(self, msg: str):
+        super().__init__(msg)
+        self.msg = msg
+        self.path: list[str] = []
+        self.offset: int | None = None
+
+    @property
+    def where(self) -> str:
+        """
+        The field path as a string, such as `header.sizes[2]`.
+        """
+
+        out = ""
+        for name in self.path:
+            out += name if (not out or name.startswith("[")) else "." + name
+        return out
+
+    def __str__(self) -> str:
+        parts = []
+        if self.path:
+            parts.append(f"at {self.where}")
+        if self.offset is not None:
+            parts.append(f"offset {self.offset}")
+        where = f" ({', '.join(parts)})" if parts else ""
+        return f"바보! {self.msg}{where} ABORT."
+
+    def __reduce__(self):
+        return (type(self), (self.msg,), {"path": self.path, "offset": self.offset})
+
+
+class StreamError(PaboError):
+    """
+    The stream ended early, had data left over, or could not be read/written.
+    """
+
+
+class SizeofError(PaboError):
+    """
+    A size was asked for, but it cannot be known without the data.
+    """
+
+
+class ValidationError(PaboError):
+    """
+    A value failed a check while parsing or building.
+    """
+
+
+class ConstError(ValidationError):
+    """
+    A constant did not have the expected value.
+    """
+
+
+class ContextError(PaboError):
+    """
+    A reference to another field (`this.name`, or a function of the context)
+    could not be evaluated.
+    """

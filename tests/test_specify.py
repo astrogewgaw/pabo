@@ -69,3 +69,29 @@ def test_nested_key_error_is_not_masked():
     outer = pb.Spec({"x": inner})
     with pytest.raises(pb.PaboError, match="'a'"):
         outer.build({"x": {}})
+
+
+def test_dependent_fields():
+    spec = pb.Spec(
+        {
+            "n": pb.Int(1),
+            "data": pb.Bytes(pb.this.n),
+            "words": pb.Repeat(pb.Int(2), lambda ctx: ctx.n - 1),
+        }
+    )
+    raw = b"\x03abc\x01\x00\x02\x00"
+    data = spec.parse(raw)
+    assert data == {"n": 3, "data": b"abc", "words": [1, 2]}
+    assert spec.build(data) == raw
+
+
+def test_reference_to_parent_field():
+    inner = pb.Spec({"data": pb.Bytes(pb.this._.n)})
+    outer = pb.Spec({"n": pb.Int(1), "inner": inner})
+    assert outer.parse(b"\x02ab") == {"n": 2, "inner": {"data": b"ab"}}
+    assert outer.build({"n": 2, "inner": {"data": b"ab"}}) == b"\x02ab"
+
+
+def test_build_requires_dict():
+    with pytest.raises(pb.PaboError):
+        pb.Spec({"a": pb.Int(1)}).build([1])

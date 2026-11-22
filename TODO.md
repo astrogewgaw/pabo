@@ -125,7 +125,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 ## 2. Missing features (compared with `construct`)
 
 ### Context and dependent fields (the biggest gap)
-- [ ] **Reference earlier fields**, for example `Bytes(this.length)` or
+- [x] **Reference earlier fields**, for example `Bytes(this.length)` or
       `Array(Int(4), count=this.n)`. Most real formats need this. Thread a context (a
       dict of already-parsed values plus a parent pointer for nested specs) through
       `_parse`/`_build`.
@@ -183,15 +183,15 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       and generated documentation.
 
 ### Debugging and diagnostics
-- [ ] Errors that include the **field path** (`png.ihdr.width`), the **stream offset**,
+- [x] Errors that include the **field path** (`png.ihdr.width`), the **stream offset**,
       and expected versus actual values.
 - [ ] `Probe` / a debug mode that hex-dumps each field as it is parsed.
-- [ ] Consistent error message style (some are SHOUTING, some aren't).
-- [ ] A specific exception hierarchy (`StreamError`, `ConstError`, `SizeError`,
+- [x] Consistent error message style (some are SHOUTING, some aren't).
+- [x] A specific exception hierarchy (`StreamError`, `ConstError`, `SizeError`,
       `ValidationError`) under `PaboError`.
 
 ### Introspection
-- [ ] Separate the static size (known at definition) from the dynamic size (known after
+- [x] Separate the static size (known at definition) from the dynamic size (known after
       parsing). Return `None` or raise a clear `SizeofError` for variable-size
       constructs.
 - [ ] `spec.describe()` / pretty `repr` showing the layout table (offsets, sizes, types).

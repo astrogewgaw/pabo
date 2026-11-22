@@ -27,7 +27,9 @@ state, or operator overloading beyond what already exists.
 ```
 src/pabo/
   __init__.py   public API re-exports, plus beartype_this_package()
-  base.py       Construct ABC, PaboError, read_exactly()
+  base.py       Construct ABC, read_exactly(), scope() (adds field paths to errors)
+  errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
+  context.py    Container, Context, `this` references, evaluate()
   numeric.py    Int, Float (struct-backed), Array (numpy-backed, optional bit packing)
   bits.py       Bits (bit-level fields, one 0/1 byte per bit)
   bytes.py      Bytes, Flag, Padding
@@ -46,12 +48,24 @@ usually does `import pabo as pb`.
 ## Core design
 
 Every construct is a `@dataclass` subclassing `Construct` (`base.py`) and implements
-exactly three hooks:
+exactly three hooks, each taking the current `Context` (`ctx`):
 
-- `_size(self) -> int`: the static size **in bytes**. Raise `PaboError` if the size
+- `_size(self, ctx) -> int`: the size **in bytes**. Raise `SizeofError` if the size
   is variable (for example greedy or `count < 0`).
-- `_parse(self, stream) -> Any`: read from a binary stream and return a value.
-- `_build(self, data, stream) -> None`: write `data` to a binary stream.
+- `_parse(self, stream, ctx) -> Any`: read from a binary stream and return a value.
+- `_build(self, data, stream, ctx) -> Any`: write `data` to a binary stream and
+  **return the value actually written** (usually `data`; computed for `Const`,
+  `Rebuild`, ...). Specifications store it in the context for later fields.
+
+Constructs that can be built with no value given override `_omittable()` to return
+True (wrappers delegate it to what they wrap).
+
+`Specification` creates a child `Context` per level (`ctx._` is the parent) and
+stores each field's value under its name, so later fields can use `this.name`
+or any `lambda ctx: ...`. Parameters that may depend on other fields are typed
+`Dynamic` and resolved with `evaluate(value, ctx)`. When building, the context
+starts as a copy of the full input dict. Composite constructs wrap each child in
+`with scope(name, stream):` so errors carry the field path and offset.
 
 The public `parse()`, `build()` and `size` live on the base class and handle the
 input/output types: `bytes`/`bytearray`/`memoryview`, a `str`/`Path`, or a file-like
@@ -66,9 +80,10 @@ Conventions to keep:
 - **`size` is always in bytes**, including for `Bits` and packed `Array`.
 - Use `read_exactly(stream, n)` for fixed-size reads so short reads raise `PaboError`
   and don't get silently truncated.
-- **Raise `PaboError`** for every user-facing failure. Wrap `struct.error` and
-  similar errors instead of letting them leak out, because `Greedy` relies on
-  `PaboError` to detect the end of the stream. `PaboError` formats messages as
+- **Raise a `PaboError` subclass** (`errors.py`) for every user-facing failure. Wrap
+  `struct.error` and similar errors instead of letting them leak out, because
+  `Greedy` relies on `PaboError` to detect the end of the stream. Messages are
+  full sentences in sentence case. `PaboError` formats messages as
   `"바보! <msg> ABORT."`.
 - Validate constructor arguments in `__post_init__` (widths, endianness, bit order,
   packing).

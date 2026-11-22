@@ -8,7 +8,9 @@ from typing import Literal
 
 import numpy as np
 
-from pabo.base import Construct, PaboError, read_exactly
+from pabo.base import Construct, read_exactly
+from pabo.context import Context, Dynamic, evaluate
+from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
 from pabo.packed import pack, unpack
 
 Endian = Literal["little", "big", "native"]
@@ -40,16 +42,17 @@ class _Fixed(Construct):
     def format(self) -> str:
         raise NotImplementedError
 
-    def _size(self):
+    def _size(self, ctx):
         return self.width
 
-    def _build(self, data, stream) -> None:
+    def _build(self, data, stream, ctx):
         try:
             stream.write(struct.pack(self.format, data))
         except struct.error as error:
-            raise PaboError(f"Cannot build {data!r} as {self!r}: {error}.") from error
+            raise ValidationError(f"Cannot build {data!r} as {self!r}: {error}.") from error
+        return data
 
-    def _parse(self, stream):
+    def _parse(self, stream, ctx):
         return struct.unpack(self.format, read_exactly(stream, self.width))[0]
 
 
@@ -109,7 +112,7 @@ class Array(Construct):
     """
 
     dtype: Int | Float
-    count: int = -1
+    count: Dynamic = -1
     packing: int | None = None
     bitorder: BitOrder = "big"
 
@@ -132,37 +135,47 @@ class Array(Construct):
             return count * self.dtype.width
         return -(-count * self.packing // 8)
 
-    def _size(self):
-        if self.count < 0:
-            raise PaboError("A greedy array has no fixed size.")
-        return self._nbytes(self.count)
+    def _count(self, ctx) -> int:
+        count = evaluate(self.count, ctx)
+        if not isinstance(count, (int, np.integer)):
+            raise PaboError(f"The count must be an integer, got {count!r}.")
+        return int(count)
 
-    def _build(self, data, stream):
+    def _size(self, ctx):
+        count = self._count(ctx)
+        if count < 0:
+            raise SizeofError("A greedy array has no fixed size.")
+        return self._nbytes(count)
+
+    def _build(self, data, stream, ctx):
         array = np.asarray(data, dtype=self.numpy_dtype).ravel()
-        if self.count >= 0:
-            if array.size < self.count:
-                raise PaboError(
-                    f"Not enough data to build: need {self.count} elements, got {array.size}."
+        count = self._count(ctx)
+        if count >= 0:
+            if array.size < count:
+                raise ValidationError(
+                    f"Not enough data to build: need {count} elements, got {array.size}."
                 )
-            array = array[: self.count]
+            array = array[:count]
         if self.packing is None:
             stream.write(array.tobytes())
-            return
+            return array
         if array.size and (array.min() < 0 or array.max() >= 1 << self.packing):
-            raise PaboError(f"Values do not fit in {self.packing} bits.")
+            raise ValidationError(f"Values do not fit in {self.packing} bits.")
         per_byte = 8 // self.packing
         values = np.zeros(-(-array.size // per_byte) * per_byte, dtype=np.uint8)
         values[: array.size] = array
         stream.write(pack(values, nbits=self.packing, bitorder=self.bitorder).tobytes())
+        return array
 
-    def _parse(self, stream):
-        if self.count >= 0:
-            raw = read_exactly(stream, self._nbytes(self.count))
+    def _parse(self, stream, ctx):
+        count = self._count(ctx)
+        if count >= 0:
+            raw = read_exactly(stream, self._nbytes(count))
         else:
             raw = stream.read()
         if self.packing is None:
             if len(raw) % self.dtype.width:
-                raise PaboError(
+                raise StreamError(
                     f"{len(raw)} bytes is not a whole number of "
                     f"{self.dtype.width}-byte elements."
                 )
@@ -172,6 +185,6 @@ class Array(Construct):
             nbits=self.packing,
             bitorder=self.bitorder,
         )
-        if self.count >= 0:
-            values = values[: self.count]
+        if count >= 0:
+            values = values[:count]
         return values.astype(self.numpy_dtype)
