@@ -36,7 +36,9 @@ from pabo.specify import Specification
 from pabo.specify import Specification as Spec
 from pabo.stream import Aligned, AlignedSpec, Lazy, LazyValue, Peek, Pointer, Seek, Tell
 from pabo.strings import CString, GreedyString, Line, PaddedString, PascalString
+from pabo.transforms import Checksummed, Compressed, Transformed
 from pabo.wrappers import Adapted, Const, Greedy, Padded, Prefixed, Repeat, Sequential
+from pabo.transforms import Checksummed, Compressed, Transformed
 from pabo.wrappers import Sequential as Seq
 
 __all__ = [
@@ -51,6 +53,8 @@ __all__ = [
     "BitStruct",
     "Bytes",
     "Check",
+    "Checksummed",
+    "Compressed",
     "Computed",
     "Const",
     "ConstError",
@@ -96,6 +100,7 @@ __all__ = [
     "Terminated",
     "this",
     "Timestamp",
+    "Transformed",
     "Validated",
     "ValidationError",
     "VarInt",

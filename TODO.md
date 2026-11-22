@@ -163,8 +163,9 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       `priwo` use case of multi-GB pulsar data files.
 
 ### Transforms
-- [ ] `Compressed` (zlib, gzip, bz2, lzma), `Checksum` (CRC32, MD5, ...), and
-      `Transformed` / `Restreamed` for encoded sub-streams.
+- [x] `Compressed` (zlib, gzip, bz2, lzma), `Checksum` (CRC32, MD5, ...), and
+      `Transformed` / `Restreamed` for encoded sub-streams. (Done as `Compressed`,
+      `Checksummed` and `Transformed`; `Transformed` covers what `Restreamed` does.)
 
 ### Ergonomics
 - [ ] **A class-based declarative syntax**, which would set pabo apart from construct:
