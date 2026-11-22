@@ -16,10 +16,10 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       abstract methods. Right now `pabo.Bytes(4)` raises
       `TypeError: Can't instantiate abstract class Bytes ...`. Cross-object calls such as
       `field.__build(...)` in `specify.py` are mangled too (`field._Specification__build`).
-      - Pick one convention: single underscore (`_size`, `_parse`, `_build`) or the old
+      - [x] Pick one convention: single underscore (`_size`, `_parse`, `_build`) or the old
         dunders. Apply it everywhere. Some classes still use the dunder style
         (`PaddedString`, `Line`, `Adapted`, `Greedy.__parse__`).
-      - The `Construct` docstring still says `__size__`/`__parse__`/`__build__`.
+      - [x] The `Construct` docstring still says `__size__`/`__parse__`/`__build__`.
 - [x] **`attrs` is imported but no longer a dependency.** `numeric.py` uses
       `from attrs import define`, but `pyproject.toml` only lists `numpy` and `beartype`.
       Either add it back or switch `numeric.py` to `@dataclass`, as the other modules
@@ -122,7 +122,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       defaults to big, but `unpack_1bit<little>` is LSB-first. Document this and expose
       it as a `bitorder` option on `Bits`/`Array`.
 
-## 2. Missing features (compared with `construct`)
+## 2. Missing features (compared with `construct`) ✅ (done)
 
 ### Context and dependent fields (the biggest gap)
 - [x] **Reference earlier fields**, for example `Bytes(this.length)` or
@@ -201,7 +201,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       constructs.
 - [x] `spec.describe()` / pretty `repr` showing the layout table (offsets, sizes, types).
 
-## 3. Performance
+## 3. Performance ✅ (done)
 
 - [x] Compile fixed-size specs into a single `struct.Struct` format (or a NumPy
       structured `dtype`) and parse in one call instead of field by field.
@@ -214,7 +214,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       one machine: a PNG header in ~2 µs, about as fast as construct's compiled
       mode; 1000 fixed-size records in ~0.26 ms, ~10× faster than construct.)
 
-## 4. Testing
+## 4. Testing ✅ (done)
 
 - [x] Unit tests per construct: parse, build and **round-trip**
       (`parse(build(x)) == x`).
@@ -225,19 +225,19 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Real-world fixtures: PNG header, WAV/RIFF, ELF header, a SIGPROC filterbank header.
 - [x] Coverage reporting. (`pytest --cov`; about 95% with branches.)
 
-## 5. Packaging and CI
+## 5. Packaging and CI ✅ (done)
 
 - [x] **Add a CI workflow** that runs tests and lint on push and PR, across a
       Python × OS matrix. Currently only a release workflow exists.
 - [x] Modernise `release.yml`:
-      - `actions/upload-artifact@v3` and `download-artifact@v3` have been shut down, so
+      - [x] `actions/upload-artifact@v3` and `download-artifact@v3` have been shut down, so
         move to `@v4`. With v4, artifact names must be unique per matrix job, so download
         with `pattern:` and `merge-multiple: true`.
-      - `pypa/cibuildwheel@v2.11.2` is very old and doesn't know about scikit-build-core
+      - [x] `pypa/cibuildwheel@v2.11.2` is very old and doesn't know about scikit-build-core
         or recent Python versions, so bump it.
-      - `actions/checkout@v3` → `@v4`, and `gh-action-pypi-publish@v1.5.1` → `release/v1`
+      - [x] `actions/checkout@v3` → `@v4`, and `gh-action-pypi-publish@v1.5.1` → `release/v1`
         with **trusted publishing** instead of `PYPI_PASSWORD`.
-      - Add `fetch-depth: 0` to the checkout so `setuptools-scm` sees tags.
+      - [x] Add `fetch-depth: 0` to the checkout so `setuptools-scm` sees tags.
 - [x] Configure `[tool.cibuildwheel]` (skip PyPy/musl if unsupported, run tests in the
       wheels).
 - [x] Add `[project.optional-dependencies]` groups for `docs` and `dev` (`test` exists).
@@ -250,7 +250,7 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       `Construct`.)
 - [x] Add a `.pyi` stub for the `packed` extension.
 
-## 6. Documentation
+## 6. Documentation ✅ (done)
 
 - [x] `.readthedocs.yaml` uses `ubuntu-20.04` and Python 3.9, but the package requires
       Python 3.10 or later. Update to `ubuntu-24.04` / Python 3.12 or later, and install
@@ -262,11 +262,11 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Write real docs: a tutorial, an API reference (autodoc), a cookbook of real formats,
       a "pabo vs construct" comparison, and a guide to writing custom constructs.
 - [x] README:
-      - The doc-coverage badge points to `assets/doc_cov.svg`, which this refactor
+      - [x] The doc-coverage badge points to `assets/doc_cov.svg`, which this refactor
         deletes. Point it at `assets/interrogate.svg`.
-      - Remove the dangling `[attrs]` / `[numpy]` link refs if unused.
-      - Show `build()` as well as `parse()`.
-      - The "Code style: black" badge should match whatever formatter is actually used.
+      - [x] Remove the dangling `[attrs]` / `[numpy]` link refs if unused.
+      - [x] Show `build()` as well as `parse()`.
+      - [x] The "Code style: black" badge should match whatever formatter is actually used.
 - [x] Docstrings: most constructs have one-line docstrings with no parameter docs. Fix the
       typo "functinality" in `base.py`.
 - [x] Add a `CHANGELOG.md`.
