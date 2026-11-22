@@ -168,20 +168,22 @@ These come from the in-progress refactor (uncommitted changes on `main`).
       `Checksummed` and `Transformed`; `Transformed` covers what `Restreamed` does.)
 
 ### Ergonomics
-- [ ] **A class-based declarative syntax**, which would set pabo apart from construct:
+- [x] **A class-based declarative syntax**, which would set pabo apart from construct:
       ```python
       class PNGHeader(pb.Struct):
           magic: bytes = pb.Const(b"\x89PNG\r\n\x1a\n")
           width: int = pb.Int(4, endian="big")
       ```
       Parse into a typed dataclass instance instead of a plain `dict`.
-- [ ] Attribute access on results (`data.width`), or return dataclasses.
+- [x] Attribute access on results (`data.width`), or return dataclasses.
 - [x] A spec-level default endianness so you don't repeat `endian="big"` on every field.
-- [ ] Short aliases: `pb.u8`, `pb.u16be`, `pb.i32le`, `pb.f64`, and so on.
-- [ ] Nested `Specification`s should round-trip, and an "embedded"/flattened variant
+- [x] Short aliases: `pb.u8`, `pb.u16be`, `pb.i32le`, `pb.f64`, and so on.
+- [x] Nested `Specification`s should round-trip, and an "embedded"/flattened variant
       should be available.
-- [ ] Make `docs` (the `/` operator) actually useful: show docs in `repr`, error messages,
-      and generated documentation.
+- [x] Make `docs` (the `/` operator) actually useful: show docs in `repr`, error messages,
+      and generated documentation. (Docs now appear in error messages and in
+      `describe()`; `/` returns a copy instead of mutating. `repr` is left alone so
+      that undocumented constructs don't print `docs=''` everywhere.)
 
 ### Debugging and diagnostics
 - [x] Errors that include the **field path** (`png.ihdr.width`), the **stream offset**,

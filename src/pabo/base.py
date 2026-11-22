@@ -48,9 +48,11 @@ def tell(stream) -> int | None:
 
 
 @contextmanager
-def scope(name: str, stream) -> Generator[None, None, None]:
+def scope(name: str, stream, docs: str = "") -> Generator[None, None, None]:
     """
     Add `name` to the path (and the start offset) of any `PaboError` raised inside.
+
+    `docs` is recorded too, if no field further in already gave one.
     """
 
     start = tell(stream)
@@ -60,6 +62,8 @@ def scope(name: str, stream) -> Generator[None, None, None]:
         error.path.insert(0, name)
         if error.offset is None:
             error.offset = start
+        if docs and not error.docs:
+            error.docs = docs
         raise
 
 

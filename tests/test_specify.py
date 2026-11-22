@@ -95,3 +95,32 @@ def test_reference_to_parent_field():
 def test_build_requires_dict():
     with pytest.raises(pb.PaboError):
         pb.Spec({"a": pb.Int(1)}).build([1])
+
+
+def test_embedded():
+    common = pb.Spec({"a": pb.Int(1), "b": pb.Int(1)})
+    spec = pb.Spec({"x": pb.Int(1), "_": pb.Embedded(common), "c": pb.Bytes(pb.this.a)})
+    raw = b"\x09\x02\x03ab"
+    data = spec.parse(raw)
+    assert data == {"x": 9, "a": 2, "b": 3, "c": b"ab"}
+    assert spec.build(data) == raw
+    assert spec.sizeof(data) == 5
+    assert pb.Embedded(common).parse(b"\x01\x02") == {"a": 1, "b": 2}
+
+
+def test_nested_specs_roundtrip_deeply():
+    spec = pb.Spec(
+        {"a": pb.Spec({"b": pb.Spec({"c": pb.Int(2)}), "d": pb.Seq([pb.Int(1), pb.Spec({"e": pb.Int(1)})])})}
+    )
+    raw = b"\x01\x00\x02\x03"
+    data = spec.parse(raw)
+    assert data.a.b.c == 1 and data.a.d[1].e == 3
+    assert spec.build(data) == raw
+
+
+def test_docs_in_errors():
+    spec = pb.Spec({"w": pb.Int(4) / "Image width"})
+    with pytest.raises(pb.StreamError) as info:
+        spec.parse(b"\x00")
+    assert info.value.docs == "Image width"
+    assert "'Image width'" in str(info.value)

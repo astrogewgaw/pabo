@@ -36,9 +36,14 @@ class Specification(Construct[Container]):
         return child
 
     def _size(self, ctx):
-        child = self._child(ctx, ctx._)
+        return self._size_fields(self._child(ctx, ctx._))
+
+    def _size_fields(self, child: Context) -> int:
         total = 0
         for name, field in self.fields.items():
+            if isinstance(field, Embedded):
+                total += field.wraps._size_fields(child)
+                continue
             value = child.get(name)
             sub = Context(value, parent=child) if isinstance(value, dict) else child
             total += field._size(sub)
@@ -49,27 +54,61 @@ class Specification(Construct[Container]):
             raise PaboError(f"Expected a dict of fields, got {type(data).__name__}.")
         child = self._child(data, ctx)
         try:
-            for name, field in self.fields.items():
-                with scope(name, stream):
-                    if name in child:
-                        value = child[name]
-                    elif field._omittable():
-                        value = None
-                    else:
-                        raise PaboError(
-                            f"Missing field {name!r}. Data not according to specification."
-                        )
-                    child[name] = field._build(value, stream, child)
+            self._build_fields(stream, child)
         except Stop:
             pass
         return Container(child)
 
+    def _build_fields(self, stream, child: Context) -> None:
+        for name, field in self.fields.items():
+            if isinstance(field, Embedded):
+                field.wraps._build_fields(stream, child)
+                continue
+            with scope(name, stream, field.docs):
+                if name in child:
+                    value = child[name]
+                elif field._omittable():
+                    value = None
+                else:
+                    raise PaboError(
+                        f"Missing field {name!r}. Data not according to specification."
+                    )
+                child[name] = field._build(value, stream, child)
+
     def _parse(self, stream, ctx):
         child = self._child((), ctx)
         try:
-            for name, field in self.fields.items():
-                with scope(name, stream):
-                    child[name] = field._parse(stream, child)
+            self._parse_fields(stream, child)
         except Stop:
             pass
         return Container(child)
+
+    def _parse_fields(self, stream, child: Context) -> None:
+        for name, field in self.fields.items():
+            if isinstance(field, Embedded):
+                field.wraps._parse_fields(stream, child)
+                continue
+            with scope(name, stream, field.docs):
+                child[name] = field._parse(stream, child)
+
+
+@dataclass
+class Embedded(Construct[Container]):
+    """
+    Put the fields of a specification directly into the enclosing one.
+
+    The key it is stored under in the enclosing specification is ignored, and
+    the embedded fields share the enclosing context (and its endianness).
+    On its own, it behaves like the specification it wraps.
+    """
+
+    wraps: Specification
+
+    def _size(self, ctx):
+        return self.wraps._size(ctx)
+
+    def _build(self, data, stream, ctx):
+        return self.wraps._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        return self.wraps._parse(stream, ctx)

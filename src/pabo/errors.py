@@ -9,7 +9,8 @@ class PaboError(Exception):
 
     `path` lists the fields being parsed or built when the error happened, from
     the outermost inwards, and `offset` is the stream position where the
-    innermost of those fields started (None if unknown).
+    innermost of those fields started (None if unknown). `docs` holds the docs
+    of the innermost documented field on the path.
     """
 
     def __init__(self, msg: str):
@@ -17,6 +18,7 @@ class PaboError(Exception):
         self.msg = msg
         self.path: list[str] = []
         self.offset: int | None = None
+        self.docs: str = ""
 
     @property
     def where(self) -> str:
@@ -33,13 +35,16 @@ class PaboError(Exception):
         parts = []
         if self.path:
             parts.append(f"at {self.where}")
+        if self.docs:
+            parts.append(repr(self.docs))
         if self.offset is not None:
             parts.append(f"offset {self.offset}")
         where = f" ({', '.join(parts)})" if parts else ""
         return f"바보! {self.msg}{where} ABORT."
 
     def __reduce__(self):
-        return (type(self), (self.msg,), {"path": self.path, "offset": self.offset})
+        state = {"path": self.path, "offset": self.offset, "docs": self.docs}
+        return (type(self), (self.msg,), state)
 
 
 class StreamError(PaboError):
