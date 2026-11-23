@@ -46,7 +46,7 @@
    :members:
 
 .. automodule:: pabo.packing
-   :members: pack_bits, unpack_bits
+   :members: packbits, unpackbits
 ```
 
 ## Wrappers and control flow

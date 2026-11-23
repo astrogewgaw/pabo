@@ -71,5 +71,5 @@ def test_inheritance_and_nesting():
 
 def test_to_and_from_dict():
     header = PNGHeader.parse(PNG)
-    assert header.to_dict()["width"] == 602
-    assert PNGHeader.from_dict(header.to_dict()) == header
+    assert header.todict()["width"] == 602
+    assert PNGHeader.fromdict(header.todict()) == header

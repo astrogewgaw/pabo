@@ -71,7 +71,7 @@ class Struct:
         dataclasses.dataclass(cls, kw_only=True)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Struct":
+    def fromdict(cls, data: dict) -> "Struct":
         """
         Create an instance from a dict of field values (such as a parsed `Container`).
         """
@@ -79,7 +79,7 @@ class Struct:
         names = {f.name for f in dataclasses.fields(cls)}  # type: ignore[arg-type]
         return cls(**{name: data[name] for name in names if name in data})
 
-    def to_dict(self) -> Container:
+    def todict(self) -> Container:
         """
         The field values, as a `Container`.
         """
@@ -92,14 +92,14 @@ class Struct:
         Parse an instance from bytes, a path or a binary stream.
         """
 
-        return cls.from_dict(cls.__pabo_spec__.parse(src))
+        return cls.fromdict(cls.__pabo_spec__.parse(src))
 
     def build(self, src=None, append: bool = False) -> bytes | None:
         """
         Build this instance into bytes (see `Construct.build`).
         """
 
-        return self.__pabo_spec__.build(self.to_dict(), src, append)
+        return self.__pabo_spec__.build(self.todict(), src, append)
 
     @classmethod
     def sizeof(cls, ctx: dict | None = None) -> int:
@@ -132,9 +132,9 @@ class StructConstruct(Construct):
         return self.cls.__pabo_spec__._size(ctx)
 
     def _build(self, data, stream, ctx):
-        values = data.to_dict() if isinstance(data, Struct) else data
+        values = data.todict() if isinstance(data, Struct) else data
         self.cls.__pabo_spec__._build(values, stream, ctx)
         return data
 
     def _parse(self, stream, ctx):
-        return self.cls.from_dict(self.cls.__pabo_spec__._parse(stream, ctx))
+        return self.cls.fromdict(self.cls.__pabo_spec__._parse(stream, ctx))

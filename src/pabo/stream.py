@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
 
-from pabo.base import Construct, read_exactly, tell
+from pabo.base import Construct, readexact, tell
 from pabo.context import Context, Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError
 from pabo.specify import Specification
@@ -171,7 +171,7 @@ class Aligned(Construct):
     def _parse(self, stream, ctx):
         start = stream.tell()
         data = self.wraps._parse(stream, ctx)
-        read_exactly(stream, -(stream.tell() - start) % self.modulus)
+        readexact(stream, -(stream.tell() - start) % self.modulus)
         return data
 
 

@@ -293,7 +293,7 @@ def test_wav_file(tmp_path):
     assert built == path.read_bytes()
 
 
-def _elf_spec():
+def _elfspec():
     def body(endian):
         word = lambda ctx: ctx._.ident.cls == 2
         addr = pb.If(word, pb.u64, pb.u32)
@@ -344,14 +344,14 @@ def test_elf_header_of_running_python():
     with open(sys.executable, "rb") as f:
         if f.read(4) != b"\x7fELF":
             pytest.skip("Not running from an ELF binary.")
-    elf = _elf_spec()
+    elf = _elfspec()
     data = elf.parse(sys.executable)
     assert data.ident.cls in (1, 2) and data.ident.data in (1, 2)
     assert data.header.ehsize == (64 if data.ident.cls == 2 else 52)
 
 
 def test_elf_header_both_endians():
-    elf = _elf_spec()
+    elf = _elfspec()
     values = {
         "type": 2,
         "machine": 62,

@@ -10,10 +10,10 @@ from typing import Literal
 
 import numpy as np
 
-from pabo.base import Construct, read_exactly
+from pabo.base import Construct, readexact
 from pabo.context import Context, Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
-from pabo.packing import BitOrder, pack_bits, unpack_bits
+from pabo.packing import BitOrder, packbits, unpackbits
 
 Endian = Literal["little", "big", "native"]
 
@@ -22,19 +22,19 @@ INT_CODES = {1: "b", 2: "h", 4: "i", 8: "q"}
 FLOAT_CODES = {2: "e", 4: "f", 8: "d"}
 
 
-def _check_endian(endian: str | None) -> None:
+def _checkendian(endian: str | None) -> None:
     if endian is not None and endian not in ENDIANS:
         raise PaboError(
             f"Invalid endianness {endian!r}. Must be one of {list(ENDIANS)}."
         )
 
 
-def _check_bitorder(bitorder: str) -> None:
+def _checkbitorder(bitorder: str) -> None:
     if bitorder not in ("big", "little"):
         raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
 
 
-def resolve_endian(endian: str | None, ctx: Context) -> str:
+def resolveendian(endian: str | None, ctx: Context) -> str:
     """
     Return `endian`, or the default set by an enclosing specification, or "little".
     """
@@ -53,7 +53,7 @@ class _Fixed(Construct):
     width: int
     endian: "Endian | None"
 
-    def format_for(self, endian: str) -> str:
+    def formatfor(self, endian: str) -> str:
         """
         The `struct` format for the given endianness.
         """
@@ -66,13 +66,13 @@ class _Fixed(Construct):
         The `struct` format (little-endian if no endianness was given).
         """
 
-        return self.format_for(self.endian or "little")
+        return self.formatfor(self.endian or "little")
 
     def _size(self, ctx):
         return self.width
 
     def _build(self, data, stream, ctx):
-        fmt = self.format_for(resolve_endian(self.endian, ctx))
+        fmt = self.formatfor(resolveendian(self.endian, ctx))
         try:
             stream.write(struct.pack(fmt, data))
         except struct.error as error:
@@ -82,8 +82,8 @@ class _Fixed(Construct):
         return data
 
     def _parse(self, stream, ctx):
-        fmt = self.format_for(resolve_endian(self.endian, ctx))
-        return struct.unpack(fmt, read_exactly(stream, self.width))[0]
+        fmt = self.formatfor(resolveendian(self.endian, ctx))
+        return struct.unpack(fmt, readexact(stream, self.width))[0]
 
 
 @dataclass
@@ -104,9 +104,9 @@ class Int(_Fixed):
             raise PaboError(
                 f"Unsupported integer width {self.width}. Must be positive."
             )
-        _check_endian(self.endian)
+        _checkendian(self.endian)
 
-    def format_for(self, endian: str) -> str:
+    def formatfor(self, endian: str) -> str:
         """
         The `struct` format for the given endianness (only for 1, 2, 4 or 8 bytes).
         """
@@ -119,7 +119,7 @@ class Int(_Fixed):
         return ENDIANS[endian] + (code if self.signed else code.upper())
 
     def _byteorder(self, ctx) -> Literal["little", "big"]:
-        endian = resolve_endian(self.endian, ctx)
+        endian = resolveendian(self.endian, ctx)
         if endian == "native":
             return sys.byteorder
         return "big" if endian == "big" else "little"
@@ -139,7 +139,7 @@ class Int(_Fixed):
     def _parse(self, stream, ctx):
         if self.width in INT_CODES:
             return super()._parse(stream, ctx)
-        raw = read_exactly(stream, self.width)
+        raw = readexact(stream, self.width)
         return int.from_bytes(raw, self._byteorder(ctx), signed=self.signed)
 
 
@@ -157,9 +157,9 @@ class Float(_Fixed):
             raise PaboError(
                 f"Unsupported float width {self.width}. Must be one of {list(FLOAT_CODES)}."
             )
-        _check_endian(self.endian)
+        _checkendian(self.endian)
 
-    def format_for(self, endian: str) -> str:
+    def formatfor(self, endian: str) -> str:
         """
         The `struct` format for the given endianness.
         """
@@ -194,7 +194,7 @@ class VarInt(Construct[int]):
     def _parse(self, stream, ctx):
         value = shift = 0
         while True:
-            byte = read_exactly(stream, 1)[0]
+            byte = readexact(stream, 1)[0]
             value |= (byte & 0x7F) << shift
             shift += 7
             if not byte & 0x80:
@@ -252,29 +252,29 @@ class Array(Construct):
                     f"Unsupported packing {self.packing}. Must be from 1 to "
                     f"{8 * self.dtype.width} bits for {self.dtype.width}-byte elements."
                 )
-        _check_bitorder(self.bitorder)
+        _checkbitorder(self.bitorder)
 
     @property
-    def numpy_dtype(self) -> np.dtype:
+    def numpydtype(self) -> np.dtype:
         """
         The numpy dtype of the elements (little-endian if no endianness was given).
         """
 
         return np.dtype(self.dtype.format)
 
-    def dtype_for(self, ctx) -> np.dtype:
+    def dtypefor(self, ctx) -> np.dtype:
         """
         The numpy dtype of the elements, with the endianness resolved from `ctx`.
         """
 
-        return np.dtype(self.dtype.format_for(resolve_endian(self.dtype.endian, ctx)))
+        return np.dtype(self.dtype.formatfor(resolveendian(self.dtype.endian, ctx)))
 
     def _nbytes(self, count: int) -> int:
         if self.packing is None:
             return count * self.dtype.width
         return -(-count * self.packing // 8)
 
-    def _parse_mapped(
+    def _parsemapped(
         self, stream: mmap.mmap, count: int, dtype: np.dtype
     ) -> np.ndarray:
         """
@@ -298,7 +298,7 @@ class Array(Construct):
         stream.seek(start + nbytes)
         return array
 
-    def _parse_into(self, stream, count: int, dtype: np.dtype) -> np.ndarray:
+    def _parseinto(self, stream, count: int, dtype: np.dtype) -> np.ndarray:
         """
         Read straight into a new array, without an intermediate bytes object.
         """
@@ -328,7 +328,7 @@ class Array(Construct):
         return self._nbytes(count)
 
     def _build(self, data, stream, ctx):
-        dtype = self.dtype_for(ctx)
+        dtype = self.dtypefor(ctx)
         try:
             array = np.asarray(data, dtype=dtype).ravel()
         except (OverflowError, TypeError, ValueError) as error:
@@ -346,7 +346,7 @@ class Array(Construct):
             stream.write(array.tobytes())
             return array
         try:
-            stream.write(pack_bits(array, self.packing, self.bitorder))
+            stream.write(packbits(array, self.packing, self.bitorder))
         except PaboError as error:
             raise ValidationError(error.msg) from None
         return array
@@ -354,18 +354,18 @@ class Array(Construct):
     def _parse(self, stream, ctx):
         count = self._count(ctx)
         if self.packing is None and isinstance(stream, mmap.mmap):
-            return self._parse_mapped(stream, count, self.dtype_for(ctx))
+            return self._parsemapped(stream, count, self.dtypefor(ctx))
         if self.packing is None and count >= 0 and hasattr(stream, "readinto"):
-            return self._parse_into(stream, count, self.dtype_for(ctx))
-        raw = read_exactly(stream, self._nbytes(count)) if count >= 0 else stream.read()
+            return self._parseinto(stream, count, self.dtypefor(ctx))
+        raw = readexact(stream, self._nbytes(count)) if count >= 0 else stream.read()
         if self.packing is None:
             if len(raw) % self.dtype.width:
                 raise StreamError(
                     f"{len(raw)} bytes is not a whole number of "
                     f"{self.dtype.width}-byte elements."
                 )
-            return np.frombuffer(raw, dtype=self.dtype_for(ctx))
-        values = unpack_bits(raw, self.packing, self.bitorder)
+            return np.frombuffer(raw, dtype=self.dtypefor(ctx))
+        values = unpackbits(raw, self.packing, self.bitorder)
         if count >= 0:
             values = values[:count]
-        return values.astype(self.dtype_for(ctx))
+        return values.astype(self.dtypefor(ctx))

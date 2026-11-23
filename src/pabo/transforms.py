@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
 
-from pabo.base import Construct, read_exactly
+from pabo.base import Construct, readexact
 from pabo.context import Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
 
@@ -63,7 +63,7 @@ class Transformed(Construct):
 
     def _parse(self, stream, ctx):
         size = evaluate(self.length, ctx)
-        raw = read_exactly(stream, size) if size >= 0 else stream.read()
+        raw = readexact(stream, size) if size >= 0 else stream.read()
         try:
             decoded = self.decode(raw)
         except Exception as error:
@@ -137,7 +137,7 @@ class Checksummed(Construct):
         value = self.wraps._parse(stream, ctx)
         end = stream.tell()
         stream.seek(start)
-        raw = read_exactly(stream, end - start)
+        raw = readexact(stream, end - start)
         stored = self.check._parse(stream, ctx)
         computed = _hasher(self.algorithm)(raw)
         if stored != computed:

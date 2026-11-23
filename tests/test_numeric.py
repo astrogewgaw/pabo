@@ -30,7 +30,7 @@ def test_float_roundtrip(width, endian):
 def test_int_format_is_public():
     assert pb.Int(4, signed=True, endian="big").format == ">i"
     assert pb.Float(8).format == "<d"
-    assert pb.Int(2).format_for("big") == ">H"
+    assert pb.Int(2).formatfor("big") == ">H"
     with pytest.raises(pb.PaboError):
         pb.Int(3).format
 

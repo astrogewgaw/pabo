@@ -21,7 +21,7 @@ class Stop(Exception):
     """
 
 
-def read_exactly(stream, size: int) -> bytes:
+def readexact(stream, size: int) -> bytes:
     """
     Read exactly `size` bytes from a stream, or raise a `StreamError`.
     """

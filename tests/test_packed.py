@@ -57,7 +57,7 @@ def test_parallel_matches_serial(nbits):
     )
 
 
-def _reference_pack(values, nbits, bitorder):
+def _referencepack(values, nbits, bitorder):
     bits = ((values[:, None] >> np.arange(nbits)[::-1]) & 1).astype(np.uint8)
     if bitorder == "little":
         bits = bits[:, ::-1]
@@ -70,7 +70,7 @@ def _reference_pack(values, nbits, bitorder):
 def test_matches_numpy_reference(nbits, bitorder, parallel):
     rng = np.random.default_rng(nbits)
     values = rng.integers(0, 2**nbits, size=8 * 1000, dtype=np.uint8)
-    expected = _reference_pack(values, nbits, bitorder)
+    expected = _referencepack(values, nbits, bitorder)
     packed = pack(values, nbits=nbits, bitorder=bitorder, parallel=parallel)
     np.testing.assert_array_equal(packed, expected)
     np.testing.assert_array_equal(

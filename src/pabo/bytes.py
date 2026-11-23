@@ -4,7 +4,7 @@ Byte manipulation.
 
 from dataclasses import dataclass
 
-from pabo.base import Construct, read_exactly
+from pabo.base import Construct, readexact
 from pabo.context import Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
 from pabo.wrappers import Const
@@ -48,7 +48,7 @@ class Bytes(Construct[bytes]):
         count = _count(self.count, ctx)
         if count < 0:
             return stream.read()
-        return read_exactly(stream, count)
+        return readexact(stream, count)
 
 
 @dataclass
@@ -68,7 +68,7 @@ class Flag(Construct[bool]):
         return bool(data)
 
     def _parse(self, stream, ctx) -> bool:
-        return read_exactly(stream, 1) != b"\x00"
+        return readexact(stream, 1) != b"\x00"
 
 
 def GreedyBytes() -> Bytes:

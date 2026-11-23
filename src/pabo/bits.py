@@ -6,11 +6,11 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from pabo.base import Construct, read_exactly
+from pabo.base import Construct, readexact
 from pabo.context import Container
 from pabo.errors import PaboError, ValidationError
-from pabo.numeric import BitOrder, _check_bitorder
-from pabo.packing import pack_bits, unpack_bits
+from pabo.numeric import BitOrder, _checkbitorder
+from pabo.packing import packbits, unpackbits
 
 
 @dataclass
@@ -30,7 +30,7 @@ class Bits(Construct):
     def __post_init__(self):
         if self.count < 0:
             raise PaboError("The number of bits cannot be negative.")
-        _check_bitorder(self.bitorder)
+        _checkbitorder(self.bitorder)
 
     def _size(self, ctx):
         return -(-self.count // 8)
@@ -46,12 +46,12 @@ class Bits(Construct):
             raise ValidationError("Bits must be 0 or 1.")
         padded = np.zeros(self.size * 8, dtype=np.uint8)
         padded[: self.count] = values
-        stream.write(pack_bits(padded, 1, self.bitorder))
+        stream.write(packbits(padded, 1, self.bitorder))
         return bits
 
     def _parse(self, stream, ctx):
-        raw = read_exactly(stream, self.size)
-        bits = unpack_bits(raw, 1, self.bitorder)
+        raw = readexact(stream, self.size)
+        bits = unpackbits(raw, 1, self.bitorder)
         return bits[: self.count].tobytes()
 
 
@@ -110,7 +110,7 @@ class BitStruct(Construct[Container]):
     bitorder: BitOrder = "big"
 
     def __post_init__(self):
-        _check_bitorder(self.bitorder)
+        _checkbitorder(self.bitorder)
         total = sum(spec.nbits for spec in self.fields.values())
         if total % 8:
             raise PaboError(
@@ -154,7 +154,7 @@ class BitStruct(Construct[Container]):
         return data
 
     def _parse(self, stream, ctx):
-        raw = read_exactly(stream, self._size(ctx))
+        raw = readexact(stream, self._size(ctx))
         value = int.from_bytes(raw, self.bitorder)
         out = Container()
         for name, spec, shift in self._layout():

@@ -5,7 +5,7 @@ String constructs.
 from dataclasses import dataclass
 from typing import Literal
 
-from pabo.base import Construct, read_exactly
+from pabo.base import Construct, readexact
 from pabo.bytes import Bytes
 from pabo.context import Dynamic, evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
@@ -28,14 +28,14 @@ def _decode(raw: bytes, code: str) -> str:
         raise ValidationError(f"Cannot decode {raw!r} as {code}: {error}.") from error
 
 
-def _read_until(stream, terminator: bytes, unit: int) -> bytes:
+def _readuntil(stream, terminator: bytes, unit: int) -> bytes:
     """
     Read whole code units until `terminator`, and return what came before it.
     """
 
     data = bytearray()
     while True:
-        data += read_exactly(stream, unit)
+        data += readexact(stream, unit)
         if data.endswith(terminator):
             return bytes(data[: -len(terminator)])
 
@@ -62,7 +62,7 @@ class CString(Construct[str]):
 
     def _parse(self, stream, ctx):
         null = _fragment("\x00", self.code)
-        return _decode(_read_until(stream, null, len(null)), self.code)
+        return _decode(_readuntil(stream, null, len(null)), self.code)
 
 
 @dataclass
@@ -130,7 +130,7 @@ class PaddedString(Construct[str]):
         return data
 
     def _parse(self, stream, ctx):
-        raw = read_exactly(stream, evaluate(self.length, ctx))
+        raw = readexact(stream, evaluate(self.length, ctx))
         unit = _fragment(self.pad, self.code)
         size = len(unit)
         if self.side == "right":
@@ -183,4 +183,4 @@ class Line(Construct[str]):
     def _parse(self, stream, ctx):
         crlf = _fragment("\r\n", self.code)
         unit = len(_fragment("\x00", self.code))
-        return _decode(_read_until(stream, crlf, unit), self.code)
+        return _decode(_readuntil(stream, crlf, unit), self.code)

@@ -102,7 +102,7 @@ def test_custom_construct():
             return 1
 
         def _parse(self, stream, ctx):
-            byte = pb.base.read_exactly(stream, 1)[0]
+            byte = pb.base.readexact(stream, 1)[0]
             return byte >> 4, byte & 15
 
         def _build(self, data, stream, ctx):

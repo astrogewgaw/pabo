@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any, Literal
 
-from pabo.base import Construct, Stop, read_exactly, scope
+from pabo.base import Construct, Stop, readexact, scope
 from pabo.context import Dynamic, evaluate
 from pabo.errors import ConstError, PaboError, SizeofError, ValidationError
 from pabo.numeric import Int
@@ -178,7 +178,7 @@ class Repeat(Construct[list]):
 
     def _parse(self, stream, ctx):
         count = _int(self.count, ctx)
-        many = getattr(self.wraps, "_parse_many", None)
+        many = getattr(self.wraps, "_parsemany", None)
         if many is not None and count > 0:
             data = many(stream, ctx, count)
             if data is not None:
@@ -240,7 +240,7 @@ class Prefixed(Construct):
 
     def _parse(self, stream, ctx):
         size = self.pre._parse(stream, ctx)
-        return self.wraps._parse(BytesIO(read_exactly(stream, size)), ctx)
+        return self.wraps._parse(BytesIO(readexact(stream, size)), ctx)
 
 
 @dataclass
@@ -281,8 +281,8 @@ class Padded(Construct):
 
     def _parse(self, stream, ctx):
         if self.side == "left":
-            read_exactly(stream, _int(self.pad, ctx, "padding"))
+            readexact(stream, _int(self.pad, ctx, "padding"))
         data = self.wraps._parse(stream, ctx)
         if self.side == "right":
-            read_exactly(stream, _int(self.pad, ctx, "padding"))
+            readexact(stream, _int(self.pad, ctx, "padding"))
         return data

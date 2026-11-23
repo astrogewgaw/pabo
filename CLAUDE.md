@@ -27,7 +27,7 @@ state, or operator overloading beyond what already exists.
 ```
 src/pabo/
   __init__.py   public API re-exports; beartype_this_package() unless PABO_BEARTYPE=0
-  base.py       Construct ABC, read_exactly(), scope() (adds field paths to errors)
+  base.py       Construct ABC, readexact(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
   context.py    Container, Context, `this` references, evaluate()
   numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional packing)
@@ -44,7 +44,7 @@ src/pabo/
   control.py    Computed, Rebuild, If, Optional, Switch, RepeatUntil, StopIf, Check, ...
   adapters.py   Enum, FlagsEnum, Timestamp
   stream.py     Seek, Tell, Pointer, Peek, Aligned, Lazy/LazyValue
-  packing.py    pack_bits/unpack_bits: any nbits (C++ fast path for 1/2/4, else numpy)
+  packing.py    packbits/unpackbits: any nbits (C++ fast path for 1/2/4, else numpy)
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
 tests/          one test_<module>.py per source module (incl. test_packed.py)
@@ -93,7 +93,7 @@ Conventions to keep:
 - **Hook names use a single underscore** (`_size`, not `__size`). Double-underscore
   names get mangled and break subclassing, as happened in a past refactor.
 - **`size` is always in bytes**, including for `Bits` and packed `Array`.
-- Use `read_exactly(stream, n)` for fixed-size reads so short reads raise `PaboError`
+- Use `readexact(stream, n)` for fixed-size reads so short reads raise `PaboError`
   and don't get silently truncated.
 - **Raise a `PaboError` subclass** (`errors.py`) for every user-facing failure. Wrap
   `struct.error` and similar errors instead of letting them leak out, because
@@ -174,7 +174,7 @@ which is not committed). Docstring coverage is checked by `interrogate`
 
 - Code style: `ruff format` and `ruff check` (config in `pyproject.toml`), pyright in
   basic mode, and docstrings on everything public (interrogate enforces this).
-- Hot internal paths (`Context`, `Specification._parse_fields`, ...) are marked
+- Hot internal paths (`Context`, `Specification._parsefields`, ...) are marked
   `@typing.no_type_check` so beartype skips them; keep it that way for speed.
 - Commits use [gitmoji](https://gitmoji.dev) prefixes in `:code:` form, for example
   `:bug: Fix bug when reading in arrays.` or `:recycle: Refactoring.`.

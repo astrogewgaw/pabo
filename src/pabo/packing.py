@@ -19,7 +19,7 @@ def _check(nbits: int, bitorder: str) -> None:
         raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
 
 
-def unpack_bits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
+def unpackbits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
     """
     Unpack every `nbits`-bit integer from the bytes in `raw`.
 
@@ -50,9 +50,9 @@ def unpack_bits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
     return values
 
 
-def pack_bits(values, nbits: int, bitorder: BitOrder = "big") -> bytes:
+def packbits(values, nbits: int, bitorder: BitOrder = "big") -> bytes:
     """
-    Pack non-negative integers into `nbits` bits each (the inverse of `unpack_bits`).
+    Pack non-negative integers into `nbits` bits each (the inverse of `unpackbits`).
 
     The last byte is padded with zero bits. Values must fit in `nbits` bits.
     """

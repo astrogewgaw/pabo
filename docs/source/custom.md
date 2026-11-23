@@ -20,7 +20,7 @@ Here is a construct for a 32-bit fixed-point number with 16 fractional bits:
 from dataclasses import dataclass
 
 import pabo as pb
-from pabo.base import read_exactly
+from pabo.base import readexact
 
 
 @dataclass
@@ -35,7 +35,7 @@ class Fixed16(pb.Construct):
         return 4
 
     def _parse(self, stream, ctx):
-        raw = read_exactly(stream, 4)
+        raw = readexact(stream, 4)
         return int.from_bytes(raw, self.endian, signed=True) / 65536
 
     def _build(self, data, stream, ctx):
@@ -52,7 +52,7 @@ Fixed16().parse(b"\x00\x01\x80\x00")    # 1.5
 
 A few conventions keep custom constructs working well with the rest of pabo:
 
-- Use `read_exactly(stream, n)` for fixed-size reads, so short reads raise
+- Use `readexact(stream, n)` for fixed-size reads, so short reads raise
   `StreamError` instead of silently giving less data.
 - Raise a subclass of `pabo.PaboError` for every failure (`ValidationError`
   for bad values, `StreamError` for stream problems). `Greedy` and `Optional`

@@ -11,7 +11,7 @@ from pabo.base import Construct, Stop, hexdump, scope, tell
 from pabo.bytes import Bytes, Flag
 from pabo.context import Container, Context
 from pabo.errors import PaboError
-from pabo.numeric import ENDIANS, INT_CODES, Endian, Float, Int, _check_endian
+from pabo.numeric import ENDIANS, INT_CODES, Endian, Float, Int, _checkendian
 from pabo.wrappers import Const
 
 
@@ -34,7 +34,7 @@ class Specification(Construct[Container]):
     _plans: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self):
-        _check_endian(self.endian)
+        _checkendian(self.endian)
 
     @no_type_check
     def _child(self, data, parent) -> Context:
@@ -43,14 +43,14 @@ class Specification(Construct[Container]):
         return child
 
     def _size(self, ctx):
-        return self._size_fields(self._child(ctx, ctx._))
+        return self._sizefields(self._child(ctx, ctx._))
 
     @no_type_check
-    def _size_fields(self, child: Context) -> int:
+    def _sizefields(self, child: Context) -> int:
         total = 0
         for name, member in self.fields.items():
             if isinstance(member, Embedded):
-                total += member.wraps._size_fields(child)
+                total += member.wraps._sizefields(child)
                 continue
             value = child.get(name)
             sub = Context(value, parent=child) if isinstance(value, dict) else child
@@ -69,7 +69,7 @@ class Specification(Construct[Container]):
         return self._plans[endian]
 
     @no_type_check
-    def _parse_many(self, stream, ctx, count: int) -> list | None:
+    def _parsemany(self, stream, ctx, count: int) -> list | None:
         """
         Parse `count` copies in one go with the compiled plan, or return None.
         """
@@ -100,16 +100,16 @@ class Specification(Construct[Container]):
                 stream.write(raw)
                 return Container(child)
         try:
-            self._build_fields(stream, child)
+            self._buildfields(stream, child)
         except Stop:
             pass
         return Container(child)
 
     @no_type_check
-    def _build_fields(self, stream, child: Context) -> None:
+    def _buildfields(self, stream, child: Context) -> None:
         for name, member in self.fields.items():
             if isinstance(member, Embedded):
-                member.wraps._build_fields(stream, child)
+                member.wraps._buildfields(stream, child)
                 continue
             with scope(name, stream, member.docs):
                 if name in child:
@@ -133,29 +133,29 @@ class Specification(Construct[Container]):
             ):
                 return Container(child)
         try:
-            self._parse_fields(stream, child)
+            self._parsefields(stream, child)
         except Stop:
             pass
         return Container(child)
 
     @no_type_check
-    def _parse_fields(self, stream, child: Context) -> None:
+    def _parsefields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
         for name, member in self.fields.items():
             if isinstance(member, Embedded):
-                member.wraps._parse_fields(stream, child)
+                member.wraps._parsefields(stream, child)
                 continue
             start = tell(stream) if trace else None
             with scope(name, stream, member.docs):
                 child[name] = member._parse(stream, child)
             if trace:
-                _trace_field(trace, stream, child, name, start, child[name])
+                _tracefield(trace, stream, child, name, start, child[name])
 
     def _label(self) -> str:
         return "Specification" + (f"(endian={self.endian!r})" if self.endian else "")
 
     def _rows(self, name, depth, offset):
-        rows = list(self._field_rows(depth + (1 if name else 0), offset))
+        rows = list(self._fieldrows(depth + (1 if name else 0), offset))
         try:
             size = self.size
         except PaboError:
@@ -164,10 +164,10 @@ class Specification(Construct[Container]):
             yield offset, size, name, depth, self._label(), self.docs
         yield from rows
 
-    def _field_rows(self, depth, offset):
+    def _fieldrows(self, depth, offset):
         for name, member in self.fields.items():
             if isinstance(member, Embedded):
-                rows = list(member.wraps._field_rows(depth, offset))
+                rows = list(member.wraps._fieldrows(depth, offset))
             else:
                 rows = list(member._rows(name, depth, offset))
             yield from rows
@@ -201,7 +201,7 @@ class Embedded(Construct[Container]):
         return self.wraps._parse(stream, ctx)
 
 
-def _trace_field(
+def _tracefield(
     trace, stream, ctx: Context, name: str, start: int | None, value
 ) -> None:
     """
@@ -260,7 +260,7 @@ class _Plan:
             elif type(construct) is Float:
                 if (construct.endian or endian) != endian:
                     return None
-                codes.append(construct.format_for(endian)[1:])
+                codes.append(construct.formatfor(endian)[1:])
             elif (
                 type(construct) is Bytes
                 and isinstance(construct.count, int)
