@@ -63,4 +63,25 @@ This release is a rewrite. Code that defines its own constructs needs updating
 
 ### Fixed
 
-- Many correctness bugs; see `TODO.md` for the full list.
+- Building into an open file silently did nothing (`isinstance(src, BinaryIO)` is
+  never true for real files), and building to a path appended instead of
+  overwriting. Paths are now overwritten unless `append=True`.
+- `parse` now accepts `bytearray` and `memoryview` as well as `bytes`.
+- `Array.size` was the element count rather than the size in bytes, and packed
+  arrays read the wrong number of bytes, accepted any dtype, and did not check
+  greedy reads.
+- `Bits.size` was in bits, and counts that were not a multiple of 8 lost bits.
+- `Int`/`Float` with an unsupported width failed with a cryptic `struct.error`,
+  and any `endian` other than `"big"` silently meant little-endian.
+- `Flag` parsed `True` at the end of the stream; `Bytes` did not check lengths.
+- `Line` never found its CRLF; `CString` failed for UTF-16 and UTF-32;
+  `PaddedString` accepted strings that were too long; `Padded` stripped null
+  bytes that belonged to the payload.
+- `Greedy.size` returned a method, and `Greedy` crashed at the end of the stream
+  instead of stopping, without rewinding after a partial element.
+- `Sequential` silently truncated on a length mismatch and ignored
+  variable-size members in `size`, and `Prefixed.size` was meaningless.
+- Constants and padding had to be given a value when building a specification.
+- The C++ extension had a data race with OpenMP (which was never actually
+  enabled), silently dropped elements that did not fill a byte, did not mask
+  values wider than `nbits`, and did not build on Windows.

@@ -52,7 +52,7 @@ src/pabo/
 tests/          one test_<module>.py per source module (incl. test_packed.py)
 benchmarks/     pytest-benchmark comparisons with struct, numpy and construct
 docs/source/    Sphinx (furo + MyST) docs: tutorial, cookbook, custom, comparison, api
-TODO.md         roadmap (all items currently done); CHANGELOG.md for user-facing changes
+CHANGELOG.md    user-facing changes (keep the "Unreleased" section up to date)
 ```
 
 Aliases exported from `pabo`: `Spec = Specification` and `Seq = Sequential`. Code
@@ -191,7 +191,7 @@ which is not committed). Docstring coverage is checked by `interrogate`
   Don't add it to unannotated functions: beartype already ignores those.
 - Commits use [gitmoji](https://gitmoji.dev) prefixes in `:code:` form, for example
   `:bug: Fix bug when reading in arrays.` or `:recycle: Refactoring.`.
-- When you fix a bug or implement a feature listed in `TODO.md`, tick it off there.
+- Record user-facing changes (features, fixes, breaking changes) in `CHANGELOG.md`.
 
 ## Gotchas
 
