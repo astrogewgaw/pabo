@@ -52,7 +52,8 @@ src/pabo/
   packing.py    packbits/unpackbits for 1, 2 or 4 bits (C++); other widths are rejected
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
-tests/          one test_<module>.py per source module (incl. test_packed.py)
+tests/          one test_<module>.py per source module (incl. test_packed.py), plus
+                test_cookbook.py for the real formats in the docs' cookbook
 benchmarks/     pytest-benchmark comparisons with struct, numpy and construct;
                 plot.py summarizes a run into results.json and draws the docs plots
                 (ultraplot) into docs/source/_static/benchmarks/
@@ -171,7 +172,9 @@ which is not committed). Docstring coverage is checked by `interrogate`
 ## Testing
 
 - One test file per source module: `tests/test_<module>.py`. Add tests to the
-  matching file rather than creating new ones.
+  matching file rather than creating new ones. The one exception is
+  `tests/test_cookbook.py`, which tests every recipe in `docs/source/cookbook.md`
+  (keep the two in sync).
 - Every test (and test helper or test-local class) has a docstring saying what
   behaviour it checks, in the repo's style (triple quotes on their own lines).
 - For every construct, test parse, build and **round-trip**
@@ -180,8 +183,7 @@ which is not committed). Docstring coverage is checked by `interrogate`
 - Known-but-unfixed bugs may be marked `pytest.mark.xfail(strict=True)`, so a fix
   turns the test red until the marker is removed.
 - Test the C++ packer against `np.packbits`/`np.unpackbits` for both bit orders.
-- Property-based tests use hypothesis; real-world formats (WAV, ELF) live
-  in `test_specify.py`.
+- Property-based tests use hypothesis.
 - When asserting on bad constructor arguments, accept both `pb.PaboError` and
   `BeartypeCallHintParamViolation`, since beartype may reject a bad `Literal` first
   (and may be turned off).
