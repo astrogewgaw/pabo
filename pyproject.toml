@@ -64,6 +64,11 @@ test-extras = ["test"]
 test-command = "pytest {project}/tests -p no:cacheprovider"
 build-verbosity = 1
 
+[tool.cibuildwheel.macos.environment]
+# nanobind needs C++17 aligned allocation, which macOS only has from 10.13 on;
+# nanobind recommends 10.14. (Python 3.10 and 3.11 would otherwise target 10.9.)
+MACOSX_DEPLOYMENT_TARGET = "10.14"
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"
