@@ -34,6 +34,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
   the field's docs. There is a hierarchy of errors under `PaboError`:
   `StreamError`, `SizeofError`, `ValidationError`, `ConstError` and
   `ContextError`.
+- Docs attached with `/` are shown in `repr`, error messages and `describe()`.
 - `describe()`, `parse(..., trace=True)` and `Probe` for debugging, and
   `sizeof(ctx)` for sizes that depend on the data.
 - Files are memory-mapped when parsed from a path, and arrays parsed from them

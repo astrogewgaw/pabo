@@ -217,8 +217,8 @@ All errors are subclasses of `PaboError`: `StreamError`, `SizeofError`,
 - `spec.parse(data, trace=True)` prints every field as it is parsed, with a hex
   dump of its bytes.
 - `Probe()` prints the context and the next few bytes wherever you put it.
-- `construct / "some docs"` attaches docs to a field; they show up in errors and
-  in `describe()`.
+- `construct / "some docs"` attaches docs to a field; they show up in errors, in
+  `describe()` and in the construct's `repr`.
 
 ## Performance
 

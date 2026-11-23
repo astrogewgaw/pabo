@@ -190,3 +190,37 @@ def test_hexdump():
 
     assert hexdump(b"AB\x00", 16) == "00000010  41 42 00" + " " * 39 + "  AB."
     assert len(hexdump(bytes(40)).splitlines()) == 3
+
+
+def test_repr_shows_docs_only_when_set():
+    """
+    `repr` of a construct looks like a dataclass repr, adding `docs=...` at the end
+    only when docs are set (also for nested and user-defined constructs).
+    """
+    from dataclasses import dataclass
+
+    assert repr(pb.Int(2)) == "Int(width=2, signed=False, endian=None)"
+    assert repr(pb.Int(2) / "Width") == (
+        "Int(width=2, signed=False, endian=None, docs='Width')"
+    )
+    assert "docs='A'" in repr(pb.Spec({"a": pb.u8 / "A"}))
+
+    @dataclass
+    class Mine(pb.Construct):
+        """
+        A minimal user-defined construct.
+        """
+
+        n: int = 1
+
+        def _size(self, ctx):
+            return 0
+
+        def _parse(self, stream, ctx):
+            return None
+
+        def _build(self, data, stream, ctx):
+            return data
+
+    assert repr(Mine()) == "Mine(n=1)"
+    assert repr(Mine(docs="mine")) == "Mine(n=1, docs='mine')"

@@ -5,7 +5,7 @@ Base classes.
 import mmap
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Generic, TypeVar, no_type_check
@@ -113,6 +113,31 @@ class Construct(ABC, Generic[T]):
 
     docs: str = field(default="", kw_only=True, repr=False)
 
+    def __init_subclass__(cls, **kwargs: Any):
+        # Give every construct the shared `__repr__` below. It is set on the class
+        # itself, before `@dataclass` runs, and dataclasses never replace a
+        # `__repr__` that the class already has.
+        super().__init_subclass__(**kwargs)
+        if "__repr__" not in cls.__dict__:
+            cls.__repr__ = Construct.__repr__
+
+    def __repr__(self) -> str:
+        return self._repr(docs=True)
+
+    def _repr(self, docs: bool) -> str:
+        """
+        The dataclass-style repr, with `docs` at the end if asked for and set.
+        """
+
+        parts = [
+            f"{member.name}={getattr(self, member.name)!r}"
+            for member in fields(self)
+            if member.repr
+        ]
+        if docs and self.docs:
+            parts.append(f"docs={self.docs!r}")
+        return f"{type(self).__name__}({', '.join(parts)})"
+
     @abstractmethod
     def _size(self, ctx: Context) -> int:
         pass
@@ -165,10 +190,11 @@ class Construct(ABC, Generic[T]):
 
     def _label(self) -> str:
         """
-        A short description of this construct, for `describe`.
+        A short description of this construct, for `describe` (which shows the
+        docs in a column of their own).
         """
 
-        return repr(self)
+        return self._repr(docs=False)
 
     def _rows(self, name: str, depth: int, offset: int | None):
         """
