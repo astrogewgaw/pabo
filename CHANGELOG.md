@@ -46,7 +46,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   beartype rejects bad arguments as soon as a construct is created.
 - `Timestamp` units: "s", "ms", "us", "ns" or "day".
 - A test suite (with hypothesis), benchmarks, CI, and documentation, including
-  a "Performance" page with plots of the benchmark results.
+  a "Performance" page with plots of the benchmark results. The documentation
+  moves from Read the Docs to GitHub Pages: https://astrogewgaw.github.io/pabo/.
 
 ### Changed
 

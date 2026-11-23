@@ -1,6 +1,0 @@
-sphinx
-furo
-myst-parser
-sphinx-sitemap
-sphinx-copybutton
-sphinx-autodoc-typehints

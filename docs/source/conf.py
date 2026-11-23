@@ -9,13 +9,14 @@ author = "Ujjwal Panda"
 copyright = f"2022-{date.today().year}, Ujjwal Panda"
 html_theme = "furo"
 html_title = "pabo"
-html_baseurl = "https://pabo.readthedocs.io/en/latest/"
+html_baseurl = "https://astrogewgaw.github.io/pabo/"
 
 extensions = [
     "myst_parser",
     "sphinx_sitemap",
     "sphinx_copybutton",
     "sphinx.ext.autodoc",
+    "sphinx.ext.githubpages",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",

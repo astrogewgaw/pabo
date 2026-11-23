@@ -140,7 +140,7 @@ clean and easy-to-understand.
 
 </div>
 
-[docs]: https://pabo.readthedocs.io
+[docs]: https://astrogewgaw.github.io/pabo/
 [ruff]: https://github.com/astral-sh/ruff
 [gitmoji]: https://gitmoji.dev
 [bread]: https://github.com/alexras/bread

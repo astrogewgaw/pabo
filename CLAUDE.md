@@ -154,8 +154,10 @@ just docs       # sphinx-reload docs (or `just docs-build` for a one-off build)
 
 Extras: `test` (pytest, pytest-cov, hypothesis), `bench`, `docs`, and `dev` (all
 of them plus ruff, pyright, pre-commit, interrogate). CI (`.github/workflows/ci.yml`)
-runs lint and the test matrix; `release.yml` builds wheels with cibuildwheel and
-publishes with trusted publishing.
+runs lint and the test matrix; `docs.yml` builds the docs on every PR (warnings are
+errors) and publishes them to GitHub Pages (https://astrogewgaw.github.io/pabo/)
+from `main`; `release.yml` builds wheels with cibuildwheel and publishes with
+trusted publishing.
 
 The editable install uses `--no-build-isolation`, so the build dependencies must
 already be in the environment: `pip install scikit-build-core nanobind setuptools-scm`.

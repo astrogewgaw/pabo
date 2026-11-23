@@ -40,7 +40,7 @@ dev = ["pabo[test,bench,docs]", "ruff", "pyright", "pre-commit", "interrogate"]
 Source = "https://github.com/astrogewgaw/pabo"
 Homepage = "https://github.com/astrogewgaw/pabo"
 Issues = "https://github.com/astrogewgaw/pabo/issues"
-Documentation = "https://pabo.readthedocs.io/en/latest"
+Documentation = "https://astrogewgaw.github.io/pabo/"
 
 [tool.scikit-build]
 wheel.py-api = "cp312"

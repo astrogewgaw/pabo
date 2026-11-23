@@ -20,3 +20,5 @@ src/pabo/_version.py
 .benchmarks
 coverage.xml
 benchmarks/raw.json
+docs/build
+docs/_build

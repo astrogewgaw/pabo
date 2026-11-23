@@ -20,7 +20,7 @@ default:
     rm -rf .eggs
     rm -rf .coverage
     rm -rf .mypy_cache
-    rm -rf docs/build/*
+    rm -rf docs/build docs/_build
     rm -rf .pytest_cache
     fd -I -e pyc -x rm -rf
     fd -I __pycache__ -x rm -rf
