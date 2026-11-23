@@ -43,7 +43,7 @@ class Fixed16(pb.Construct):
         try:
             stream.write(value.to_bytes(4, self.endian, signed=True))
         except OverflowError as error:
-            raise pb.ValidationError(f"{data} does not fit in 16.16 fixed point.") from error
+            raise pb.ValidationError(f"{data} DOES NOT FIT IN 16.16 FIXED POINT.") from error
         return data
 
 

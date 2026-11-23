@@ -191,7 +191,8 @@ These come from the in-progress refactor (uncommitted changes on `main`).
 - [x] Errors that include the **field path** (`png.ihdr.width`), the **stream offset**,
       and expected versus actual values.
 - [x] `Probe` / a debug mode that hex-dumps each field as it is parsed.
-- [x] Consistent error message style (some are SHOUTING, some aren't).
+- [x] Consistent error message style (some are SHOUTING, some aren't). (All are now
+      uppercase, as requested in the review of PR #2.)
 - [x] A specific exception hierarchy (`StreamError`, `ConstError`, `SizeError`,
       `ValidationError`) under `PaboError`.
 

@@ -25,13 +25,13 @@ FLOAT_CODES = {2: "e", 4: "f", 8: "d"}
 def _checkendian(endian: str | None) -> None:
     if endian is not None and endian not in ENDIANS:
         raise PaboError(
-            f"Invalid endianness {endian!r}. Must be one of {list(ENDIANS)}."
+            f"INVALID ENDIANNESS {endian!r}. MUST BE ONE OF {list(ENDIANS)}."
         )
 
 
 def _checkbitorder(bitorder: str) -> None:
     if bitorder not in ("big", "little"):
-        raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
+        raise PaboError(f"INVALID BIT ORDER {bitorder!r}. MUST BE 'big' OR 'little'.")
 
 
 def resolveendian(endian: str | None, ctx: Context) -> str:
@@ -77,7 +77,7 @@ class _Fixed(Construct):
             stream.write(struct.pack(fmt, data))
         except struct.error as error:
             raise ValidationError(
-                f"Cannot build {data!r} as {self!r}: {error}."
+                f"CANNOT BUILD {data!r} AS {self!r}: {error}."
             ) from error
         return data
 
@@ -102,7 +102,7 @@ class Int(_Fixed):
     def __post_init__(self):
         if self.width < 1:
             raise PaboError(
-                f"Unsupported integer width {self.width}. Must be positive."
+                f"UNSUPPORTED INTEGER WIDTH {self.width}. MUST BE POSITIVE."
             )
         _checkendian(self.endian)
 
@@ -113,7 +113,7 @@ class Int(_Fixed):
 
         if self.width not in INT_CODES:
             raise PaboError(
-                f"There is no struct format for {self.width}-byte integers."
+                f"THERE IS NO STRUCT FORMAT FOR {self.width}-BYTE INTEGERS."
             )
         code = INT_CODES[self.width]
         return ENDIANS[endian] + (code if self.signed else code.upper())
@@ -131,7 +131,7 @@ class Int(_Fixed):
             raw = data.to_bytes(self.width, self._byteorder(ctx), signed=self.signed)
         except (AttributeError, OverflowError) as error:
             raise ValidationError(
-                f"Cannot build {data!r} as {self!r}: {error}."
+                f"CANNOT BUILD {data!r} AS {self!r}: {error}."
             ) from error
         stream.write(raw)
         return data
@@ -155,7 +155,7 @@ class Float(_Fixed):
     def __post_init__(self):
         if self.width not in FLOAT_CODES:
             raise PaboError(
-                f"Unsupported float width {self.width}. Must be one of {list(FLOAT_CODES)}."
+                f"UNSUPPORTED FLOAT WIDTH {self.width}. MUST BE ONE OF {list(FLOAT_CODES)}."
             )
         _checkendian(self.endian)
 
@@ -177,11 +177,11 @@ class VarInt(Construct[int]):
     """
 
     def _size(self, ctx):
-        raise SizeofError("A VarInt has no fixed size.")
+        raise SizeofError("A VarInt HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, int) or data < 0:
-            raise ValidationError(f"A VarInt must be a non-negative int, got {data!r}.")
+            raise ValidationError(f"A VarInt MUST BE A NON-NEGATIVE INT, GOT {data!r}.")
         value, out = data, bytearray()
         while True:
             byte, value = value & 0x7F, value >> 7
@@ -210,11 +210,11 @@ class ZigZag(Construct[int]):
     """
 
     def _size(self, ctx):
-        raise SizeofError("A ZigZag integer has no fixed size.")
+        raise SizeofError("A ZigZag INTEGER HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, int):
-            raise ValidationError(f"A ZigZag integer must be an int, got {data!r}.")
+            raise ValidationError(f"A ZigZag INTEGER MUST BE AN INT, GOT {data!r}.")
         VarInt()._build(2 * data if data >= 0 else -2 * data - 1, stream, ctx)
         return data
 
@@ -243,14 +243,14 @@ class Array(Construct):
 
     def __post_init__(self):
         if isinstance(self.dtype, Int) and self.dtype.width not in INT_CODES:
-            raise PaboError("Array elements must be 1, 2, 4 or 8 bytes wide.")
+            raise PaboError("ARRAY ELEMENTS MUST BE 1, 2, 4 OR 8 BYTES WIDE.")
         if self.packing is not None:
             if not isinstance(self.dtype, Int):
-                raise PaboError("Only integer arrays can be packed.")
+                raise PaboError("ONLY INTEGER ARRAYS CAN BE PACKED.")
             if not 1 <= self.packing <= 8 * self.dtype.width:
                 raise PaboError(
-                    f"Unsupported packing {self.packing}. Must be from 1 to "
-                    f"{8 * self.dtype.width} bits for {self.dtype.width}-byte elements."
+                    f"UNSUPPORTED PACKING {self.packing}. MUST BE FROM 1 TO "
+                    f"{8 * self.dtype.width} BITS FOR {self.dtype.width}-BYTE ELEMENTS."
                 )
         _checkbitorder(self.bitorder)
 
@@ -286,11 +286,11 @@ class Array(Construct):
         nbytes = self._nbytes(count) if count >= 0 else available
         if nbytes > available:
             raise StreamError(
-                f"Stream ended early: expected {nbytes} bytes, got {available}."
+                f"STREAM ENDED EARLY: EXPECTED {nbytes} BYTES, GOT {available}."
             )
         if nbytes % dtype.itemsize:
             raise StreamError(
-                f"{nbytes} bytes is not a whole number of {dtype.itemsize}-byte elements."
+                f"{nbytes} BYTES IS NOT A WHOLE NUMBER OF {dtype.itemsize}-BYTE ELEMENTS."
             )
         array = np.frombuffer(
             stream, dtype=dtype, count=nbytes // dtype.itemsize, offset=start
@@ -310,7 +310,7 @@ class Array(Construct):
             n = stream.readinto(view[got:])
             if not n:
                 raise StreamError(
-                    f"Stream ended early: expected {nbytes} bytes, got {got}."
+                    f"STREAM ENDED EARLY: EXPECTED {nbytes} BYTES, GOT {got}."
                 )
             got += n
         return array
@@ -318,13 +318,13 @@ class Array(Construct):
     def _count(self, ctx) -> int:
         count = evaluate(self.count, ctx)
         if not isinstance(count, (int, np.integer)):
-            raise PaboError(f"The count must be an integer, got {count!r}.")
+            raise PaboError(f"THE COUNT MUST BE AN INTEGER, GOT {count!r}.")
         return int(count)
 
     def _size(self, ctx):
         count = self._count(ctx)
         if count < 0:
-            raise SizeofError("A greedy array has no fixed size.")
+            raise SizeofError("A GREEDY ARRAY HAS NO FIXED SIZE.")
         return self._nbytes(count)
 
     def _build(self, data, stream, ctx):
@@ -333,13 +333,13 @@ class Array(Construct):
             array = np.asarray(data, dtype=dtype).ravel()
         except (OverflowError, TypeError, ValueError) as error:
             raise ValidationError(
-                f"Cannot build {data!r} as {dtype} values: {error}."
+                f"CANNOT BUILD {data!r} AS {dtype} VALUES: {error}."
             ) from error
         count = self._count(ctx)
         if count >= 0:
             if array.size < count:
                 raise ValidationError(
-                    f"Not enough data to build: need {count} elements, got {array.size}."
+                    f"NOT ENOUGH DATA TO BUILD: NEED {count} ELEMENTS, GOT {array.size}."
                 )
             array = array[:count]
         if self.packing is None:
@@ -361,8 +361,8 @@ class Array(Construct):
         if self.packing is None:
             if len(raw) % self.dtype.width:
                 raise StreamError(
-                    f"{len(raw)} bytes is not a whole number of "
-                    f"{self.dtype.width}-byte elements."
+                    f"{len(raw)} BYTES IS NOT A WHOLE NUMBER OF "
+                    f"{self.dtype.width}-BYTE ELEMENTS."
                 )
             return np.frombuffer(raw, dtype=self.dtypefor(ctx))
         values = unpackbits(raw, self.packing, self.bitorder)

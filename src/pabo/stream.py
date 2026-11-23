@@ -15,7 +15,7 @@ from pabo.specify import Specification
 def _offset(value, ctx) -> int:
     offset = evaluate(value, ctx)
     if not isinstance(offset, int):
-        raise PaboError(f"The offset must be an integer, got {offset!r}.")
+        raise PaboError(f"THE OFFSET MUST BE AN INTEGER, GOT {offset!r}.")
     return offset
 
 
@@ -25,7 +25,7 @@ def _seek(stream, offset: int, whence: int = 0) -> int:
         return stream.tell()
     except (AttributeError, OSError, ValueError) as error:
         raise StreamError(
-            f"Cannot seek to {offset} (whence={whence}): {error}."
+            f"CANNOT SEEK TO {offset} (whence={whence}): {error}."
         ) from error
 
 
@@ -44,7 +44,7 @@ class Seek(Construct[int]):
         return True
 
     def _size(self, ctx):
-        raise SizeofError("A Seek has no meaningful size.")
+        raise SizeofError("A SEEK HAS NO MEANINGFUL SIZE.")
 
     def _build(self, data, stream, ctx):
         return _seek(stream, _offset(self.offset, ctx), self.whence)
@@ -68,7 +68,7 @@ class Tell(Construct[int]):
     def _position(self, stream) -> int:
         position = tell(stream)
         if position is None:
-            raise StreamError("The stream cannot tell its position.")
+            raise StreamError("THE STREAM CANNOT TELL ITS POSITION.")
         return position
 
     def _build(self, data, stream, ctx):
@@ -150,9 +150,9 @@ class Aligned(Construct):
 
     def __post_init__(self):
         if self.modulus < 1:
-            raise PaboError("The modulus must be positive.")
+            raise PaboError("THE MODULUS MUST BE POSITIVE.")
         if len(self.fill) != 1:
-            raise PaboError("The fill must be a single byte.")
+            raise PaboError("THE FILL MUST BE A SINGLE BYTE.")
 
     def _omittable(self):
         return self.wraps._omittable()
@@ -266,7 +266,7 @@ class Lazy(Construct):
         stream.seek(offset)
         if end - offset < size:
             raise StreamError(
-                f"Stream ended early: expected {size} bytes, got {end - offset}."
+                f"STREAM ENDED EARLY: EXPECTED {size} BYTES, GOT {end - offset}."
             )
         stream.seek(offset + size)
         return LazyValue(self.wraps, stream, offset, ctx)

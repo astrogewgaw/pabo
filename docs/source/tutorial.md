@@ -207,7 +207,7 @@ PNGHeader(ihdr_size=13, width=602, height=172).build()
 Errors say which field failed and where:
 
 ```text
-pabo.errors.StreamError: 바보! Stream ended early: expected 2 bytes, got 1. (at header.sizes[2], offset 7) ABORT.
+pabo.errors.StreamError: 바보! STREAM ENDED EARLY: EXPECTED 2 BYTES, GOT 1. (AT header.sizes[2], OFFSET 7) ABORT.
 ```
 
 All errors are subclasses of `PaboError`: `StreamError`, `SizeofError`,

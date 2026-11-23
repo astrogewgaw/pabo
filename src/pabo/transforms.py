@@ -44,7 +44,7 @@ class Transformed(Construct):
         size = evaluate(self.length, ctx)
         if size < 0:
             raise SizeofError(
-                "A Transformed construct without a length has no fixed size."
+                "A TRANSFORMED CONSTRUCT WITHOUT A LENGTH HAS NO FIXED SIZE."
             )
         return size
 
@@ -54,10 +54,10 @@ class Transformed(Construct):
         try:
             raw = self.encode(buffer.getvalue())
         except Exception as error:
-            raise ValidationError(f"Cannot encode the data: {error}.") from error
+            raise ValidationError(f"CANNOT ENCODE THE DATA: {error}.") from error
         size = evaluate(self.length, ctx)
         if size >= 0 and len(raw) != size:
-            raise ValidationError(f"Expected {size} encoded bytes, got {len(raw)}.")
+            raise ValidationError(f"EXPECTED {size} ENCODED BYTES, GOT {len(raw)}.")
         stream.write(raw)
         return built
 
@@ -67,7 +67,7 @@ class Transformed(Construct):
         try:
             decoded = self.decode(raw)
         except Exception as error:
-            raise ValidationError(f"Cannot decode the data: {error}.") from error
+            raise ValidationError(f"CANNOT DECODE THE DATA: {error}.") from error
         return self.wraps._parse(BytesIO(decoded), ctx)
 
 
@@ -81,7 +81,7 @@ def Compressed(
     """
 
     if codec not in CODECS:
-        raise PaboError(f"Unknown codec {codec!r}. Must be one of {list(CODECS)}.")
+        raise PaboError(f"UNKNOWN CODEC {codec!r}. MUST BE ONE OF {list(CODECS)}.")
     decode, encode = CODECS[codec]
     return Transformed(wraps, decode, encode, length)
 
@@ -96,7 +96,7 @@ def _hasher(algorithm: str | Callable[[bytes], Any]) -> Callable[[bytes], Any]:
     if algorithm in hashlib.algorithms_available:
         return lambda raw: hashlib.new(algorithm, raw).digest()
     raise PaboError(
-        f"Unknown checksum {algorithm!r}. Use 'crc32', 'adler32', a hashlib name or a function."
+        f"UNKNOWN CHECKSUM {algorithm!r}. USE 'crc32', 'adler32', A HASHLIB NAME OR A FUNCTION."
     )
 
 
@@ -142,6 +142,6 @@ class Checksummed(Construct):
         computed = _hasher(self.algorithm)(raw)
         if stored != computed:
             raise ValidationError(
-                f"Checksum mismatch: stored {stored!r}, computed {computed!r}."
+                f"CHECKSUM MISMATCH: STORED {stored!r}, COMPUTED {computed!r}."
             )
         return value

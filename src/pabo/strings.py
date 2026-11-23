@@ -25,7 +25,7 @@ def _decode(raw: bytes, code: str) -> str:
     try:
         return raw.decode(code)
     except UnicodeDecodeError as error:
-        raise ValidationError(f"Cannot decode {raw!r} as {code}: {error}.") from error
+        raise ValidationError(f"CANNOT DECODE {raw!r} AS {code}: {error}.") from error
 
 
 def _readuntil(stream, terminator: bytes, unit: int) -> bytes:
@@ -52,11 +52,11 @@ class CString(Construct[str]):
     code: str = "utf-8"
 
     def _size(self, ctx):
-        raise SizeofError("A CString has no fixed size.")
+        raise SizeofError("A CString HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         if "\x00" in data:
-            raise ValidationError("A CString cannot contain a null character.")
+            raise ValidationError("A CString CANNOT CONTAIN A NULL CHARACTER.")
         stream.write(data.encode(self.code) + _fragment("\x00", self.code))
         return data
 
@@ -78,7 +78,7 @@ class PascalString(Construct[str]):
     code: str = "utf-8"
 
     def _size(self, ctx):
-        raise SizeofError("A PascalString has no fixed size.")
+        raise SizeofError("A PascalString HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         Prefixed(self.pre, Bytes(-1))._build(data.encode(self.code), stream, ctx)
@@ -109,9 +109,9 @@ class PaddedString(Construct[str]):
 
     def __post_init__(self):
         if len(self.pad) != 1:
-            raise PaboError("The padding must be a single character.")
+            raise PaboError("THE PADDING MUST BE A SINGLE CHARACTER.")
         if self.side not in ("right", "left"):
-            raise PaboError(f"Invalid side {self.side!r}. Must be 'right' or 'left'.")
+            raise PaboError(f"INVALID SIDE {self.side!r}. MUST BE 'right' OR 'left'.")
 
     def _size(self, ctx):
         return evaluate(self.length, ctx)
@@ -121,7 +121,7 @@ class PaddedString(Construct[str]):
         length = evaluate(self.length, ctx)
         if len(raw) > length:
             raise ValidationError(
-                f"String too long: {len(raw)} bytes encoded, but only {length} available."
+                f"STRING TOO LONG: {len(raw)} BYTES ENCODED, BUT ONLY {length} AVAILABLE."
             )
         unit = _fragment(self.pad, self.code)
         missing = length - len(raw)
@@ -153,7 +153,7 @@ class GreedyString(Construct[str]):
     code: str = "utf-8"
 
     def _size(self, ctx):
-        raise SizeofError("A GreedyString has no fixed size.")
+        raise SizeofError("A GreedyString HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         stream.write(data.encode(self.code))
@@ -172,11 +172,11 @@ class Line(Construct[str]):
     code: str = "utf-8"
 
     def _size(self, ctx):
-        raise SizeofError("A Line has no fixed size.")
+        raise SizeofError("A LINE HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         if "\r\n" in data:
-            raise ValidationError("A Line cannot contain a CRLF.")
+            raise ValidationError("A LINE CANNOT CONTAIN A CRLF.")
         stream.write(data.encode(self.code) + _fragment("\r\n", self.code))
         return data
 

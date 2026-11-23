@@ -91,7 +91,7 @@ class Specification(Construct[Container]):
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, dict):
-            raise PaboError(f"Expected a dict of fields, got {type(data).__name__}.")
+            raise PaboError(f"EXPECTED A DICT OF FIELDS, GOT {type(data).__name__}.")
         child = self._child(data, ctx)
         plan = self._plan(child)
         if plan is not None:
@@ -118,7 +118,7 @@ class Specification(Construct[Container]):
                     value = None
                 else:
                     raise PaboError(
-                        f"Missing field {name!r}. Data not according to specification."
+                        f"MISSING FIELD {name!r}. DATA NOT ACCORDING TO SPECIFICATION."
                     )
                 child[name] = member._build(value, stream, child)
 

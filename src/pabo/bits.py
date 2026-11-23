@@ -29,7 +29,7 @@ class Bits(Construct):
 
     def __post_init__(self):
         if self.count < 0:
-            raise PaboError("The number of bits cannot be negative.")
+            raise PaboError("THE NUMBER OF BITS CANNOT BE NEGATIVE.")
         _checkbitorder(self.bitorder)
 
     def _size(self, ctx):
@@ -41,9 +41,9 @@ class Bits(Construct):
         else:
             values = np.asarray(bits, dtype=np.uint8).ravel()
         if values.size != self.count:
-            raise ValidationError(f"Expected {self.count} bits, got {values.size}.")
+            raise ValidationError(f"EXPECTED {self.count} BITS, GOT {values.size}.")
         if (values > 1).any():
-            raise ValidationError("Bits must be 0 or 1.")
+            raise ValidationError("BITS MUST BE 0 OR 1.")
         padded = np.zeros(self.size * 8, dtype=np.uint8)
         padded[: self.count] = values
         stream.write(packbits(padded, 1, self.bitorder))
@@ -66,7 +66,7 @@ class BitInt:
 
     def __post_init__(self):
         if self.nbits < 1:
-            raise PaboError("A bit field needs at least one bit.")
+            raise PaboError("A BIT FIELD NEEDS AT LEAST ONE BIT.")
 
 
 @dataclass
@@ -90,7 +90,7 @@ class BitPadding:
 
     def __post_init__(self):
         if self.nbits < 1:
-            raise PaboError("Bit padding needs at least one bit.")
+            raise PaboError("BIT PADDING NEEDS AT LEAST ONE BIT.")
 
 
 @dataclass
@@ -114,7 +114,7 @@ class BitStruct(Construct[Container]):
         total = sum(spec.nbits for spec in self.fields.values())
         if total % 8:
             raise PaboError(
-                f"The bit fields add up to {total} bits, which is not a whole number of bytes."
+                f"THE BIT FIELDS ADD UP TO {total} BITS, WHICH IS NOT A WHOLE NUMBER OF BYTES."
             )
 
     def _layout(self):
@@ -138,7 +138,7 @@ class BitStruct(Construct[Container]):
             if isinstance(spec, BitPadding):
                 continue
             if name not in data:
-                raise PaboError(f"Missing bit field {name!r}.")
+                raise PaboError(f"MISSING BIT FIELD {name!r}.")
             field_value = int(data[name])
             lo, hi = (
                 (-(1 << (spec.nbits - 1)), 1 << (spec.nbits - 1))
@@ -147,7 +147,7 @@ class BitStruct(Construct[Container]):
             )
             if not lo <= field_value < hi:
                 raise ValidationError(
-                    f"The value {field_value} of bit field {name!r} does not fit in {spec.nbits} bits."
+                    f"THE VALUE {field_value} OF BIT FIELD {name!r} DOES NOT FIT IN {spec.nbits} BITS."
                 )
             value |= (field_value & ((1 << spec.nbits) - 1)) << shift
         stream.write(value.to_bytes(self._size(ctx), self.bitorder))

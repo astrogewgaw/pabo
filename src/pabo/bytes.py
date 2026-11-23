@@ -13,7 +13,7 @@ from pabo.wrappers import Const
 def _count(value, ctx) -> int:
     count = evaluate(value, ctx)
     if not isinstance(count, int):
-        raise PaboError(f"The count must be an integer, got {count!r}.")
+        raise PaboError(f"THE COUNT MUST BE AN INTEGER, GOT {count!r}.")
     return count
 
 
@@ -32,15 +32,15 @@ class Bytes(Construct[bytes]):
     def _size(self, ctx):
         count = _count(self.count, ctx)
         if count < 0:
-            raise SizeofError("Greedy bytes have no fixed size.")
+            raise SizeofError("GREEDY BYTES HAVE NO FIXED SIZE.")
         return count
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, (bytes, bytearray, memoryview)):
-            raise ValidationError(f"Expected bytes, got {type(data).__name__}.")
+            raise ValidationError(f"EXPECTED BYTES, GOT {type(data).__name__}.")
         count = _count(self.count, ctx)
         if count >= 0 and len(data) != count:
-            raise ValidationError(f"Expected {count} bytes, got {len(data)}.")
+            raise ValidationError(f"EXPECTED {count} BYTES, GOT {len(data)}.")
         stream.write(data)
         return data
 

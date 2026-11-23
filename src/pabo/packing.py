@@ -14,9 +14,9 @@ BitOrder = Literal["big", "little"]
 
 def _check(nbits: int, bitorder: str) -> None:
     if not 1 <= nbits <= 64:
-        raise PaboError(f"Unsupported number of bits {nbits}. Must be from 1 to 64.")
+        raise PaboError(f"UNSUPPORTED NUMBER OF BITS {nbits}. MUST BE FROM 1 TO 64.")
     if bitorder not in ("big", "little"):
-        raise PaboError(f"Invalid bit order {bitorder!r}. Must be 'big' or 'little'.")
+        raise PaboError(f"INVALID BIT ORDER {bitorder!r}. MUST BE 'big' OR 'little'.")
 
 
 def unpackbits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
@@ -62,7 +62,7 @@ def packbits(values, nbits: int, bitorder: BitOrder = "big") -> bytes:
     if values.size and (
         values.min() < 0 or (nbits < 64 and values.max() >= 1 << nbits)
     ):
-        raise PaboError(f"Values do not fit in {nbits} bits.")
+        raise PaboError(f"VALUES DO NOT FIT IN {nbits} BITS.")
     values = values.astype(np.uint64)
     if nbits in (1, 2, 4):
         per_byte = 8 // nbits

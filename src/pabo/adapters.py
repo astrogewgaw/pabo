@@ -40,7 +40,7 @@ class Enum(Construct):
             return self.enum(data)
         except (KeyError, ValueError):
             raise ValidationError(
-                f"{data!r} is not a member of {self.enum.__name__}."
+                f"{data!r} IS NOT A MEMBER OF {self.enum.__name__}."
             ) from None
 
     def _build(self, data, stream, ctx):
@@ -94,11 +94,11 @@ class Timestamp(Construct[datetime]):
     def __post_init__(self):
         if isinstance(self.epoch, str) and self.epoch not in EPOCHS:
             raise PaboError(
-                f"Unknown epoch {self.epoch!r}. Must be one of {list(EPOCHS)} or a datetime."
+                f"UNKNOWN EPOCH {self.epoch!r}. MUST BE ONE OF {list(EPOCHS)} OR A DATETIME."
             )
         if not isinstance(self.epoch, (str, datetime)):
             raise PaboError(
-                f"The epoch must be a str or a datetime, got {self.epoch!r}."
+                f"THE EPOCH MUST BE A STR OR A DATETIME, GOT {self.epoch!r}."
             )
 
     def _origin(self) -> tuple[datetime, float]:
@@ -115,7 +115,7 @@ class Timestamp(Construct[datetime]):
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, datetime):
-            raise ValidationError(f"Expected a datetime, got {type(data).__name__}.")
+            raise ValidationError(f"EXPECTED A DATETIME, GOT {type(data).__name__}.")
         if data.tzinfo is None:
             data = data.replace(tzinfo=timezone.utc)
         origin, unit = self._origin()

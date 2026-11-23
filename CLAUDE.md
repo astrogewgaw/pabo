@@ -98,8 +98,10 @@ Conventions to keep:
 - **Raise a `PaboError` subclass** (`errors.py`) for every user-facing failure. Wrap
   `struct.error` and similar errors instead of letting them leak out, because
   `Greedy` relies on `PaboError` to detect the end of the stream. Messages are
-  full sentences in sentence case. `PaboError` formats messages as
-  `"바보! <msg> ABORT."`.
+  full sentences **in uppercase**, but interpolated values (`{data!r}`, field
+  names), class names (`VarInt`) and literal values the user types (`'big'`)
+  keep their case. `PaboError` formats messages as
+  `"바보! <MSG> (AT <path>, OFFSET <n>) ABORT."`.
 - Validate constructor arguments in `__post_init__` (widths, endianness, bit order,
   packing).
 - `docs` is a keyword-only dataclass field, set with `construct / "description"`.

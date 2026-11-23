@@ -29,7 +29,7 @@ def readexact(stream, size: int) -> bytes:
     data = stream.read(size)
     if len(data) != size:
         raise StreamError(
-            f"Stream ended early: expected {size} bytes, got {len(data)}."
+            f"STREAM ENDED EARLY: EXPECTED {size} BYTES, GOT {len(data)}."
         )
     return data
 
@@ -132,7 +132,7 @@ class Construct(ABC, Generic[T]):
 
     def __truediv__(self, operand):
         if not isinstance(operand, str):
-            raise PaboError(f"{operand!r} is not a str, so it cannot be used as docs.")
+            raise PaboError(f"{operand!r} IS NOT A STR, SO IT CANNOT BE USED AS DOCS.")
         return replace(self, docs=operand)
 
     def __floordiv__(self, operand):
@@ -155,11 +155,11 @@ class Construct(ABC, Generic[T]):
             size = self._size(Context(ctx or {}))
         except ContextError as error:
             raise SizeofError(
-                f"The size depends on other fields: {error.msg}"
+                f"THE SIZE DEPENDS ON OTHER FIELDS: {error.msg}"
             ) from error
         if isinstance(size, int) and size >= 0:
             return size
-        raise SizeofError(f"No reasonable size was returned (got {size!r}).")
+        raise SizeofError(f"NO REASONABLE SIZE WAS RETURNED (GOT {size!r}).")
 
     def _label(self) -> str:
         """
@@ -224,7 +224,7 @@ class Construct(ABC, Generic[T]):
         if hasattr(src, "write"):
             self._build(data, src, Context())
             return None
-        raise PaboError(f"Cannot build into an object of type {type(src).__name__}.")
+        raise PaboError(f"CANNOT BUILD INTO AN OBJECT OF TYPE {type(src).__name__}.")
 
     def parse(self, dst, trace: Any = False) -> T:
         """
@@ -254,4 +254,4 @@ class Construct(ABC, Generic[T]):
             return self._parse(stream, ctx)
         if hasattr(dst, "read"):
             return self._parse(dst, ctx)
-        raise PaboError(f"Cannot parse from an object of type {type(dst).__name__}.")
+        raise PaboError(f"CANNOT PARSE FROM AN OBJECT OF TYPE {type(dst).__name__}.")

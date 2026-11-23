@@ -34,11 +34,11 @@ class PaboError(Exception):
     def __str__(self) -> str:
         parts = []
         if self.path:
-            parts.append(f"at {self.where}")
+            parts.append(f"AT {self.where}")
         if self.docs:
             parts.append(repr(self.docs))
         if self.offset is not None:
-            parts.append(f"offset {self.offset}")
+            parts.append(f"OFFSET {self.offset}")
         where = f" ({', '.join(parts)})" if parts else ""
         return f"바보! {self.msg}{where} ABORT."
 

@@ -16,7 +16,7 @@ from pabo.numeric import Int
 def _int(value, ctx, what: str = "count") -> int:
     value = evaluate(value, ctx)
     if not isinstance(value, int):
-        raise PaboError(f"The {what} must be an integer, got {value!r}.")
+        raise PaboError(f"THE {what} MUST BE AN INTEGER, GOT {value!r}.")
     return value
 
 
@@ -39,7 +39,7 @@ class Const(Construct):
 
     def _build(self, data, stream, ctx):
         if data is not None and data != self.value:
-            raise ConstError(f"Cannot build {data!r}: the constant is {self.value!r}.")
+            raise ConstError(f"CANNOT BUILD {data!r}: THE CONSTANT IS {self.value!r}.")
         self.wraps._build(self.value, stream, ctx)
         return self.value
 
@@ -47,7 +47,7 @@ class Const(Construct):
         data = self.wraps._parse(stream, ctx)
         if data != self.value:
             raise ConstError(
-                f"Parsed {data!r}, but expected the constant {self.value!r}."
+                f"PARSED {data!r}, BUT EXPECTED THE CONSTANT {self.value!r}."
             )
         return data
 
@@ -71,7 +71,7 @@ class Greedy(Construct[list]):
     wraps: Construct
 
     def _size(self, ctx):
-        raise SizeofError("A Greedy construct has no fixed size.")
+        raise SizeofError("A GREEDY CONSTRUCT HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         for ix, element in enumerate(data):
@@ -122,7 +122,7 @@ class Sequential(Construct[list], MutableSequence):
     def _build(self, data, stream, ctx):
         if len(data) != len(self.items):
             raise ValidationError(
-                f"Expected {len(self.items)} elements, got {len(data)}."
+                f"EXPECTED {len(self.items)} ELEMENTS, GOT {len(data)}."
             )
         built = []
         try:
@@ -169,7 +169,7 @@ class Repeat(Construct[list]):
     def _build(self, data, stream, ctx):
         count = _int(self.count, ctx)
         if len(data) < count:
-            raise ValidationError(f"Not enough data. Need at least {count} elements.")
+            raise ValidationError(f"NOT ENOUGH DATA. NEED AT LEAST {count} ELEMENTS.")
         built = []
         for ix in range(count):
             with scope(f"[{ix}]", stream):
@@ -228,7 +228,7 @@ class Prefixed(Construct):
     wraps: Construct
 
     def _size(self, ctx):
-        raise SizeofError("A Prefixed construct has no fixed size.")
+        raise SizeofError("A PREFIXED CONSTRUCT HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         buffer = BytesIO()
@@ -260,9 +260,9 @@ class Padded(Construct):
 
     def __post_init__(self):
         if len(self.fill) != 1:
-            raise PaboError("The fill must be a single byte.")
+            raise PaboError("THE FILL MUST BE A SINGLE BYTE.")
         if self.side not in ("right", "left"):
-            raise PaboError(f"Invalid side {self.side!r}. Must be 'right' or 'left'.")
+            raise PaboError(f"INVALID SIDE {self.side!r}. MUST BE 'right' OR 'left'.")
 
     def _omittable(self):
         return self.wraps._omittable()

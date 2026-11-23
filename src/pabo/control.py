@@ -90,7 +90,7 @@ class If(Construct):
         if branch is None:
             return None
         if data is None and not branch._omittable():
-            raise ValidationError("A value is required, since the condition holds.")
+            raise ValidationError("A VALUE IS REQUIRED, SINCE THE CONDITION HOLDS.")
         return branch._build(data, stream, ctx)
 
     def _parse(self, stream, ctx):
@@ -112,7 +112,7 @@ class Optional(Construct):
         return True
 
     def _size(self, ctx):
-        raise SizeofError("An Optional construct has no fixed size.")
+        raise SizeofError("AN OPTIONAL CONSTRUCT HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         if data is None:
@@ -145,7 +145,7 @@ class Switch(Construct):
         key = evaluate(self.key, ctx)
         case = self.cases.get(key, self.default)
         if case is None:
-            raise ValidationError(f"No case for the key {key!r}.")
+            raise ValidationError(f"NO CASE FOR THE KEY {key!r}.")
         return case
 
     def _size(self, ctx):
@@ -172,7 +172,7 @@ class RepeatUntil(Construct[list]):
     wraps: Construct
 
     def _size(self, ctx):
-        raise SizeofError("A RepeatUntil construct has no fixed size.")
+        raise SizeofError("A RepeatUntil CONSTRUCT HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
         built = []
@@ -183,7 +183,7 @@ class RepeatUntil(Construct[list]):
             if self.predicate(value, ctx):
                 return built
         raise ValidationError(
-            "No element satisfies the predicate, so nothing ends the list."
+            "NO ELEMENT SATISFIES THE PREDICATE, SO NOTHING ENDS THE LIST."
         )
 
     def _parse(self, stream, ctx):
@@ -241,7 +241,7 @@ class Terminated(Construct):
     def _parse(self, stream, ctx):
         if stream.read(1):
             raise StreamError(
-                f"Expected the end of the stream, at offset {tell(stream)}."
+                f"EXPECTED THE END OF THE STREAM, AT OFFSET {tell(stream)}."
             )
         return None
 
@@ -253,7 +253,7 @@ class Check(Construct):
     """
 
     func: Callable
-    message: str = field(default="Check failed.", kw_only=True)
+    message: str = field(default="CHECK FAILED.", kw_only=True)
 
     def _omittable(self):
         return True
@@ -289,7 +289,7 @@ class Validated(Construct):
 
     def _check(self, value, ctx):
         if not self.predicate(value, ctx):
-            raise ValidationError(self.message or f"The value {value!r} is not valid.")
+            raise ValidationError(self.message or f"THE VALUE {value!r} IS NOT VALID.")
         return value
 
     def _size(self, ctx):

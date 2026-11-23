@@ -12,12 +12,12 @@ def test_hierarchy():
 
 
 def test_message_format():
-    error = pb.PaboError("Something broke.")
-    assert str(error) == "바보! Something broke. ABORT."
+    error = pb.PaboError("SOMETHING BROKE.")
+    assert str(error) == "바보! SOMETHING BROKE. ABORT."
     error.path = ["a", "b", "[2]", "c"]
     error.offset = 7
     assert error.where == "a.b[2].c"
-    assert str(error) == "바보! Something broke. (at a.b[2].c, offset 7) ABORT."
+    assert str(error) == "바보! SOMETHING BROKE. (AT a.b[2].c, OFFSET 7) ABORT."
 
 
 def test_pickle_keeps_location():

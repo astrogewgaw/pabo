@@ -110,7 +110,7 @@ class This:
         return This((*self.__path, name))
 
     def __setattr__(self, name: str, value: Any) -> None:
-        raise AttributeError("References are read-only.")
+        raise AttributeError("REFERENCES ARE READ-ONLY.")
 
     @no_type_check
     def __call__(self, ctx: Context) -> Any:
@@ -124,9 +124,9 @@ class This:
                 else:
                     value = value[name]
             except (KeyError, AttributeError, TypeError):
-                raise ContextError(f"Cannot resolve {self!r}.") from None
+                raise ContextError(f"CANNOT RESOLVE {self!r}.") from None
             if value is None and name in ("_", "_root"):
-                raise ContextError(f"Cannot resolve {self!r}: there is no parent.")
+                raise ContextError(f"CANNOT RESOLVE {self!r}: THERE IS NO PARENT.")
         return value
 
     def __repr__(self) -> str:
@@ -156,4 +156,4 @@ def evaluate(value: Any, ctx: Context) -> Any:
     try:
         return value(ctx)
     except (KeyError, AttributeError) as error:
-        raise ContextError(f"Cannot evaluate {value!r}: {error!r}.") from error
+        raise ContextError(f"CANNOT EVALUATE {value!r}: {error!r}.") from error
