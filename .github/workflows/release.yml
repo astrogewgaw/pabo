@@ -6,9 +6,14 @@ on:
     types:
       - published
 
+# Never cancel a release halfway through: a second trigger waits its turn.
 concurrency:
-  cancel-in-progress: true
+  cancel-in-progress: false
   group: ${{ github.workflow }}-${{ github.ref }}
+
+# Read-only by default; only the upload job gets more (an OIDC token for PyPI).
+permissions:
+  contents: read
 
 jobs:
 
@@ -18,7 +23,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-13, macos-latest]
+        # macos-15-intel builds the Intel (x86_64) wheels, macos-latest the Apple
+        # silicon (arm64) ones. (The macos-13 runners were retired in December 2025.)
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-15-intel, macos-latest]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
