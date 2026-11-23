@@ -11,7 +11,8 @@ from pabo.base import Construct, Stop, hexdump, scope, tell
 from pabo.bytes import Bytes, Flag
 from pabo.context import Container, Context
 from pabo.errors import PaboError
-from pabo.numeric import ENDIANS, INT_CODES, Endian, Float, Int, _checkendian
+from pabo.hints import Endian
+from pabo.numeric import ENDIANS, INT_CODES, Float, Int, _checkendian
 from pabo.wrappers import Const
 
 
@@ -253,7 +254,7 @@ class _Plan:
         self.lengths = lengths
 
     @classmethod
-    def compile(cls, fields: dict, endian: str) -> "_Plan | None":
+    def compile(cls, fields: dict, endian: Endian) -> "_Plan | None":
         codes, names, consts, lengths = [], [], {}, {}
         for name, construct in fields.items():
             if isinstance(construct, Const):

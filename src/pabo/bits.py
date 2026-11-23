@@ -9,12 +9,13 @@ import numpy as np
 from pabo.base import Construct, readexact
 from pabo.context import Container
 from pabo.errors import PaboError, ValidationError
-from pabo.numeric import BitOrder, _checkbitorder
+from pabo.hints import BitOrder
+from pabo.numeric import _checkbitorder
 from pabo.packing import packbits, unpackbits
 
 
 @dataclass
-class Bits(Construct):
+class Bits(Construct[bytes]):
     """
     Represents `count` bits, as bytes with one 0 or 1 per bit.
 

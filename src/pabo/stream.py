@@ -7,8 +7,9 @@ from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, readexact, tell
-from pabo.context import Context, Dynamic, evaluate
+from pabo.context import Context, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError
+from pabo.hints import Dynamic, Endian, Whence
 from pabo.specify import Specification
 
 
@@ -17,6 +18,11 @@ def _offset(value, ctx) -> int:
     if not isinstance(offset, int):
         raise PaboError(f"THE OFFSET MUST BE AN INTEGER, GOT {offset!r}.")
     return offset
+
+
+def _checkwhence(whence) -> None:
+    if whence not in (0, 1, 2):
+        raise PaboError(f"INVALID WHENCE {whence!r}. MUST BE 0, 1 OR 2.")
 
 
 def _seek(stream, offset: int, whence: int = 0) -> int:
@@ -38,7 +44,10 @@ class Seek(Construct[int]):
     """
 
     offset: Dynamic
-    whence: int = 0
+    whence: Whence = 0
+
+    def __post_init__(self):
+        _checkwhence(self.whence)
 
     def _omittable(self):
         return True
@@ -88,7 +97,10 @@ class Pointer(Construct):
 
     offset: Dynamic
     wraps: Construct
-    whence: int = 0
+    whence: Whence = 0
+
+    def __post_init__(self):
+        _checkwhence(self.whence)
 
     def _omittable(self):
         return self.wraps._omittable()
@@ -175,13 +187,16 @@ class Aligned(Construct):
         return data
 
 
-def AlignedSpec(modulus: int, fields: dict[str, Construct], **kwargs) -> Specification:
+def AlignedSpec(
+    modulus: int, fields: dict[str, Construct], endian: Endian | None = None
+) -> Specification:
     """
     A specification with every field aligned to a multiple of `modulus` bytes.
     """
 
     return Specification(
-        {name: Aligned(modulus, field) for name, field in fields.items()}, **kwargs
+        {name: Aligned(modulus, member) for name, member in fields.items()},
+        endian=endian,
     )
 
 

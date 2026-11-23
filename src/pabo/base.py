@@ -4,13 +4,15 @@ Base classes.
 
 import mmap
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, no_type_check
 
 from pabo.context import Context
 from pabo.errors import ContextError, PaboError, SizeofError, StreamError
+from pabo.hints import BytesLike, Readable, Source, Target, Writable
 
 T = TypeVar("T")
 
@@ -21,7 +23,10 @@ class Stop(Exception):
     """
 
 
-def readexact(stream, size: int) -> bytes:
+# No runtime type check (see `context.py`): called for nearly every field read,
+# and checking the `Readable` protocol slowed field-by-field parsing by ~20%.
+@no_type_check
+def readexact(stream: Readable, size: int) -> bytes:
     """
     Read exactly `size` bytes from a stream, or raise a `StreamError`.
     """
@@ -45,7 +50,7 @@ def tell(stream) -> int | None:
         return None
 
 
-def hexdump(raw: bytes, offset: int = 0) -> str:
+def hexdump(raw: BytesLike, offset: int = 0) -> str:
     """
     Format bytes as a hex dump: offset, 16 hex bytes, and their ASCII.
     """
@@ -143,7 +148,7 @@ class Construct(ABC, Generic[T]):
 
         return self.sizeof()
 
-    def sizeof(self, ctx: dict | None = None) -> int:
+    def sizeof(self, ctx: Mapping[str, Any] | None = None) -> int:
         """
         The size in bytes, given the values in `ctx` (for example, parsed data).
         """
@@ -201,7 +206,9 @@ class Construct(ABC, Generic[T]):
             lines.append(line.rstrip())
         return "\n".join(lines)
 
-    def build(self, data: Any, src=None, append: bool = False) -> bytes | None:
+    def build(
+        self, data: Any, src: Target = None, append: bool = False
+    ) -> bytes | None:
         """
         Build `data` into bytes.
 
@@ -223,7 +230,7 @@ class Construct(ABC, Generic[T]):
             return None
         raise PaboError(f"CANNOT BUILD INTO AN OBJECT OF TYPE {type(src).__name__}.")
 
-    def parse(self, dst, trace: Any = False) -> T:
+    def parse(self, dst: Source, trace: bool | Writable = False) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
 

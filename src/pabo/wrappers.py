@@ -5,11 +5,12 @@ Wrappers for constructs.
 from collections.abc import Callable, MutableSequence
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Literal
+from typing import Any
 
 from pabo.base import Construct, Stop, readexact, scope
-from pabo.context import Dynamic, evaluate
+from pabo.context import evaluate
 from pabo.errors import ConstError, PaboError, SizeofError, ValidationError
+from pabo.hints import Dynamic, Side, Target
 from pabo.numeric import Int
 
 
@@ -51,7 +52,9 @@ class Const(Construct):
             )
         return data
 
-    def build(self, data=None, src=None, append: bool = False) -> bytes | None:
+    def build(
+        self, data: Any = None, src: Target = None, append: bool = False
+    ) -> bytes | None:
         """
         Build the constant (`data` may be left out).
         """
@@ -200,8 +203,8 @@ class Adapted(Construct):
     """
 
     wraps: Construct
-    decode: Callable
-    encode: Callable
+    decode: Callable[[Any], Any]
+    encode: Callable[[Any], Any]
 
     def _size(self, ctx):
         return self.wraps._size(ctx)
@@ -256,7 +259,7 @@ class Padded(Construct):
     pad: Dynamic
     wraps: Construct
     fill: bytes = b"\x00"
-    side: Literal["right", "left"] = "right"
+    side: Side = "right"
 
     def __post_init__(self):
         if len(self.fill) != 1:

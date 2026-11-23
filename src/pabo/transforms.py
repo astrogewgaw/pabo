@@ -10,11 +10,15 @@ import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 
 from pabo.base import Construct, readexact
-from pabo.context import Dynamic, evaluate
+from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.hints import Dynamic
+
+#: The compression formats `Compressed` supports.
+Codec = Literal["zlib", "gzip", "bz2", "lzma"]
 
 CODECS: dict[str, tuple[Callable[[bytes], bytes], Callable[[bytes], bytes]]] = {
     "zlib": (zlib.decompress, zlib.compress),
@@ -72,7 +76,7 @@ class Transformed(Construct):
 
 
 def Compressed(
-    wraps: Construct, codec: str = "zlib", length: Dynamic = -1
+    wraps: Construct, codec: Codec = "zlib", length: Dynamic = -1
 ) -> Transformed:
     """
     `wraps`, compressed with "zlib", "gzip", "bz2" or "lzma".
@@ -113,7 +117,7 @@ class Checksummed(Construct):
 
     wraps: Construct
     check: Construct
-    algorithm: Any = "crc32"
+    algorithm: str | Callable[[bytes], Any] = "crc32"
 
     def __post_init__(self):
         _hasher(self.algorithm)

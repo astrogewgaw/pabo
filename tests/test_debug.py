@@ -1,5 +1,8 @@
 import io
 
+import pytest
+from beartype.roar import BeartypeCallHintParamViolation
+
 import pabo as pb
 
 
@@ -19,6 +22,11 @@ def test_probe_building():
     spec = pb.Spec({"a": pb.u8, "probe": pb.Probe(file=out)})
     assert spec.build({"a": 1}) == b"\x01"
     assert "while building, at offset 1" in out.getvalue()
+
+
+def test_probe_rejects_non_streams():
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Probe(file="stderr")
 
 
 def test_hexdump():

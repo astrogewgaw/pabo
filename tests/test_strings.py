@@ -66,6 +66,21 @@ def test_line_errors():
         pb.Line().build("a\r\nb")
 
 
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: pb.CString("klingon"),
+        lambda: pb.PascalString(pb.u8, "klingon"),
+        lambda: pb.PaddedString(4, "klingon"),
+        lambda: pb.GreedyString("klingon"),
+        lambda: pb.Line("klingon"),
+    ],
+)
+def test_unknown_encoding(make):
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        make()
+
+
 def test_greedy_string():
     c = pb.GreedyString()
     assert c.parse("héllo".encode()) == "héllo"

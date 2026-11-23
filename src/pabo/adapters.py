@@ -6,16 +6,30 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum as PyEnum
 from enum import IntFlag
-from typing import Any
+from fractions import Fraction
+from typing import Literal
 
 from pabo.base import Construct
 from pabo.errors import PaboError, ValidationError
 from pabo.numeric import Int, VarInt, ZigZag
 
+#: Where each named epoch starts, and its default unit.
 EPOCHS = {
-    "unix": (datetime(1970, 1, 1, tzinfo=timezone.utc), 1.0),
-    "mjd": (datetime(1858, 11, 17, tzinfo=timezone.utc), 86400.0),
+    "unix": (datetime(1970, 1, 1, tzinfo=timezone.utc), "s"),
+    "mjd": (datetime(1858, 11, 17, tzinfo=timezone.utc), "day"),
 }
+
+#: The length of each unit, in microseconds (exact, so no precision is lost).
+UNITS = {
+    "s": Fraction(10**6),
+    "ms": Fraction(10**3),
+    "us": Fraction(1),
+    "ns": Fraction(1, 1000),
+    "day": Fraction(86400 * 10**6),
+}
+
+Epoch = Literal["unix", "mjd"] | datetime
+Unit = Literal["s", "ms", "us", "ns", "day"]
 
 
 @dataclass
@@ -80,16 +94,18 @@ class Timestamp(Construct[datetime]):
     """
     Map the numbers parsed by `wraps` to timezone-aware (UTC) datetimes.
 
-    `epoch` is "unix" (seconds since 1970-01-01), "mjd" (Modified Julian Date:
-    days since 1858-11-17) or a datetime. `unit` is the length of one tick in
-    seconds; it defaults to 1 for "unix" and to 86400 for "mjd". When building
-    into an integer, the value is rounded to the nearest tick. Naive datetimes
-    are taken to be in UTC.
+    `epoch` is "unix" (1970-01-01), "mjd" (Modified Julian Date: 1858-11-17) or a
+    datetime. `unit` is what one tick counts: "s", "ms", "us", "ns" or "day". It
+    defaults to "s" for "unix" and for datetimes, and to "day" for "mjd", but
+    many formats store Unix time in milliseconds, microseconds or nanoseconds.
+    Datetimes only resolve microseconds, so nanoseconds are rounded. When
+    building into an integer, the value is rounded to the nearest tick. Naive
+    datetimes are taken to be in UTC.
     """
 
     wraps: Construct
-    epoch: Any = "unix"
-    unit: float | None = None
+    epoch: Epoch = "unix"
+    unit: Unit | None = None
 
     def __post_init__(self):
         if isinstance(self.epoch, str) and self.epoch not in EPOCHS:
@@ -100,15 +116,19 @@ class Timestamp(Construct[datetime]):
             raise PaboError(
                 f"THE EPOCH MUST BE A STR OR A DATETIME, GOT {self.epoch!r}."
             )
+        if self.unit is not None and self.unit not in UNITS:
+            raise PaboError(
+                f"UNKNOWN UNIT {self.unit!r}. MUST BE ONE OF {list(UNITS)}."
+            )
 
-    def _origin(self) -> tuple[datetime, float]:
+    def _origin(self) -> tuple[datetime, Fraction]:
         if isinstance(self.epoch, str):
             origin, unit = EPOCHS[self.epoch]
         else:
-            origin, unit = self.epoch, 1.0
+            origin, unit = self.epoch, "s"
         if origin.tzinfo is None:
             origin = origin.replace(tzinfo=timezone.utc)
-        return origin, self.unit if self.unit is not None else unit
+        return origin, UNITS[self.unit or unit]
 
     def _size(self, ctx):
         return self.wraps._size(ctx)
@@ -119,12 +139,18 @@ class Timestamp(Construct[datetime]):
         if data.tzinfo is None:
             data = data.replace(tzinfo=timezone.utc)
         origin, unit = self._origin()
-        ticks = (data - origin) / timedelta(seconds=unit)
-        if isinstance(self.wraps, (Int, VarInt, ZigZag)):
-            ticks = round(ticks)
+        delta = data - origin
+        micro = (delta.days * 86400 + delta.seconds) * 10**6 + delta.microseconds
+        exact = Fraction(micro) / unit
+        ticks = (
+            round(exact)
+            if isinstance(self.wraps, (Int, VarInt, ZigZag))
+            else float(exact)
+        )
         self.wraps._build(ticks, stream, ctx)
         return data
 
     def _parse(self, stream, ctx):
         origin, unit = self._origin()
-        return origin + timedelta(seconds=self.wraps._parse(stream, ctx) * unit)
+        micro = Fraction(self.wraps._parse(stream, ctx)) * unit
+        return origin + timedelta(microseconds=round(micro))

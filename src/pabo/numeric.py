@@ -10,12 +10,11 @@ from typing import Literal
 
 import numpy as np
 
-from pabo.base import Construct, readexact
-from pabo.context import Context, Dynamic, evaluate
+from pabo.base import Construct, T, readexact
+from pabo.context import Context, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
-from pabo.packing import BitOrder, packbits, unpackbits
-
-Endian = Literal["little", "big", "native"]
+from pabo.hints import BitOrder, Dynamic, Endian
+from pabo.packing import packbits, unpackbits
 
 ENDIANS = {"little": "<", "big": ">", "native": "="}
 INT_CODES = {1: "b", 2: "h", 4: "i", 8: "q"}
@@ -34,7 +33,7 @@ def _checkbitorder(bitorder: str) -> None:
         raise PaboError(f"INVALID BIT ORDER {bitorder!r}. MUST BE 'big' OR 'little'.")
 
 
-def resolveendian(endian: str | None, ctx: Context) -> str:
+def resolveendian(endian: Endian | None, ctx: Context) -> Endian:
     """
     Return `endian`, or the default set by an enclosing specification, or "little".
     """
@@ -42,7 +41,7 @@ def resolveendian(endian: str | None, ctx: Context) -> str:
     return endian or ctx.setting("_endian") or "little"
 
 
-class _Fixed(Construct):
+class _Fixed(Construct[T]):
     """
     Shared implementation for fixed-width numbers.
 
@@ -53,7 +52,7 @@ class _Fixed(Construct):
     width: int
     endian: "Endian | None"
 
-    def formatfor(self, endian: str) -> str:
+    def formatfor(self, endian: Endian) -> str:
         """
         The `struct` format for the given endianness.
         """
@@ -87,7 +86,7 @@ class _Fixed(Construct):
 
 
 @dataclass
-class Int(_Fixed):
+class Int(_Fixed[int]):
     """
     Represents a fixed-width integer, of any whole number of bytes.
 
@@ -106,7 +105,7 @@ class Int(_Fixed):
             )
         _checkendian(self.endian)
 
-    def formatfor(self, endian: str) -> str:
+    def formatfor(self, endian: Endian) -> str:
         """
         The `struct` format for the given endianness (only for 1, 2, 4 or 8 bytes).
         """
@@ -144,7 +143,7 @@ class Int(_Fixed):
 
 
 @dataclass
-class Float(_Fixed):
+class Float(_Fixed[float]):
     """
     Represents a fixed-width floating point number (2, 4 or 8 bytes).
     """
@@ -159,7 +158,7 @@ class Float(_Fixed):
             )
         _checkendian(self.endian)
 
-    def formatfor(self, endian: str) -> str:
+    def formatfor(self, endian: Endian) -> str:
         """
         The `struct` format for the given endianness.
         """
@@ -224,7 +223,7 @@ class ZigZag(Construct[int]):
 
 
 @dataclass
-class Array(Construct):
+class Array(Construct[np.ndarray]):
     """
     Represents an array of fixed-width numbers.
 

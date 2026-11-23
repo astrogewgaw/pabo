@@ -4,11 +4,12 @@ Class-based specifications, parsed into typed dataclass instances.
 
 import dataclasses
 import inspect
+from collections.abc import Mapping
 from typing import Any, ClassVar
 
 from pabo.base import Construct
 from pabo.context import Container
-from pabo.numeric import Endian
+from pabo.hints import Endian, Source, Target
 from pabo.specify import Specification
 from pabo.wrappers import Const
 
@@ -71,7 +72,7 @@ class Struct:
         dataclasses.dataclass(cls, kw_only=True)
 
     @classmethod
-    def fromdict(cls, data: dict) -> "Struct":
+    def fromdict(cls, data: Mapping[str, Any]) -> "Struct":
         """
         Create an instance from a dict of field values (such as a parsed `Container`).
         """
@@ -87,14 +88,14 @@ class Struct:
         return Container({name: getattr(self, name) for name in self.__pabo_fields__})
 
     @classmethod
-    def parse(cls, src) -> "Struct":
+    def parse(cls, src: Source) -> "Struct":
         """
         Parse an instance from bytes, a path or a binary stream.
         """
 
         return cls.fromdict(cls.__pabo_spec__.parse(src))
 
-    def build(self, src=None, append: bool = False) -> bytes | None:
+    def build(self, src: Target = None, append: bool = False) -> bytes | None:
         """
         Build this instance into bytes (see `Construct.build`).
         """
@@ -102,7 +103,7 @@ class Struct:
         return self.__pabo_spec__.build(self.todict(), src, append)
 
     @classmethod
-    def sizeof(cls, ctx: dict | None = None) -> int:
+    def sizeof(cls, ctx: Mapping[str, Any] | None = None) -> int:
         """
         The size in bytes (see `Construct.sizeof`).
         """

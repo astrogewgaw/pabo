@@ -83,6 +83,13 @@
    :members:
 ```
 
+## Type hints
+
+```{eval-rst}
+.. automodule:: pabo.hints
+   :members: Readable, Writable
+```
+
 ## Errors
 
 ```{eval-rst}

@@ -2,15 +2,23 @@
 String constructs.
 """
 
+import codecs
 from dataclasses import dataclass
-from typing import Literal
 
 from pabo.base import Construct, readexact
 from pabo.bytes import Bytes
-from pabo.context import Dynamic, evaluate
+from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.hints import Dynamic, Side
 from pabo.numeric import Int
 from pabo.wrappers import Prefixed
+
+
+def _checkcode(code: str) -> None:
+    try:
+        codecs.lookup(code)
+    except LookupError:
+        raise PaboError(f"UNKNOWN ENCODING {code!r}.") from None
 
 
 def _fragment(text: str, code: str) -> bytes:
@@ -51,6 +59,9 @@ class CString(Construct[str]):
 
     code: str = "utf-8"
 
+    def __post_init__(self):
+        _checkcode(self.code)
+
     def _size(self, ctx):
         raise SizeofError("A CString HAS NO FIXED SIZE.")
 
@@ -77,6 +88,9 @@ class PascalString(Construct[str]):
     pre: Int
     code: str = "utf-8"
 
+    def __post_init__(self):
+        _checkcode(self.code)
+
     def _size(self, ctx):
         raise SizeofError("A PascalString HAS NO FIXED SIZE.")
 
@@ -86,9 +100,6 @@ class PascalString(Construct[str]):
 
     def _parse(self, stream, ctx):
         return _decode(Prefixed(self.pre, Bytes(-1))._parse(stream, ctx), self.code)
-
-
-Side = Literal["right", "left"]
 
 
 @dataclass
@@ -108,6 +119,7 @@ class PaddedString(Construct[str]):
     side: Side = "right"
 
     def __post_init__(self):
+        _checkcode(self.code)
         if len(self.pad) != 1:
             raise PaboError("THE PADDING MUST BE A SINGLE CHARACTER.")
         if self.side not in ("right", "left"):
@@ -152,6 +164,9 @@ class GreedyString(Construct[str]):
 
     code: str = "utf-8"
 
+    def __post_init__(self):
+        _checkcode(self.code)
+
     def _size(self, ctx):
         raise SizeofError("A GreedyString HAS NO FIXED SIZE.")
 
@@ -170,6 +185,9 @@ class Line(Construct[str]):
     """
 
     code: str = "utf-8"
+
+    def __post_init__(self):
+        _checkcode(self.code)
 
     def _size(self, ctx):
         raise SizeofError("A LINE HAS NO FIXED SIZE.")

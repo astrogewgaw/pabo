@@ -2,6 +2,7 @@ import hashlib
 import zlib
 
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 
@@ -46,7 +47,7 @@ def test_compressed_with_size():
 
 
 def test_transform_errors():
-    with pytest.raises(pb.PaboError):
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Compressed(pb.GreedyBytes(), "rot13")
     with pytest.raises(pb.ValidationError):
         pb.Compressed(pb.GreedyBytes()).parse(b"not zlib")

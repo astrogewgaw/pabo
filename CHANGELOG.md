@@ -39,9 +39,16 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Files are memory-mapped when parsed from a path, and arrays parsed from them
   are zero-copy views.
 - `pabo.__version__`, `py.typed`, and a type stub for the C++ extension.
+- Strict type hints (`pabo.hints`) on every construct and public function, so
+  beartype rejects bad arguments as soon as a construct is created.
+- `Timestamp` units: "s", "ms", "us", "ns" or "day".
 - A test suite (with hypothesis), benchmarks, CI, and documentation.
 
 ### Changed
+
+- All error messages are in uppercase.
+- Functions no longer have underscores in their names: `readexact`,
+  `packbits`/`unpackbits`, `todict`/`fromdict`, `formatfor`, `dtypefor`.
 
 - The construct hooks are now `_size(ctx)`, `_parse(stream, ctx)` and
   `_build(data, stream, ctx)`, and `_build` returns the value it wrote.

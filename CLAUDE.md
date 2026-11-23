@@ -30,6 +30,8 @@ src/pabo/
   base.py       Construct ABC, readexact(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
   context.py    Container, Context, `this` references, evaluate()
+  hints.py      shared type hints: Source/Target, Readable/Writable protocols, Endian,
+                BitOrder, Side, Whence, Dynamic, Condition, Key, Predicate
   numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional packing)
   bits.py       Bits (one 0/1 byte per bit), BitStruct with BitInt/BitFlag/BitPadding
   bytes.py      Bytes, GreedyBytes, Flag, Padding
@@ -108,7 +110,9 @@ Conventions to keep:
 - Use stdlib `dataclasses`, not `attrs`. Runtime dependencies are only `numpy` and
   `beartype`.
 - `beartype_this_package()` runs at import, so type hints on public signatures are
-  **enforced at runtime**. Annotate them accurately.
+  **enforced at runtime**. Annotate them as strictly as possible (`Literal`s, the
+  aliases in `hints.py`, `Callable[[...], ...]`), and also validate in
+  `__post_init__`, since beartype can be turned off.
 - `Const` values (and therefore `Padding`) may be left out when building a
   `Specification`. They are filled in automatically.
 - Endianness is `Literal["little", "big", "native"]`, default `"little"`. Bit order

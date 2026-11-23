@@ -1,6 +1,7 @@
 from io import BytesIO
 
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 
@@ -37,9 +38,9 @@ def test_build_to_path_truncates_unless_appending(tmp_path):
 
 
 def test_unsupported_targets():
-    with pytest.raises(pb.PaboError):
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Int(1).build(1, 42)
-    with pytest.raises(pb.PaboError):
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Int(1).parse(42)
 
 

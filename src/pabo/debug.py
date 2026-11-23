@@ -4,9 +4,10 @@ Debugging helpers.
 
 import sys
 from dataclasses import dataclass, field
-from typing import Any
 
 from pabo.base import Construct, hexdump, tell
+from pabo.errors import PaboError
+from pabo.hints import Writable
 
 
 @dataclass
@@ -21,7 +22,11 @@ class Probe(Construct):
 
     name: str = ""
     lookahead: int = 16
-    file: Any = field(default=None, repr=False)
+    file: Writable | None = field(default=None, repr=False)
+
+    def __post_init__(self):
+        if self.file is not None and not hasattr(self.file, "write"):
+            raise PaboError(f"CANNOT PRINT TO {self.file!r}: IT HAS NO WRITE METHOD.")
 
     def _omittable(self):
         return True

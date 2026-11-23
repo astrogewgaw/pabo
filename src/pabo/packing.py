@@ -2,14 +2,14 @@
 Packing and unpacking of integers narrower than a byte (or not byte-aligned).
 """
 
-from typing import Literal
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
 from pabo import packed
 from pabo.errors import PaboError
-
-BitOrder = Literal["big", "little"]
+from pabo.hints import BitOrder, BytesLike
 
 
 def _check(nbits: int, bitorder: str) -> None:
@@ -19,7 +19,9 @@ def _check(nbits: int, bitorder: str) -> None:
         raise PaboError(f"INVALID BIT ORDER {bitorder!r}. MUST BE 'big' OR 'little'.")
 
 
-def unpackbits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
+def unpackbits(
+    raw: BytesLike | np.ndarray, nbits: int, bitorder: BitOrder = "big"
+) -> np.ndarray:
     """
     Unpack every `nbits`-bit integer from the bytes in `raw`.
 
@@ -50,7 +52,9 @@ def unpackbits(raw, nbits: int, bitorder: BitOrder = "big") -> np.ndarray:
     return values
 
 
-def packbits(values, nbits: int, bitorder: BitOrder = "big") -> bytes:
+def packbits(
+    values: np.ndarray | Sequence[Any], nbits: int, bitorder: BitOrder = "big"
+) -> bytes:
     """
     Pack non-negative integers into `nbits` bits each (the inverse of `unpackbits`).
 

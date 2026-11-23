@@ -2,6 +2,7 @@ from io import BytesIO
 
 import numpy as np
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 from pabo import this
@@ -18,6 +19,11 @@ def test_seek_and_tell():
     with pytest.raises(pb.SizeofError):
         spec.size
     assert pb.Spec({"a": pb.Int(1), "pos": pb.Tell()}).size == 1
+
+
+def test_seek_rejects_bad_whence():
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Seek(0, whence=3)
 
 
 def test_seek_relative():

@@ -2,6 +2,7 @@ import enum
 from datetime import datetime, timezone
 
 import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
 
@@ -57,14 +58,28 @@ def test_mjd_timestamp():
 
 
 def test_custom_epoch_and_unit():
-    c = pb.Timestamp(pb.Int(8), epoch=datetime(2000, 1, 1), unit=1e-3)
+    c = pb.Timestamp(pb.Int(8), epoch=datetime(2000, 1, 1), unit="ms")
     moment = datetime(2000, 1, 1, 0, 0, 1, 500000, tzinfo=timezone.utc)
     assert pb.Int(8).parse(c.build(moment)) == 1500
     assert c.parse(c.build(moment)) == moment
 
 
+@pytest.mark.parametrize(
+    "unit, ticks", [("s", 1), ("ms", 1_000), ("us", 1_000_000), ("ns", 1_000_000_000)]
+)
+def test_unix_timestamp_units(unit, ticks):
+    c = pb.Timestamp(pb.Int(8), unit=unit)
+    moment = datetime(1970, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
+    assert pb.Int(8).parse(c.build(moment)) == ticks
+    assert c.parse(c.build(moment)) == moment
+
+
 def test_timestamp_errors():
-    with pytest.raises(pb.PaboError):
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Timestamp(pb.Int(4), epoch="martian")
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Timestamp(pb.Int(4), unit="fortnight")
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Timestamp(pb.Int(4), unit=1e-3)
     with pytest.raises(pb.ValidationError):
         pb.Timestamp(pb.Int(4)).build(5)

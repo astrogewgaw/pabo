@@ -10,7 +10,6 @@ checking them made parsing about twice as slow (a PNG header went from about
 are still checked.
 """
 
-from collections.abc import Callable
 from typing import Any, no_type_check
 
 from pabo.errors import ContextError
@@ -158,9 +157,6 @@ class This:
 
 
 this = This()
-
-#: A value given directly, or computed from the context when parsing/building.
-Dynamic = int | Callable[[Context], Any]
 
 
 # No runtime type check: runs for every dynamic parameter (counts, lengths,

@@ -2,13 +2,13 @@
 Control flow: computed, conditional, switched and validated fields.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from pabo.base import Construct, Stop, scope, tell
 from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
+from pabo.hints import Condition, ContextFunction, Key, Predicate
 
 
 @dataclass
@@ -46,7 +46,7 @@ class Rebuild(Construct):
     """
 
     wraps: Construct
-    func: Callable
+    func: ContextFunction
 
     def _omittable(self):
         return True
@@ -69,7 +69,7 @@ class If(Construct):
     `cond` is a value or a function of the context.
     """
 
-    cond: Any
+    cond: Condition
     then: Construct
     otherwise: Construct | None = None
 
@@ -137,7 +137,7 @@ class Switch(Construct):
     case matches, `default` is used, or a `ValidationError` is raised.
     """
 
-    key: Any
+    key: Key
     cases: dict[Any, Construct]
     default: Construct | None = None
 
@@ -168,7 +168,7 @@ class RepeatUntil(Construct[list]):
     elements are `Container` objects, with attribute access).
     """
 
-    predicate: Callable
+    predicate: Predicate
     wraps: Construct
 
     def _size(self, ctx):
@@ -204,7 +204,7 @@ class StopIf(Construct):
     The fields after it are left out of the result.
     """
 
-    cond: Any
+    cond: Condition
 
     def _omittable(self):
         return True
@@ -252,7 +252,7 @@ class Check(Construct):
     Check that `func(ctx)` holds, when parsing and when building. Takes no bytes.
     """
 
-    func: Callable
+    func: ContextFunction
     message: str = field(default="CHECK FAILED.", kw_only=True)
 
     def _omittable(self):
@@ -281,7 +281,7 @@ class Validated(Construct):
     """
 
     wraps: Construct
-    predicate: Callable
+    predicate: Predicate
     message: str = field(default="", kw_only=True)
 
     def _omittable(self):
