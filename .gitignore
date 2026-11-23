@@ -19,3 +19,4 @@ src/pabo/_version.py
 .hypothesis
 .benchmarks
 coverage.xml
+benchmarks/raw.json

@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-23",
+  "cpu": "AMD Ryzen 5 220 w/ Radeon 740M Graphics",
+  "python": "3.12.16",
+  "commit": "c60e41d",
+  "versions": {
+    "construct": "2.10.70",
+    "numpy": "2.5.5"
+  },
+  "results": [
+    {
+      "group": "header",
+      "implementation": "pabo",
+      "median": 2.2051468100016793e-06,
+      "q1": 2.1864204125000695e-06,
+      "q3": 2.2216002675003215e-06,
+      "rounds": 5
+    },
+    {
+      "group": "header",
+      "implementation": "struct",
+      "median": 7.987180100008118e-08,
+      "q1": 7.933573249988512e-08,
+      "q3": 8.023891099986712e-08,
+      "rounds": 13
+    },
+    {
+      "group": "header",
+      "implementation": "construct",
+      "median": 4.1226187605540235e-06,
+      "q1": 4.053126115259997e-06,
+      "q3": 4.209942408164176e-06,
+      "rounds": 20
+    },
+    {
+      "group": "header",
+      "implementation": "construct_compiled",
+      "median": 1.7616338849995826e-06,
+      "q1": 1.7576963600004092e-06,
+      "q3": 1.7652883699997802e-06,
+      "rounds": 6
+    },
+    {
+      "group": "records",
+      "implementation": "pabo",
+      "median": 0.0002711681400000998,
+      "q1": 0.00026819695749998116,
+      "q3": 0.00027410909550013685,
+      "rounds": 5
+    },
+    {
+      "group": "records",
+      "implementation": "numpy",
+      "median": 1.3060521899990362e-07,
+      "q1": 1.3036803400007103e-07,
+      "q3": 1.3208137300000546e-07,
+      "rounds": 8
+    },
+    {
+      "group": "records",
+      "implementation": "construct",
+      "median": 0.0027587633100006315,
+      "q1": 0.0025486044674994444,
+      "q3": 0.0027724017874993477,
+      "rounds": 5
+    },
+    {
+      "group": "array",
+      "implementation": "pabo",
+      "median": 7.964460750008584e-05,
+      "q1": 7.796518899999682e-05,
+      "q3": 8.017504000008557e-05,
+      "rounds": 14
+    },
+    {
+      "group": "array",
+      "implementation": "numpy",
+      "median": 1.512136000001192e-07,
+      "q1": 1.4904883299999482e-07,
+      "q3": 1.515224480001507e-07,
+      "rounds": 7
+    },
+    {
+      "group": "array",
+      "implementation": "construct",
+      "median": 0.33230658499996935,
+      "q1": 0.33230658499996935,
+      "q3": 0.33230658499996935,
+      "rounds": 1
+    }
+  ]
+}

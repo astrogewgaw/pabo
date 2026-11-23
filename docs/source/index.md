@@ -31,6 +31,7 @@ tutorial
 cookbook
 custom
 comparison
+performance
 api
 changelog
 ```

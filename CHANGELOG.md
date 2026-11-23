@@ -45,7 +45,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Strict type hints (`pabo.hints`) on every construct and public function, so
   beartype rejects bad arguments as soon as a construct is created.
 - `Timestamp` units: "s", "ms", "us", "ns" or "day".
-- A test suite (with hypothesis), benchmarks, CI, and documentation.
+- A test suite (with hypothesis), benchmarks, CI, and documentation, including
+  a "Performance" page with plots of the benchmark results.
 
 ### Changed
 

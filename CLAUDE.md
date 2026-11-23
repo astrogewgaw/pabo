@@ -53,7 +53,9 @@ src/pabo/
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
 tests/          one test_<module>.py per source module (incl. test_packed.py)
-benchmarks/     pytest-benchmark comparisons with struct, numpy and construct
+benchmarks/     pytest-benchmark comparisons with struct, numpy and construct;
+                plot.py summarizes a run into results.json and draws the docs plots
+                (ultraplot) into docs/source/_static/benchmarks/
 docs/source/    Sphinx (furo + MyST) docs: tutorial, cookbook, custom, comparison, api
 CHANGELOG.md    user-facing changes (keep the "Unreleased" section up to date)
 ```
@@ -145,6 +147,7 @@ just test       # pytest -vv tests   (then runs `just clean`)
 just cov        # tests with a coverage report
 just lint       # ruff check, ruff format --check, pyright src, interrogate src
 just bench      # benchmarks (needs the `bench` extra)
+just bench-plot # benchmarks, then results.json and the docs plots (docs/source/performance.md)
 just clean      # remove caches/build junk (uses `fd`)
 just docs       # sphinx-reload docs (or `just docs-build` for a one-off build)
 ```

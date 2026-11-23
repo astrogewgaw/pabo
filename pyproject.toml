@@ -25,7 +25,7 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "hypothesis"]
-bench = ["pytest-benchmark", "construct"]
+bench = ["pytest-benchmark", "construct", "ultraplot"]
 docs = [
   "sphinx",
   "furo",

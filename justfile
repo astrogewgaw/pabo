@@ -44,6 +44,12 @@ default:
 @bench:
   pytest benchmarks/bench_parse.py --benchmark-group-by=group --benchmark-columns=mean,ops
 
+# Run benchmarks, then summarize them and redraw the plots in the docs.
+@bench-plot:
+  pytest benchmarks/bench_parse.py --benchmark-warmup=on --benchmark-min-time=0.05 --benchmark-json=benchmarks/raw.json
+  python benchmarks/plot.py benchmarks/raw.json
+  rm benchmarks/raw.json
+
 # Install.
 @install: && clean
     echo "Installing..."
