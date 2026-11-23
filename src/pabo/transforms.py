@@ -13,7 +13,7 @@ from io import BytesIO
 from typing import Any, Literal
 
 from pabo.base import Construct, readexact
-from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.errors import PaboError, SizeofError, ValidationError, attempt
 from pabo.expressions import evaluate
 from pabo.hints import Dynamic
 
@@ -133,7 +133,7 @@ class Checksummed(Construct):
         built = self.wraps._build(data, buffer, ctx)
         raw = buffer.getvalue()
         stream.write(raw)
-        self.check._build(_hasher(self.algorithm)(raw), stream, ctx)
+        self.check._build(attempt(_hasher(self.algorithm), raw), stream, ctx)
         return built
 
     def _parse(self, stream, ctx):
@@ -143,7 +143,7 @@ class Checksummed(Construct):
         stream.seek(start)
         raw = readexact(stream, end - start)
         stored = self.check._parse(stream, ctx)
-        computed = _hasher(self.algorithm)(raw)
+        computed = attempt(_hasher(self.algorithm), raw)
         if stored != computed:
             raise ValidationError(
                 f"CHECKSUM MISMATCH: STORED {stored!r}, COMPUTED {computed!r}."

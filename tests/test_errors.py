@@ -79,3 +79,30 @@ def test_error_is_not_a_dataclass():
     import dataclasses
 
     assert not dataclasses.is_dataclass(pb.PaboError)
+
+
+def test_attempt():
+    """
+    `attempt` returns the function's result, lets `PaboError`s through unchanged,
+    and turns other exceptions into `ValidationError`s with a shortened repr of
+    the value.
+    """
+
+    from pabo.errors import attempt
+
+    assert attempt(len, b"abc") == 3
+    error = pb.StreamError("SHORT.")
+
+    def fail(value):
+        """
+        Raise the given pabo error.
+        """
+
+        raise error
+
+    with pytest.raises(pb.StreamError) as info:
+        attempt(fail, 1)
+    assert info.value is error
+    with pytest.raises(pb.ValidationError) as info:
+        attempt(int, "x" * 100)
+    assert "..." in info.value.msg and len(info.value.msg) < 200

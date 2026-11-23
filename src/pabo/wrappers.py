@@ -8,10 +8,9 @@ from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, Stop, readexact, scope
-from pabo.errors import ConstError, PaboError, SizeofError, ValidationError
+from pabo.errors import ConstError, PaboError, SizeofError, ValidationError, attempt
 from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Side, Target
-from pabo.numeric import Int
 
 
 def _int(value, ctx, what: str = "count") -> int:
@@ -199,7 +198,7 @@ class Adapted(Construct):
     Represents a binary construct that is adaptable.
 
     `decode` is applied to the parsed value, and `encode` to the value before
-    it is built.
+    it is built. If either raises an exception, it becomes a `ValidationError`.
     """
 
     wraps: Construct
@@ -210,11 +209,11 @@ class Adapted(Construct):
         return self.wraps._size(ctx)
 
     def _build(self, data, stream, ctx):
-        self.wraps._build(self.encode(data), stream, ctx)
+        self.wraps._build(attempt(self.encode, data), stream, ctx)
         return data
 
     def _parse(self, stream, ctx):
-        return self.decode(self.wraps._parse(stream, ctx))
+        return attempt(self.decode, self.wraps._parse(stream, ctx))
 
 
 @dataclass
@@ -222,12 +221,14 @@ class Prefixed(Construct):
     """
     Represents a binary construct prefixed by its length in bytes.
 
-    `pre` is the integer construct holding the length. When parsing, exactly
-    that many bytes are read and `wraps` is parsed from them, so `wraps` may be
-    greedy (`Bytes(-1)`, `Array(...)`). When building, the length is computed.
+    `pre` is the construct holding the length: a fixed-size integer such as
+    `pb.u16`, or a variable-length one such as `pb.VarInt()`. When parsing,
+    exactly that many bytes are read and `wraps` is parsed from them, so
+    `wraps` may be greedy (`Bytes(-1)`, `Array(...)`). When building, the
+    length is computed.
     """
 
-    pre: Int
+    pre: Construct
     wraps: Construct
 
     def _size(self, ctx):
@@ -243,6 +244,10 @@ class Prefixed(Construct):
 
     def _parse(self, stream, ctx):
         size = self.pre._parse(stream, ctx)
+        if not isinstance(size, int) or size < 0:
+            raise ValidationError(
+                f"THE LENGTH PREFIX MUST BE A NON-NEGATIVE INT, GOT {size!r}."
+            )
         return self.wraps._parse(BytesIO(readexact(stream, size)), ctx)
 
 

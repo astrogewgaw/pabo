@@ -170,11 +170,21 @@ class Float(_Fixed[float]):
 @dataclass
 class VarInt(Construct[int]):
     """
-    Represents an unsigned variable-length integer (LEB128, as in protobuf).
+    Represents an unsigned variable-length integer.
 
-    Each byte holds 7 bits of the value, least significant first, and its
-    top bit is set when more bytes follow.
+    Each byte holds 7 bits of the value, and its top bit is set when more bytes
+    follow. With `order="little"` (the default) the least significant 7 bits come
+    first, as in LEB128, protobuf and DWARF. With `order="big"` the most
+    significant come first, as in MIDI's variable-length quantities. Unlike
+    `Int`, the order is not taken from the enclosing specification, since it is
+    part of the format rather than of the machine.
     """
+
+    order: Literal["little", "big"] = "little"
+
+    def __post_init__(self):
+        if self.order not in ("little", "big"):
+            raise PaboError(f"UNKNOWN ORDER {self.order!r}. MUST BE 'little' OR 'big'.")
 
     def _size(self, ctx):
         raise SizeofError("A VarInt HAS NO FIXED SIZE.")
@@ -182,21 +192,28 @@ class VarInt(Construct[int]):
     def _build(self, data, stream, ctx):
         if not isinstance(data, int) or data < 0:
             raise ValidationError(f"A VarInt MUST BE A NON-NEGATIVE INT, GOT {data!r}.")
-        value, out = data, bytearray()
-        while True:
-            byte, value = value & 0x7F, value >> 7
-            out.append(byte | (0x80 if value else 0))
-            if not value:
-                break
-        stream.write(bytes(out))
+        groups, value = [data & 0x7F], data >> 7
+        while value:
+            groups.append(value & 0x7F)
+            value >>= 7
+        if self.order == "big":
+            groups.reverse()
+        last = len(groups) - 1
+        stream.write(
+            bytes(g | (0x80 if ix < last else 0) for ix, g in enumerate(groups))
+        )
         return data
 
     def _parse(self, stream, ctx):
         value = shift = 0
+        big = self.order == "big"
         while True:
             byte = readexact(stream, 1)[0]
-            value |= (byte & 0x7F) << shift
-            shift += 7
+            if big:
+                value = (value << 7) | (byte & 0x7F)
+            else:
+                value |= (byte & 0x7F) << shift
+                shift += 7
             if not byte & 0x80:
                 return value
 

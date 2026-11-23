@@ -200,3 +200,16 @@ def test_line_roundtrip_property(value):
     """
     c = pb.Line()
     assert c.parse(c.build(value)) == value
+
+
+def test_pascalstring_varint_length():
+    """
+    A `PascalString` whose length is a `VarInt` (as in protobuf) round-trips,
+    including past 127 bytes, where the length takes two bytes.
+    """
+
+    c = pb.PascalString(pb.VarInt())
+    assert c.build("hi") == b"\x02hi"
+    text = "é" * 100
+    raw = c.build(text)
+    assert raw[:2] == b"\xc8\x01" and c.parse(raw) == text

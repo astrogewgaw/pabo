@@ -11,7 +11,7 @@ from typing import Literal
 
 from pabo.base import Construct
 from pabo.errors import PaboError, ValidationError
-from pabo.numeric import Int, VarInt, ZigZag
+from pabo.numeric import Float
 
 #: Where each named epoch starts, and its default unit.
 EPOCHS = {
@@ -81,7 +81,12 @@ class FlagsEnum(Construct):
         return self.wraps._size(ctx)
 
     def _build(self, data, stream, ctx):
-        flags = self.flags(int(data))
+        try:
+            flags = self.flags(int(data))
+        except (TypeError, ValueError):
+            raise ValidationError(
+                f"{data!r} IS NOT A VALUE OF {self.flags.__name__}."
+            ) from None
         self.wraps._build(int(flags), stream, ctx)
         return flags
 
@@ -99,8 +104,8 @@ class Timestamp(Construct[datetime]):
     defaults to "s" for "unix" and for datetimes, and to "day" for "mjd", but
     many formats store Unix time in milliseconds, microseconds or nanoseconds.
     Datetimes only resolve microseconds, so nanoseconds are rounded. When
-    building into an integer, the value is rounded to the nearest tick. Naive
-    datetimes are taken to be in UTC.
+    building, the value is rounded to the nearest whole tick, unless `wraps`
+    is a `Float`. Naive datetimes are taken to be in UTC.
     """
 
     wraps: Construct
@@ -142,11 +147,7 @@ class Timestamp(Construct[datetime]):
         delta = data - origin
         micro = (delta.days * 86400 + delta.seconds) * 10**6 + delta.microseconds
         exact = Fraction(micro) / unit
-        ticks = (
-            round(exact)
-            if isinstance(self.wraps, (Int, VarInt, ZigZag))
-            else float(exact)
-        )
+        ticks = float(exact) if isinstance(self.wraps, Float) else round(exact)
         self.wraps._build(ticks, stream, ctx)
         return data
 

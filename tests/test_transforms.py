@@ -109,3 +109,23 @@ def test_checksummed_hashlib_and_function():
     assert s.build(b"\x01\x02") == b"\x01\x02\x03"
     with pytest.raises(pb.PaboError):
         pb.Checksummed(pb.Bytes(1), pb.Int(1), "nope")
+
+
+def test_failing_checksum_function_raises_validation_error():
+    """
+    A checksum function that raises gives a `ValidationError` when parsing and
+    when building.
+    """
+
+    def broken(raw):
+        """
+        Always fail.
+        """
+
+        raise RuntimeError("no")
+
+    c = pb.Checksummed(pb.Bytes(2), pb.u8, broken)
+    with pytest.raises(pb.ValidationError, match="broken FAILED ON b'ab'"):
+        c.build(b"ab")
+    with pytest.raises(pb.ValidationError, match="RuntimeError"):
+        c.parse(b"ab\x00")

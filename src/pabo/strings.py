@@ -10,7 +10,6 @@ from pabo.bytes import Bytes
 from pabo.errors import PaboError, SizeofError, ValidationError
 from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Side
-from pabo.numeric import Int
 from pabo.wrappers import Prefixed
 
 
@@ -81,11 +80,11 @@ class PascalString(Construct[str]):
     """
     Represents a Pascal-style string: its length in bytes, then the text.
 
-    `pre` is the integer construct holding the length (such as `pb.u8`), and
-    `code` the text encoding.
+    `pre` is the construct holding the length (such as `pb.u8`, or
+    `pb.VarInt()`), and `code` the text encoding.
     """
 
-    pre: Int
+    pre: Construct
     code: str = "utf-8"
 
     def __post_init__(self):

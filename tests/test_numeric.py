@@ -121,6 +121,57 @@ def test_varint_errors():
 
 
 @pytest.mark.parametrize(
+    "value, raw",
+    [
+        (0x00, "00"),
+        (0x40, "40"),
+        (0x7F, "7f"),
+        (0x80, "8100"),
+        (0x2000, "c000"),
+        (0x3FFF, "ff7f"),
+        (0x4000, "818000"),
+        (0x100000, "c08000"),
+        (0x1FFFFF, "ffff7f"),
+        (0x200000, "81808000"),
+        (0x0FFFFFFF, "ffffff7f"),
+    ],
+)
+def test_varint_big_order(value, raw):
+    """
+    `VarInt(order="big")` builds each value to the variable-length quantity given
+    in the Standard MIDI File specification, and parses it back.
+    """
+
+    c = pb.VarInt(order="big")
+    assert c.build(value) == bytes.fromhex(raw)
+    assert c.parse(bytes.fromhex(raw) + b"rest") == value
+
+
+@given(st.integers(min_value=0, max_value=2**70), st.sampled_from(["little", "big"]))
+def test_varint_roundtrip(value, order):
+    """
+    `VarInt` round-trips any non-negative int in either order, and both orders
+    use the same number of bytes.
+    """
+
+    raw = pb.VarInt(order=order).build(value)
+    assert pb.VarInt(order=order).parse(raw) == value
+    assert len(raw) == len(pb.VarInt().build(value))
+
+
+def test_varint_order_is_not_inherited():
+    """
+    A `VarInt` keeps its own order inside a big-endian specification, and an
+    unknown order is rejected.
+    """
+
+    spec = pb.Spec({"n": pb.VarInt()}, endian="big")
+    assert spec.build({"n": 300}) == b"\xac\x02"
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.VarInt(order="middle")
+
+
+@pytest.mark.parametrize(
     "value, encoded", [(0, 0), (-1, 1), (1, 2), (-2, 3), (2, 4), (-(2**40), 2**41 - 1)]
 )
 def test_zigzag(value, encoded):

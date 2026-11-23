@@ -126,3 +126,38 @@ def test_timestamp_errors():
         pb.Timestamp(pb.Int(4), unit=1e-3)
     with pytest.raises(pb.ValidationError):
         pb.Timestamp(pb.Int(4)).build(5)
+
+
+def test_timestamp_rounds_unless_wrapping_a_float():
+    """
+    `Timestamp` passes whole ticks to anything but a `Float` (here an `Adapted`
+    that needs an int), and fractional ticks to a `Float`.
+    """
+
+    octal = pb.Adapted(
+        pb.PaddedString(12, "ascii"), lambda t: int(t, 8), lambda v: f"{v:011o}"
+    )
+    c = pb.Timestamp(octal)
+    moment = datetime(2023, 11, 14, 22, 13, 20, 600000, tzinfo=timezone.utc)
+    assert c.build(moment) == b"14524770401\x00"
+    assert c.parse(b"14524770400\x00") == moment.replace(microsecond=0)
+    floats = pb.Timestamp(pb.f64)
+    assert floats.parse(floats.build(moment)) == moment
+
+
+def test_flagsenum_rejects_values_that_are_not_ints():
+    """
+    Building a `FlagsEnum` from something that is not an int raises a
+    `ValidationError`.
+    """
+
+    class Mode(enum.IntFlag):
+        """
+        Two flags.
+        """
+
+        READ = 1
+        WRITE = 2
+
+    with pytest.raises(pb.ValidationError, match="NOT A VALUE OF Mode"):
+        pb.FlagsEnum(pb.u8, Mode).build("read")

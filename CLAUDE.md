@@ -110,6 +110,10 @@ Conventions to keep:
   names), class names (`VarInt`) and literal values the user types (`'big'`)
   keep their case. `PaboError` formats messages as
   `"바보! <MSG> (AT <path>, OFFSET <n>) ABORT."`.
+- Call functions the user passed in through `attempt(func, value, ...)`
+  (`errors.py`), which turns any other exception into a `ValidationError`
+  (`evaluate()` does the same for functions of the context, as a
+  `ContextError`).
 - Validate constructor arguments in `__post_init__` (widths, endianness, bit order,
   packing).
 - `docs` is a keyword-only dataclass field, set with `construct / "description"`.

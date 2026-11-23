@@ -17,7 +17,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Control flow: `Computed`, `Rebuild`, `If`, `Optional`, `Switch`,
   `RepeatUntil`, `StopIf`, `Terminated`, `Check` and `Validated`.
 - Numbers: integers of any width (`Int(3)`, `Int(16)`), half floats
-  (`Float(2)`), `VarInt` and `ZigZag`, `"native"` endianness, a default
+  (`Float(2)`), `VarInt` (LEB128, or most significant first with
+  `order="big"`, as in MIDI) and `ZigZag`, `"native"` endianness, a default
   endianness per specification, and short aliases (`u8`, `u16be`, `i32le`,
   `f64`, ...).
 - `Enum`, `FlagsEnum` and `Timestamp` (Unix, MJD or any epoch).
@@ -35,7 +36,9 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Errors say which field failed (`header.sizes[2]`), at what offset, and give
   the field's docs. There is a hierarchy of errors under `PaboError`:
   `StreamError`, `SizeofError`, `ValidationError`, `ConstError` and
-  `ContextError`.
+  `ContextError`. Exceptions raised by your own functions (`Adapted`'s decode
+  and encode, predicates, checksum functions, functions of the context) are
+  turned into these too, so `Greedy` stops on them and they carry the path.
 - Docs attached with `/` are shown in `repr`, error messages and `describe()`.
 - `describe()`, `parse(..., trace=True)` and `Probe` for debugging, and
   `sizeof(ctx)` for sizes that depend on the data.

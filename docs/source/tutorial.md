@@ -39,7 +39,7 @@ Files given by path are memory-mapped, so large arrays are read without copying.
 | --- | --- |
 | `Int(width, signed=False, endian=None)` | An integer of any number of bytes. |
 | `Float(width, endian=None)` | A 2, 4 or 8-byte float. |
-| `VarInt()`, `ZigZag()` | Variable-length integers (LEB128), unsigned and signed. |
+| `VarInt(order="little")`, `ZigZag()` | Variable-length integers, unsigned (LEB128, or most significant first with `order="big"`, as in MIDI) and signed. |
 | `Array(dtype, count=-1, packing=None, bitorder="big")` | A numpy array. |
 
 `endian` is `"little"`, `"big"` or `"native"`. If you leave it out, the number
@@ -66,7 +66,7 @@ nibbles.parse(b"\x12\x34")    # array([1, 2, 3, 4], dtype=uint8)
 | `Flag()` | One byte, as a boolean. |
 | `Padding(size)` | `size` null bytes. |
 | `CString(code="utf-8")` | A null-terminated string. |
-| `PascalString(pre, code="utf-8")` | A string prefixed by its length in bytes. |
+| `PascalString(pre, code="utf-8")` | A string prefixed by its length in bytes (`pre` is `pb.u8`, `pb.VarInt()`, ...). |
 | `PaddedString(length, code="utf-8", pad="\x00", side="right")` | A fixed-length padded string. |
 | `GreedyString(code="utf-8")` | A string running to the end of the stream. |
 | `Line(code="utf-8")` | A string ending in CRLF. |

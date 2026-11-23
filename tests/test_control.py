@@ -192,3 +192,19 @@ def test_validated():
     with pytest.raises(pb.ValidationError):
         c.build(11)
     assert c.size == 1
+
+
+def test_failing_predicates_raise_validation_errors():
+    """
+    A `RepeatUntil` or `Validated` predicate that raises gives a
+    `ValidationError`, when parsing and when building.
+    """
+
+    until = pb.RepeatUntil(lambda e, ctx: 1 // e, pb.u8)
+    with pytest.raises(pb.ValidationError, match="ZeroDivisionError"):
+        until.parse(b"\x00")
+    with pytest.raises(pb.ValidationError, match="ZeroDivisionError"):
+        until.build([0])
+    valid = pb.Validated(pb.u8, lambda v, ctx: v.startswith("a"))
+    with pytest.raises(pb.ValidationError, match="AttributeError"):
+        valid.parse(b"\x01")

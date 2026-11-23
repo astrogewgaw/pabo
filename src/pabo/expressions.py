@@ -23,7 +23,7 @@ import operator
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, no_type_check
 
-from pabo.errors import ContextError
+from pabo.errors import ContextError, PaboError
 
 if TYPE_CHECKING:
     from pabo.context import Context
@@ -324,5 +324,7 @@ def evaluate(value: Any, ctx: "Context") -> Any:
         return value
     try:
         return value(ctx)
-    except (KeyError, AttributeError) as error:
+    except PaboError:
+        raise
+    except Exception as error:
         raise ContextError(f"CANNOT EVALUATE {value!r}: {error!r}.") from error

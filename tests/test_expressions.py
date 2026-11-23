@@ -197,3 +197,20 @@ def test_expressions_in_specifications():
     )
     assert spec.parse(b"\x00") == {"n": 0, "words": []}
     assert spec.sizeof({"n": 2, "tagged": True}) == 1 + 4 + 1 + 4 + 1
+
+
+def test_failing_functions_and_expressions_raise_context_errors():
+    """
+    A function of the context, or an expression, that raises any exception
+    (not only a missing field) gives a `ContextError` with the field's path.
+    """
+
+    spec = pb.Spec({"a": pb.u8, "b": pb.u8, "data": pb.Bytes(this.a // this.b)})
+    with pytest.raises(pb.ContextError, match="ZeroDivisionError") as info:
+        spec.parse(b"\x04\x00")
+    assert info.value.where == "data"
+    with pytest.raises(pb.ContextError, match="TypeError"):
+        evaluate(lambda ctx: ctx["a"] + "x", pb.Context({"a": 1}))
+    # pabo's own errors pass through unchanged.
+    with pytest.raises(pb.ContextError, match="CANNOT RESOLVE"):
+        evaluate(this.missing, pb.Context())

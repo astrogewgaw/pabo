@@ -176,3 +176,59 @@ def test_repeat_of_fixed_spec_parses_in_bulk(monkeypatch):
     with pytest.raises(pb.StreamError) as info:
         pb.Repeat(record, 6).parse(raw)
     assert info.value.where == "[5].a"
+
+
+def test_prefixed_varint_length():
+    """
+    `Prefixed` accepts a variable-length prefix such as `VarInt`, in both orders.
+    """
+
+    c = pb.Prefixed(pb.VarInt(), pb.GreedyBytes())
+    assert c.build(b"testing") == b"\x07testing"
+    assert c.parse(b"\x07testing") == b"testing"
+    long = pb.Prefixed(pb.VarInt(order="big"), pb.GreedyBytes())
+    assert long.build(b"x" * 200)[:2] == b"\x81\x48"
+    assert long.parse(long.build(b"x" * 200)) == b"x" * 200
+
+
+def test_prefixed_rejects_a_length_that_is_not_an_int():
+    """
+    A prefix that parses into something other than a non-negative int (here a
+    float) raises a `ValidationError` instead of failing inside the read.
+    """
+
+    with pytest.raises(pb.ValidationError, match="NON-NEGATIVE INT"):
+        pb.Prefixed(pb.f32, pb.GreedyBytes()).parse(b"\x00\x00\x80\x3fa")
+
+
+def test_adapted_errors_become_validation_errors():
+    """
+    Exceptions raised by `Adapted`'s decode and encode functions become
+    `ValidationError`s that name the function, the value and the field.
+    """
+
+    def decode(value):
+        """
+        Fail on zero.
+        """
+
+        return 10 // value
+
+    c = pb.Spec({"x": pb.Adapted(pb.u8, decode, lambda v: 10 // v)})
+    with pytest.raises(pb.ValidationError) as info:
+        c.parse(b"\x00")
+    assert "decode FAILED ON 0" in str(info.value) and info.value.where == "x"
+    assert isinstance(info.value.__cause__, ZeroDivisionError)
+    with pytest.raises(pb.ValidationError, match="<lambda> FAILED ON 'a'"):
+        c.build({"x": "a"})
+
+
+def test_greedy_stops_when_an_adapter_fails():
+    """
+    `Greedy` stops at an element whose `Adapted` decode fails, just as at any
+    other `PaboError`, and rewinds to before it.
+    """
+
+    digit = pb.Adapted(pb.Bytes(1), lambda raw: int(raw.decode()), str)
+    c = pb.Seq([pb.Greedy(digit), pb.GreedyBytes()])
+    assert c.parse(b"123x5") == [[1, 2, 3], b"x5"]

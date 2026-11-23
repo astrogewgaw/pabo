@@ -6,7 +6,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pabo.base import Construct, Stop, scope, tell
-from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
+from pabo.errors import (
+    PaboError,
+    SizeofError,
+    StreamError,
+    ValidationError,
+    attempt,
+)
 from pabo.expressions import evaluate
 from pabo.hints import Condition, ContextFunction, Key, Predicate
 
@@ -180,7 +186,7 @@ class RepeatUntil(Construct[list]):
             with scope(f"[{ix}]", stream):
                 value = self.wraps._build(element, stream, ctx)
             built.append(value)
-            if self.predicate(value, ctx):
+            if attempt(self.predicate, value, ctx):
                 return built
         raise ValidationError(
             "NO ELEMENT SATISFIES THE PREDICATE, SO NOTHING ENDS THE LIST."
@@ -192,7 +198,7 @@ class RepeatUntil(Construct[list]):
             with scope(f"[{len(data)}]", stream):
                 element = self.wraps._parse(stream, ctx)
             data.append(element)
-            if self.predicate(element, ctx):
+            if attempt(self.predicate, element, ctx):
                 return data
 
 
@@ -288,7 +294,7 @@ class Validated(Construct):
         return self.wraps._omittable()
 
     def _check(self, value, ctx):
-        if not self.predicate(value, ctx):
+        if not attempt(self.predicate, value, ctx):
             raise ValidationError(self.message or f"THE VALUE {value!r} IS NOT VALID.")
         return value
 
