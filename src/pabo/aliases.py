@@ -56,7 +56,6 @@ f64le = Float(8, endian="little")
 f64be = Float(8, endian="big")
 
 __all__ = [
-    "__all__",
     "f16",
     "f16be",
     "f16le",
