@@ -109,6 +109,58 @@ audio = wav.parse("tone.wav")
 audio.fmt.rate, audio.data.samples
 ```
 
+### MIDI file
+
+A Standard MIDI File is a header chunk and then track chunks of events. The time
+before each event, and the length of each meta event's data, are variable-length
+quantities: 7 bits per byte, most significant first, which is
+`VarInt(order="big")`. The kind of event is in the top 4 bits of its status byte.
+
+```python
+vlq = pb.VarInt(order="big")
+event = pb.Spec(
+    {
+        "delta": vlq,
+        "status": pb.u8,
+        "body": pb.Switch(
+            this.status & 0xF0,
+            {
+                0x80: pb.Spec({"note": pb.u8, "velocity": pb.u8}),  # note off
+                0x90: pb.Spec({"note": pb.u8, "velocity": pb.u8}),  # note on
+                0xB0: pb.Spec({"controller": pb.u8, "value": pb.u8}),
+                0xC0: pb.Spec({"program": pb.u8}),
+                0xF0: pb.Spec({"type": pb.u8, "data": pb.Prefixed(vlq, pb.GreedyBytes())}),
+            },
+        ),
+    }
+)
+track = pb.Spec(
+    {
+        "id": pb.Const(b"MTrk", pb.Bytes(4)),
+        "events": pb.Prefixed(pb.u32, pb.Greedy(event)),
+    }
+)
+midi = pb.Spec(
+    {
+        "id": pb.Const(b"MThd", pb.Bytes(4)),
+        "length": pb.Const(6, pb.u32),
+        "format": pb.u16,
+        "ntracks": pb.Rebuild(pb.u16, lenof(this.tracks)),
+        "division": pb.u16,
+        "tracks": pb.Repeat(track, this.ntracks),
+    },
+    endian="big",
+)
+
+song = midi.parse("song.mid")
+[e.body.note for e in song.tracks[0].events if e.status & 0xF0 == 0x90]
+```
+
+This handles the common events and meta events (status `0xFF`). Real files often
+use *running status*, where an event leaves out its status byte when it is the
+same as the previous one; that needs the previous event's status, which a
+custom construct can keep (see [](custom.md)).
+
 ## Archives
 
 ### gzip header
@@ -206,7 +258,7 @@ def octal(width):
     return pb.Adapted(
         pb.PaddedString(width, "ascii"),
         lambda text: int(text.strip(" \x00") or "0", 8),
-        lambda value: f"{round(value):0{width - 1}o}",
+        lambda value: f"{value:0{width - 1}o}",
     )
 
 header = pb.Spec(
@@ -501,7 +553,7 @@ field = pb.Spec(
             {
                 0: pb.VarInt(),
                 1: pb.u64,
-                2: pb.Spec({"length": pb.VarInt(), "data": pb.Bytes(this.length)}),
+                2: pb.Prefixed(pb.VarInt(), pb.GreedyBytes()),
                 5: pb.u32,
             },
         ),

@@ -390,7 +390,7 @@ def test_tar_archive():
         return pb.Adapted(
             pb.PaddedString(width, "ascii"),
             lambda text: int(text.strip(" \x00") or "0", 8),
-            lambda value: f"{round(value):0{width - 1}o}",
+            lambda value: f"{value:0{width - 1}o}",
         )
 
     header = pb.Spec(
@@ -718,7 +718,7 @@ def test_protobuf_wire_format():
                 {
                     0: pb.VarInt(),
                     1: pb.u64,
-                    2: pb.Spec({"length": pb.VarInt(), "data": pb.Bytes(this.length)}),
+                    2: pb.Prefixed(pb.VarInt(), pb.GreedyBytes()),
                     5: pb.u32,
                 },
             ),
@@ -730,7 +730,70 @@ def test_protobuf_wire_format():
     raw = bytes.fromhex("089601") + bytes.fromhex("120774657374696e67")
     data = message.parse(raw)
     assert [(f.number, f.key & 7) for f in data] == [(1, 0), (2, 2)]
-    assert data[0].value == 150 and data[1].value.data == b"testing"
+    assert data[0].value == 150 and data[1].value == b"testing"
     assert message.build(data) == raw
     # A signed field (sint32) uses zigzag encoding: -2 is stored as 3.
     assert pb.ZigZag().parse(pb.VarInt().build(3)) == -2
+
+
+def test_midi_file():
+    """
+    A MIDI file with one track (a tempo, a note on and off 128 ticks apart, and the
+    end of the track) parses into its events, with big-order `VarInt` delta times
+    and meta-event lengths, and builds back to the same bytes.
+    """
+    this = pb.this
+    vlq = pb.VarInt(order="big")
+    event = pb.Spec(
+        {
+            "delta": vlq,
+            "status": pb.u8,
+            "body": pb.Switch(
+                this.status & 0xF0,
+                {
+                    0x80: pb.Spec({"note": pb.u8, "velocity": pb.u8}),
+                    0x90: pb.Spec({"note": pb.u8, "velocity": pb.u8}),
+                    0xB0: pb.Spec({"controller": pb.u8, "value": pb.u8}),
+                    0xC0: pb.Spec({"program": pb.u8}),
+                    0xF0: pb.Spec(
+                        {"type": pb.u8, "data": pb.Prefixed(vlq, pb.GreedyBytes())}
+                    ),
+                },
+            ),
+        }
+    )
+    track = pb.Spec(
+        {
+            "id": pb.Const(b"MTrk", pb.Bytes(4)),
+            "events": pb.Prefixed(pb.u32, pb.Greedy(event)),
+        }
+    )
+    midi = pb.Spec(
+        {
+            "id": pb.Const(b"MThd", pb.Bytes(4)),
+            "length": pb.Const(6, pb.u32),
+            "format": pb.u16,
+            "ntracks": pb.Rebuild(pb.u16, pb.lenof(this.tracks)),
+            "division": pb.u16,
+            "tracks": pb.Repeat(track, this.ntracks),
+        },
+        endian="big",
+    )
+    raw = (
+        b"MThd"
+        + bytes.fromhex("00000006 0000 0001 0060")
+        + b"MTrk"
+        + bytes.fromhex("00000014")
+        + bytes.fromhex("00 ff 51 03 07a120")  # tempo: 500,000 us per beat
+        + bytes.fromhex("00 90 3c 40")  # note on, middle C
+        + bytes.fromhex("8100 80 3c 00")  # 128 ticks later, note off
+        + bytes.fromhex("00 ff 2f 00")  # end of track
+    )
+    song = midi.parse(raw)
+    assert song.division == 96 and song.ntracks == 1
+    events = song.tracks[0].events
+    assert [e.delta for e in events] == [0, 0, 128, 0]
+    assert events[0].body == {"type": 0x51, "data": bytes.fromhex("07a120")}
+    assert events[1].body == {"note": 60, "velocity": 64}
+    assert events[3].body == {"type": 0x2F, "data": b""}
+    assert midi.build(song) == raw
