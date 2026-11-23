@@ -2,7 +2,7 @@
 Binary parsing for dummies!
 
 Type hints on pabo's own functions are checked at runtime by beartype. Set
-the environment variable `PABO_BEARTYPE=0` before importing pabo to turn
+the environment variable `PABOROAR=0` before importing pabo to turn
 this off, which makes parsing in tight loops a little faster.
 """
 
@@ -15,7 +15,7 @@ try:
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 
-if os.environ.get("PABO_BEARTYPE", "1") != "0":
+if os.environ.get("PABOROAR", "1") != "0":
     from beartype.claw import beartype_this_package
 
     beartype_this_package()

@@ -62,7 +62,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - `construct / "docs"` returns a copy instead of changing the construct.
 - Specifications made of fixed-size fields are compiled into a single `struct`
   call, and repeats of them are parsed in bulk.
-- Runtime type checking can be turned off with `PABO_BEARTYPE=0`.
+- Runtime type checking can be turned off with `PABOROAR=0`.
 - The build moved to scikit-build-core and nanobind. Releases use trusted
   publishing.
 

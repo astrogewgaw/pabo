@@ -161,20 +161,20 @@ def test_custom_construct():
 
 def test_beartype_can_be_disabled():
     """
-    Setting `PABO_BEARTYPE=0` turns off runtime type checking at import, while
-    `PABO_BEARTYPE=1` makes a bad argument raise `BeartypeCallHintParamViolation`.
+    Setting `PABOROAR=0` turns off runtime type checking at import, while
+    `PABOROAR=1` makes a bad argument raise `BeartypeCallHintParamViolation`.
     """
     import os
     import subprocess
     import sys
 
     code = "import pabo; pabo.Int('x')"
-    env = {**os.environ, "PABO_BEARTYPE": "0"}
+    env = {**os.environ, "PABOROAR": "0"}
     result = subprocess.run(
         [sys.executable, "-c", code], env=env, capture_output=True, text=True
     )
     assert "Beartype" not in result.stderr
-    env["PABO_BEARTYPE"] = "1"
+    env["PABOROAR"] = "1"
     result = subprocess.run(
         [sys.executable, "-c", code], env=env, capture_output=True, text=True
     )

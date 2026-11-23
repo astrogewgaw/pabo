@@ -27,7 +27,7 @@ state. Operator overloading is limited to `Expr` (lazy expressions on `this`) an
 
 ```
 src/pabo/
-  __init__.py   public API re-exports; beartype_this_package() unless PABO_BEARTYPE=0
+  __init__.py   public API re-exports; beartype_this_package() unless PABOROAR=0
   base.py       Construct ABC, readexact(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
   context.py    Container, Context

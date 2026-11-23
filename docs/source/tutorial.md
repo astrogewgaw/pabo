@@ -234,4 +234,4 @@ Specifications made only of fixed-size numbers, bytes and constants are compiled
 into a single `struct` call, and repeats of them are parsed in bulk. Arrays are read
 straight into numpy, without copies when parsing a file. Runtime type checking of
 pabo's own functions (by beartype) can be turned off with the environment variable
-`PABO_BEARTYPE=0`.
+`PABOROAR=0`.
