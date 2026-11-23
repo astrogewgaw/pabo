@@ -6,12 +6,20 @@ import pabo as pb
 
 
 def test_hierarchy():
+    """
+    All specific error classes subclass `PaboError`, and `ConstError` subclasses
+    `ValidationError`.
+    """
     for cls in (pb.StreamError, pb.SizeofError, pb.ValidationError, pb.ContextError):
         assert issubclass(cls, pb.PaboError)
     assert issubclass(pb.ConstError, pb.ValidationError)
 
 
 def test_message_format():
+    """
+    Error messages are wrapped as `"바보! <msg> ABORT."`, and include the field path
+    and offset once they are set.
+    """
     error = pb.PaboError("SOMETHING BROKE.")
     assert str(error) == "바보! SOMETHING BROKE. ABORT."
     error.path = ["a", "b", "[2]", "c"]
@@ -21,6 +29,9 @@ def test_message_format():
 
 
 def test_pickle_keeps_location():
+    """
+    Pickling an error keeps its class, field path and offset.
+    """
     error = pb.StreamError("x")
     error.path, error.offset = ["a"], 3
     copy = pickle.loads(pickle.dumps(error))
@@ -29,6 +40,10 @@ def test_pickle_keeps_location():
 
 
 def test_errors_carry_field_path_and_offset():
+    """
+    Parse errors inside nested specifications carry the full field path (including
+    repeat indices) and stream offset: a short read and a bad constant.
+    """
     spec = pb.Spec(
         {
             "magic": pb.Const(b"PB", pb.Bytes(2)),
@@ -47,7 +62,20 @@ def test_errors_carry_field_path_and_offset():
 
 
 def test_build_errors_carry_field_path():
+    """
+    A `ValidationError` raised while building an out-of-range value inside a
+    `Sequential` carries the path `b[1]`.
+    """
     spec = pb.Spec({"a": pb.Int(1), "b": pb.Seq([pb.Int(1), pb.Int(1)])})
     with pytest.raises(pb.ValidationError) as info:
         spec.build({"a": 1, "b": [1, 300]})
     assert info.value.where == "b[1]"
+
+
+def test_error_is_not_a_dataclass():
+    """
+    `PaboError` is a plain exception class, not a dataclass.
+    """
+    import dataclasses
+
+    assert not dataclasses.is_dataclass(pb.PaboError)

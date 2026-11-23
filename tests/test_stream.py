@@ -9,6 +9,11 @@ from pabo import this
 
 
 def test_seek_and_tell():
+    """
+    `Tell` returns the stream position and `Seek` moves to an absolute offset and
+    returns it, for parsing and building; a `Seek` makes the size undefined but `Tell`
+    does not.
+    """
     spec = pb.Spec(
         {"a": pb.Int(1), "pos": pb.Tell(), "skip": pb.Seek(3), "b": pb.Int(1)}
     )
@@ -22,16 +27,27 @@ def test_seek_and_tell():
 
 
 def test_seek_rejects_bad_whence():
+    """
+    `Seek` rejects a `whence` other than 0, 1 or 2 with `PaboError` or a beartype
+    violation.
+    """
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Seek(0, whence=3)
 
 
 def test_seek_relative():
+    """
+    `Seek` with `whence=1` moves relative to the current position.
+    """
     spec = pb.Spec({"skip": pb.Seek(2, 1), "b": pb.Int(1)})
     assert spec.parse(b"\x00\x00\x07")["b"] == 7
 
 
 def test_pointer():
+    """
+    `Pointer` parses and builds its construct at an offset elsewhere in the stream,
+    then returns to where it was, and takes no space itself.
+    """
     spec = pb.Spec(
         {
             "offset": pb.Int(1),
@@ -48,6 +64,10 @@ def test_pointer():
 
 
 def test_peek():
+    """
+    `Peek` parses ahead without moving the stream, writes nothing when building and
+    takes no space.
+    """
     spec = pb.Spec({"peeked": pb.Peek(pb.Int(2)), "a": pb.Int(1), "b": pb.Int(1)})
     assert spec.parse(b"\x01\x02") == {"peeked": 0x0201, "a": 1, "b": 2}
     assert spec.build({"a": 1, "b": 2}) == b"\x01\x02"
@@ -55,6 +75,10 @@ def test_peek():
 
 
 def test_aligned():
+    """
+    `Aligned` pads its construct up to the next multiple of the modulus, with a
+    custom fill if given, and rejects a modulus of zero.
+    """
     c = pb.Aligned(4, pb.CString())
     assert c.build("ab") == b"ab\x00\x00"
     assert c.build("abc") == b"abc\x00"
@@ -67,6 +91,10 @@ def test_aligned():
 
 
 def test_aligned_spec():
+    """
+    `AlignedSpec` aligns every field to the modulus and passes the endianness on to
+    its fields.
+    """
     spec = pb.AlignedSpec(4, {"a": pb.Int(1), "b": pb.Int(2)}, endian="big")
     assert spec.build({"a": 1, "b": 2}) == b"\x01\x00\x00\x00\x00\x02\x00\x00"
     assert spec.size == 8
@@ -74,6 +102,11 @@ def test_aligned_spec():
 
 
 def test_lazy():
+    """
+    `Lazy` skips its data when parsing and returns a `LazyValue` that parses it on
+    demand, builds from either a `LazyValue` or a plain value, and checks the data is
+    there.
+    """
     spec = pb.Spec(
         {"n": pb.Int(1), "data": pb.Lazy(pb.Bytes(this.n)), "end": pb.Int(1)}
     )
@@ -90,6 +123,10 @@ def test_lazy():
 
 
 def test_lazy_from_file_after_parse(tmp_path):
+    """
+    A `LazyValue` parsed from a file path can still be read after `parse` returns,
+    since the file stays memory-mapped.
+    """
     path = tmp_path / "data.bin"
     path.write_bytes(b"\x02\x00" + b"\x01\x00\x02\x00")
     spec = pb.Spec({"n": pb.Int(2), "xs": pb.Lazy(pb.Array(pb.Int(2), count=this.n))})
@@ -98,6 +135,11 @@ def test_lazy_from_file_after_parse(tmp_path):
 
 
 def test_mmapped_arrays_are_zero_copy(tmp_path):
+    """
+    Arrays parsed from a file path are read-only views of the memory map, counted
+    arrays stop at their count, and reading past the end or a ragged tail raises
+    `StreamError`.
+    """
     path = tmp_path / "arr.bin"
     values = np.arange(1000, dtype="<f4")
     path.write_bytes(b"\x07" + values.tobytes())
@@ -126,6 +168,10 @@ def test_mmapped_arrays_are_zero_copy(tmp_path):
 
 
 def test_parse_empty_file(tmp_path):
+    """
+    Parsing an empty file works (it cannot be memory-mapped) and `GreedyBytes`
+    returns no data.
+    """
     path = tmp_path / "empty.bin"
     path.write_bytes(b"")
     assert pb.GreedyBytes().parse(path) == b""

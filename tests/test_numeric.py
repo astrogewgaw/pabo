@@ -11,6 +11,11 @@ import pabo as pb
 @pytest.mark.parametrize("signed", [False, True])
 @pytest.mark.parametrize("endian", ["little", "big"])
 def test_int_roundtrip(width, signed, endian):
+    """
+    `Int`s of every struct width (1, 2, 4, 8), signedness and endianness build their
+    extreme value to `int.to_bytes`' layout, parse it back and have `size == width`.
+    """
+
     c = pb.Int(width, signed=signed, endian=endian)
     value = -(2 ** (8 * width - 1)) if signed else 2 ** (8 * width) - 1
     raw = c.build(value)
@@ -22,12 +27,22 @@ def test_int_roundtrip(width, signed, endian):
 @pytest.mark.parametrize("width", [4, 8])
 @pytest.mark.parametrize("endian", ["little", "big"])
 def test_float_roundtrip(width, endian):
+    """
+    32- and 64-bit `Float`s in both endiannesses round-trip 1.5 and build exactly
+    `width` bytes.
+    """
+
     c = pb.Float(width, endian=endian)
     assert c.parse(c.build(1.5)) == 1.5
     assert len(c.build(1.5)) == width
 
 
 def test_int_format_is_public():
+    """
+    `Int.format`, `Float.format` and `Int.formatfor()` give the matching `struct` format
+    strings, and `format` raises `PaboError` for a width with no struct code (3).
+    """
+
     assert pb.Int(4, signed=True, endian="big").format == ">i"
     assert pb.Float(8).format == "<d"
     assert pb.Int(2).formatfor("big") == ">H"
@@ -39,6 +54,11 @@ def test_int_format_is_public():
 @pytest.mark.parametrize("signed", [False, True])
 @pytest.mark.parametrize("endian", ["little", "big", "native"])
 def test_odd_width_ints(width, signed, endian):
+    """
+    `Int`s of non-struct widths (3, 5, 16) round-trip like `int.to_bytes` in every
+    endianness; out-of-range values raise `ValidationError`, short reads `StreamError`.
+    """
+
     import sys
 
     c = pb.Int(width, signed=signed, endian=endian)
@@ -55,6 +75,11 @@ def test_odd_width_ints(width, signed, endian):
 
 
 def test_half_float():
+    """
+    A 2-byte `Float` (half precision) builds and parses 1.5, both on its own and as
+    the element type of an `Array`.
+    """
+
     c = pb.Float(2, endian="big")
     assert c.build(1.5) == b"\x3e\x00"
     assert c.parse(b"\x3e\x00") == 1.5
@@ -72,11 +97,21 @@ def test_half_float():
     ],
 )
 def test_varint(value, raw):
+    """
+    `VarInt` builds each value to its known LEB128 encoding and parses it back,
+    ignoring bytes that follow.
+    """
+
     assert pb.VarInt().build(value) == raw
     assert pb.VarInt().parse(raw + b"rest") == value
 
 
 def test_varint_errors():
+    """
+    `VarInt` raises `ValidationError` for negative values, `StreamError` when the
+    stream ends mid-number, and `SizeofError` for `size`.
+    """
+
     with pytest.raises(pb.ValidationError):
         pb.VarInt().build(-1)
     with pytest.raises(pb.StreamError):
@@ -89,12 +124,22 @@ def test_varint_errors():
     "value, encoded", [(0, 0), (-1, 1), (1, 2), (-2, 3), (2, 4), (-(2**40), 2**41 - 1)]
 )
 def test_zigzag(value, encoded):
+    """
+    `ZigZag` maps signed values to the expected unsigned codes (0, -1, 1, -2, ...),
+    stores them as a `VarInt`, and parses them back.
+    """
+
     raw = pb.ZigZag().build(value)
     assert raw == pb.VarInt().build(encoded)
     assert pb.ZigZag().parse(raw) == value
 
 
 def test_zigzag_errors():
+    """
+    `ZigZag` raises `ValidationError` when building a non-integer and `SizeofError`
+    for `size`.
+    """
+
     with pytest.raises(pb.ValidationError):
         pb.ZigZag().build(1.5)
     with pytest.raises(pb.SizeofError):
@@ -102,6 +147,12 @@ def test_zigzag_errors():
 
 
 def test_endianness_inherited_from_spec():
+    """
+    Numeric fields without an explicit endianness (including odd-width `Int`s, `Array`
+    and nested specs) use the enclosing `Spec`'s, while explicit ones and inner specs
+    with their own endianness keep theirs, and a standalone `Int` stays little-endian.
+    """
+
     spec = pb.Spec(
         {
             "a": pb.Int(2),
@@ -133,6 +184,11 @@ def test_endianness_inherited_from_spec():
 
 @pytest.mark.parametrize("dtype", [pb.Int(2, signed=True), pb.Float(4, endian="big")])
 def test_array_roundtrip(dtype):
+    """
+    Fixed-count `Array`s of a signed `Int` and a big-endian `Float` build
+    `count * width` bytes and parse back to the same values.
+    """
+
     c = pb.Array(dtype, count=3)
     raw = c.build([1, -2, 3])
     assert len(raw) == 3 * dtype.width
@@ -140,11 +196,19 @@ def test_array_roundtrip(dtype):
 
 
 def test_array_greedy_count():
+    """
+    An `Array` with no count parses every element left in the stream.
+    """
+
     c = pb.Array(pb.Int(1))
     np.testing.assert_array_equal(c.parse(b"\x01\x02\x03"), [1, 2, 3])
 
 
 def test_array_size_in_bytes():
+    """
+    A fixed-count `Array`'s `size` is the element width times the count, in bytes.
+    """
+
     assert pb.Array(pb.Int(4), count=3).size == 12
 
 
@@ -158,17 +222,31 @@ def test_array_size_in_bytes():
     ],
 )
 def test_invalid_numeric_construction(make):
+    """
+    Invalid constructor arguments (zero width, a 3-byte `Float`, unknown endianness,
+    an `Array` of a non-struct-width `Int`) are rejected at construction.
+    """
+
     # beartype may reject a bad Literal before pabo's own validation runs.
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         make()
 
 
 def test_native_endian():
+    """
+    An `Int` with native endianness round-trips a value.
+    """
+
     c = pb.Int(4, endian="native")
     assert c.parse(c.build(7)) == 7
 
 
 def test_int_out_of_range_and_short_read():
+    """
+    `Int` raises `PaboError` when building a value too large for its width and when
+    parsing from too few bytes.
+    """
+
     with pytest.raises(pb.PaboError):
         pb.Int(1).build(256)
     with pytest.raises(pb.PaboError):
@@ -176,6 +254,11 @@ def test_int_out_of_range_and_short_read():
 
 
 def test_array_short_read_and_trailing_bytes():
+    """
+    `Array` raises `PaboError` on a short read with a fixed count, when a greedy read
+    leaves a partial element, and for the `size` of a greedy array.
+    """
+
     with pytest.raises(pb.PaboError):
         pb.Array(pb.Int(4), count=2).parse(b"\x00" * 7)
     with pytest.raises(pb.PaboError):
@@ -188,6 +271,12 @@ def test_array_short_read_and_trailing_bytes():
 @pytest.mark.parametrize("bitorder", ["big", "little"])
 @pytest.mark.parametrize("count", [8, 5])
 def test_packed_array_roundtrip(packing, bitorder, count):
+    """
+    `Array`s packed at 1, 2 or 4 bits in both bit orders, with whole (8) and partial (5)
+    final bytes, take the expected number of bytes, ignore trailing input and parse
+    back with the element dtype.
+    """
+
     c = pb.Array(pb.Int(2), count=count, packing=packing, bitorder=bitorder)
     values = [i % (1 << packing) for i in range(count)]
     raw = c.build(values)
@@ -198,6 +287,11 @@ def test_packed_array_roundtrip(packing, bitorder, count):
 
 
 def test_packed_array_validation():
+    """
+    Packed `Array`s raise `PaboError` for values that do not fit the packing, a `Float`
+    element type, and a packing above the element width or of zero.
+    """
+
     with pytest.raises(pb.PaboError):
         pb.Array(pb.Int(1), count=2, packing=2).build([1, 4])
     with pytest.raises(pb.PaboError):
@@ -211,6 +305,11 @@ def test_packed_array_validation():
 @pytest.mark.parametrize("packing", [3, 5, 12, 16])
 @pytest.mark.parametrize("bitorder", ["big", "little"])
 def test_arbitrary_packing(packing, bitorder):
+    """
+    `Array`s packed at widths without a fast path (3, 5, 12, 16 bits) round-trip in both
+    bit orders, and values that do not fit raise `ValidationError`.
+    """
+
     c = pb.Array(pb.Int(2), count=7, packing=packing, bitorder=bitorder)
     values = [(i * 37) % (1 << packing) for i in range(7)]
     raw = c.build(values)
@@ -221,16 +320,30 @@ def test_arbitrary_packing(packing, bitorder):
 
 
 def test_12_bit_packing_layout():
+    """
+    12-bit packing with the default big bit order lays values out MSB first across
+    byte boundaries.
+    """
+
     c = pb.Array(pb.Int(2), count=2, packing=12)
     assert c.build([0xABC, 0x123]) == b"\xab\xc1\x23"
 
 
 def test_packed_array_greedy():
+    """
+    A packed `Array` with no count unpacks every value in the remaining bytes.
+    """
+
     c = pb.Array(pb.Int(1), packing=4)
     np.testing.assert_array_equal(c.parse(b"\x12\x34"), [1, 2, 3, 4])
 
 
 def test_array_reads_into_new_buffer():
+    """
+    Parsing an `Array` from a regular stream reads into a fresh writeable array and
+    leaves the stream just past it; a short stream raises `StreamError`.
+    """
+
     from io import BytesIO
 
     stream = BytesIO(np.arange(4, dtype=">u2").tobytes() + b"rest")
@@ -243,7 +356,16 @@ def test_array_reads_into_new_buffer():
 
 
 def test_array_reads_from_short_reads():
+    """
+    `Array` keeps calling `readinto` until it has the whole array when the stream
+    returns one byte at a time, and never falls back to `read()`.
+    """
+
     class Trickle:
+        """
+        A stream whose `readinto` returns one byte at a time, and has no `read`.
+        """
+
         def __init__(self, raw):
             self.raw = raw
 
@@ -267,6 +389,11 @@ def test_array_reads_from_short_reads():
     data=st.data(),
 )
 def test_int_roundtrip_property(width, signed, endian, data):
+    """
+    For any width from 1 to 16 bytes, signedness, endianness and in-range value, `Int`
+    builds `int.to_bytes`' output and parses it back.
+    """
+
     bits = 8 * width
     lo, hi = (-(2 ** (bits - 1)), 2 ** (bits - 1) - 1) if signed else (0, 2**bits - 1)
     value = data.draw(st.integers(lo, hi))
@@ -278,17 +405,30 @@ def test_int_roundtrip_property(width, signed, endian, data):
 
 @given(st.floats(width=32, allow_nan=False), st.sampled_from(["little", "big"]))
 def test_float_roundtrip_property(value, endian):
+    """
+    Every non-NaN 32-bit float round-trips through a 4-byte `Float` in either
+    endianness.
+    """
+
     c = pb.Float(4, endian=endian)
     assert c.parse(c.build(value)) == value
 
 
 @given(st.integers(min_value=0, max_value=2**100))
 def test_varint_roundtrip_property(value):
+    """
+    Every non-negative integer up to 2**100 round-trips through `VarInt`.
+    """
+
     assert pb.VarInt().parse(pb.VarInt().build(value)) == value
 
 
 @given(st.integers(min_value=-(2**100), max_value=2**100))
 def test_zigzag_roundtrip_property(value):
+    """
+    Every integer between -2**100 and 2**100 round-trips through `ZigZag`.
+    """
+
     assert pb.ZigZag().parse(pb.ZigZag().build(value)) == value
 
 
@@ -298,6 +438,11 @@ def test_zigzag_roundtrip_property(value):
     data=st.data(),
 )
 def test_packed_array_roundtrip_property(packing, bitorder, data):
+    """
+    For any packing from 1 to 16 bits, either bit order and any list of values that
+    fit, a packed `Array` parses back what it built.
+    """
+
     values = data.draw(st.lists(st.integers(0, 2**packing - 1), max_size=50))
     c = pb.Array(pb.Int(2), count=len(values), packing=packing, bitorder=bitorder)
     np.testing.assert_array_equal(c.parse(c.build(values)), values)

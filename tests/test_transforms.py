@@ -9,6 +9,10 @@ import pabo as pb
 
 @pytest.mark.parametrize("codec", ["zlib", "gzip", "bz2", "lzma"])
 def test_compressed_roundtrip(codec):
+    """
+    `Compressed` shrinks repetitive text and round-trips it, for each supported
+    codec (the parameter varied).
+    """
     c = pb.Compressed(pb.GreedyString(), codec)
     text = "hello " * 100
     raw = c.build(text)
@@ -17,6 +21,10 @@ def test_compressed_roundtrip(codec):
 
 
 def test_compressed_inside_prefixed():
+    """
+    A `Compressed` array inside `Prefixed` round-trips, and parsing stops at the
+    end of the compressed data so the next field is read correctly.
+    """
     spec = pb.Spec(
         {
             "body": pb.Prefixed(pb.Int(2), pb.Compressed(pb.Array(pb.Int(2)))),
@@ -29,6 +37,11 @@ def test_compressed_inside_prefixed():
 
 
 def test_compressed_with_size():
+    """
+    `Compressed` with a `length` reads exactly that many compressed bytes, has a
+    size only when the length is known, and raises `ValidationError` when it does not
+    match.
+    """
     payload = zlib.compress(b"abc")
     spec = pb.Spec(
         {
@@ -47,6 +60,10 @@ def test_compressed_with_size():
 
 
 def test_transform_errors():
+    """
+    `Compressed` rejects an unknown codec, and raises `ValidationError` on data
+    that cannot be decompressed.
+    """
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Compressed(pb.GreedyBytes(), "rot13")
     with pytest.raises(pb.ValidationError):
@@ -54,6 +71,10 @@ def test_transform_errors():
 
 
 def test_transformed_custom():
+    """
+    `Transformed` applies a custom encode and decode function (here XOR with 0xFF)
+    and reports the given `length` as its size.
+    """
     xor = lambda raw: bytes(b ^ 0xFF for b in raw)
     c = pb.Transformed(pb.Int(2), xor, xor, length=2)
     assert c.build(1) == b"\xfe\xff"
@@ -62,6 +83,10 @@ def test_transformed_custom():
 
 
 def test_checksummed_crc32():
+    """
+    `Checksummed` with `crc32` appends the checksum of the data, verifies it when
+    parsing, and raises `ValidationError` when the data is corrupted.
+    """
     c = pb.Checksummed(pb.Bytes(3), pb.Int(4), "crc32")
     raw = c.build(b"abc")
     assert raw == b"abc" + zlib.crc32(b"abc").to_bytes(4, "little")
@@ -72,6 +97,10 @@ def test_checksummed_crc32():
 
 
 def test_checksummed_hashlib_and_function():
+    """
+    `Checksummed` accepts a `hashlib` algorithm name or a custom function, and
+    rejects an unknown algorithm name with `PaboError`.
+    """
     c = pb.Checksummed(pb.Spec({"a": pb.Int(1), "b": pb.Int(1)}), pb.Bytes(16), "md5")
     raw = c.build({"a": 1, "b": 2})
     assert raw[2:] == hashlib.md5(b"\x01\x02").digest()

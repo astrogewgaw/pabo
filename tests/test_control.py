@@ -7,6 +7,10 @@ from pabo import this
 
 
 def test_computed():
+    """
+    `Computed` derives a value from earlier fields when parsing, writes nothing and
+    ignores any given value when building, takes no space, and accepts a constant.
+    """
     spec = pb.Spec(
         {"w": pb.Int(1), "h": pb.Int(1), "area": pb.Computed(lambda c: c.w * c.h)}
     )
@@ -18,6 +22,10 @@ def test_computed():
 
 
 def test_rebuild_length_prefix():
+    """
+    `Rebuild` recomputes a length prefix from a later field when building,
+    overriding any given value, and parses it as a normal field.
+    """
     spec = pb.Spec(
         {
             "n": pb.Rebuild(pb.Int(1), lambda c: len(c.payload)),
@@ -31,6 +39,11 @@ def test_rebuild_length_prefix():
 
 
 def test_if():
+    """
+    `If` parses or builds its construct only when the condition holds and gives None
+    otherwise, raises `ValidationError` when a needed value is missing, and sizes by
+    condition.
+    """
     spec = pb.Spec({"has": pb.Flag(), "value": pb.If(this.has, pb.Int(2))})
     assert spec.parse(b"\x01\x05\x00") == {"has": True, "value": 5}
     assert spec.parse(b"\x00") == {"has": False, "value": None}
@@ -43,6 +56,10 @@ def test_if():
 
 
 def test_if_else():
+    """
+    `If` with an else branch picks between two constructs by condition, is not
+    omittable, and raises `PaboError` when the value is missing.
+    """
     c = pb.If(this.wide, pb.Int(2), pb.Int(1))
     spec = pb.Spec({"wide": pb.Flag(), "v": c})
     assert spec.parse(b"\x00\x07") == {"wide": False, "v": 7}
@@ -53,6 +70,10 @@ def test_if_else():
 
 
 def test_optional():
+    """
+    `Optional` returns None and rewinds the stream when its construct fails, builds
+    nothing from None, and has no fixed size (`SizeofError`).
+    """
     c = pb.Optional(pb.Const(b"X", pb.Bytes(1)))
     stream = BytesIO(b"Y")
     assert c.parse(stream) is None and stream.tell() == 0
@@ -64,6 +85,10 @@ def test_optional():
 
 
 def test_switch():
+    """
+    `Switch` picks a construct by key and falls back to `default`, and without a
+    default an unknown key raises `ValidationError` at the field path `body`.
+    """
     spec = pb.Spec(
         {
             "tag": pb.Int(1),
@@ -84,6 +109,10 @@ def test_switch():
 
 
 def test_repeat_until():
+    """
+    `RepeatUntil` reads elements up to and including the first that meets the
+    predicate, and raises on builds that never meet it, short reads and `size`.
+    """
     c = pb.RepeatUntil(lambda x, ctx: x == 0, pb.Int(1))
     assert c.parse(b"\x03\x02\x00\x09") == [3, 2, 0]
     assert c.build([3, 2, 0]) == b"\x03\x02\x00"
@@ -97,11 +126,18 @@ def test_repeat_until():
 
 
 def test_repeat_with_context_count():
+    """
+    `Repeat` can take its count from an earlier field via `this`.
+    """
     spec = pb.Spec({"n": pb.Int(1), "xs": pb.Repeat(pb.Int(1), this.n)})
     assert spec.parse(b"\x02\x07\x08") == {"n": 2, "xs": [7, 8]}
 
 
 def test_stop_if():
+    """
+    `StopIf` ends a `Spec` or `Seq` early when its condition holds, leaving out the
+    fields after it, and does nothing otherwise.
+    """
     spec = pb.Spec(
         {"n": pb.Int(1), "stop": pb.StopIf(lambda c: c.n == 0), "x": pb.Int(1)}
     )
@@ -114,6 +150,10 @@ def test_stop_if():
 
 
 def test_terminated():
+    """
+    `Terminated` parses only at the end of the stream, raising `StreamError` when
+    data remains, and builds nothing.
+    """
     spec = pb.Spec({"a": pb.Int(1), "end": pb.Terminated()})
     assert spec.parse(b"\x01") == {"a": 1, "end": None}
     with pytest.raises(pb.StreamError):
@@ -122,6 +162,10 @@ def test_terminated():
 
 
 def test_check():
+    """
+    `Check` raises `ValidationError` with its message when its condition on earlier
+    fields fails, both when parsing and when building.
+    """
     spec = pb.Spec(
         {
             "lo": pb.Int(1),
@@ -137,6 +181,10 @@ def test_check():
 
 
 def test_validated():
+    """
+    `Validated` raises `ValidationError` when a parsed or built value fails the
+    predicate, and keeps the size of the wrapped construct.
+    """
     c = pb.Validated(pb.Int(1), lambda v, ctx: v < 10)
     assert c.parse(b"\x05") == 5
     with pytest.raises(pb.ValidationError):

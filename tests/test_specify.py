@@ -13,6 +13,10 @@ PNG = (
 
 @pytest.fixture
 def png():
+    """
+    A specification for the start of a PNG file: signature, IHDR chunk size and tag, and
+    the big-endian image width and height.
+    """
     return pb.Spec(
         {
             "magic": pb.Const(b"\x89PNG\r\n\x1a\n", pb.Bytes(8)),
@@ -25,6 +29,10 @@ def png():
 
 
 def test_readme_example(png):
+    """
+    The README example: parsing a PNG header gives the expected field dict and the
+    specification has a static `size`.
+    """
     data = png.parse(PNG)
     assert data == {
         "magic": b"\x89PNG\r\n\x1a\n",
@@ -37,10 +45,16 @@ def test_readme_example(png):
 
 
 def test_roundtrip(png):
+    """
+    Building the parsed PNG header gives back the original bytes.
+    """
     assert png.build(png.parse(PNG)) == PNG
 
 
 def test_parse_from_file(png, tmp_path):
+    """
+    `parse()` reads from a file given as a `Path` or a `str`.
+    """
     path = tmp_path / "example.png"
     path.write_bytes(PNG)
     assert png.parse(path)["width"] == 602
@@ -48,11 +62,17 @@ def test_parse_from_file(png, tmp_path):
 
 
 def test_missing_field_raises(png):
+    """
+    Building with required fields missing from the input raises `PaboError`.
+    """
     with pytest.raises(pb.PaboError):
         png.build({"width": 1})
 
 
 def test_nested():
+    """
+    A specification nested in another parses to a nested dict and round-trips.
+    """
     inner = pb.Spec({"a": pb.Int(1), "b": pb.Int(1)})
     outer = pb.Spec({"x": inner, "y": pb.Int(2)})
     raw = b"\x01\x02\x03\x00"
@@ -61,16 +81,26 @@ def test_nested():
 
 
 def test_build_fills_in_constants(png):
+    """
+    `Const` fields can be left out when building and are filled in automatically.
+    """
     data = {"ihdr_size": 13, "width": 602, "height": 172}
     assert png.build(data) == PNG
 
 
 def test_build_with_padding():
+    """
+    `Padding` fields can be left out when building and are written as zero bytes.
+    """
     c = pb.Spec({"a": pb.Int(1), "pad": pb.Padding(2), "b": pb.Int(1)})
     assert c.build({"a": 1, "b": 2}) == b"\x01\x00\x00\x02"
 
 
 def test_nested_key_error_is_not_masked():
+    """
+    A field missing from a nested specification's input raises a `PaboError` that
+    names the missing field (`'a'`).
+    """
     inner = pb.Spec({"a": pb.Int(1)})
     outer = pb.Spec({"x": inner})
     with pytest.raises(pb.PaboError, match="'a'"):
@@ -78,6 +108,10 @@ def test_nested_key_error_is_not_masked():
 
 
 def test_dependent_fields():
+    """
+    Later fields can use earlier ones for their size or count, via `this.n` or a
+    lambda, when both parsing and building.
+    """
     spec = pb.Spec(
         {
             "n": pb.Int(1),
@@ -92,6 +126,9 @@ def test_dependent_fields():
 
 
 def test_reference_to_parent_field():
+    """
+    A nested specification can refer to a field of its parent via `this._.n`.
+    """
     inner = pb.Spec({"data": pb.Bytes(pb.this._.n)})
     outer = pb.Spec({"n": pb.Int(1), "inner": inner})
     assert outer.parse(b"\x02ab") == {"n": 2, "inner": {"data": b"ab"}}
@@ -99,11 +136,18 @@ def test_reference_to_parent_field():
 
 
 def test_build_requires_dict():
+    """
+    Building a specification from a non-mapping (a list) raises `PaboError`.
+    """
     with pytest.raises(pb.PaboError):
         pb.Spec({"a": pb.Int(1)}).build([1])
 
 
 def test_embedded():
+    """
+    `Embedded` merges a specification's fields into the enclosing one, so later fields
+    can refer to them; it also parses on its own.
+    """
     common = pb.Spec({"a": pb.Int(1), "b": pb.Int(1)})
     spec = pb.Spec({"x": pb.Int(1), "_": pb.Embedded(common), "c": pb.Bytes(pb.this.a)})
     raw = b"\x09\x02\x03ab"
@@ -115,6 +159,10 @@ def test_embedded():
 
 
 def test_nested_specs_roundtrip_deeply():
+    """
+    Specifications nested several levels deep, including inside a `Sequential`, give
+    attribute access at every level and round-trip.
+    """
     spec = pb.Spec(
         {
             "a": pb.Spec(
@@ -132,6 +180,10 @@ def test_nested_specs_roundtrip_deeply():
 
 
 def test_docs_in_errors():
+    """
+    An error in a documented field carries the field's `docs` and quotes it in the
+    message.
+    """
     spec = pb.Spec({"w": pb.Int(4) / "Image width"})
     with pytest.raises(pb.StreamError) as info:
         spec.parse(b"\x00")
@@ -140,6 +192,10 @@ def test_docs_in_errors():
 
 
 def test_trace(capsys):
+    """
+    `parse(..., trace=True)` prints each field with its byte range and value plus a hex
+    dump to stderr, indenting nested specifications.
+    """
     spec = pb.Spec({"a": pb.Int(1), "inner": pb.Spec({"b": pb.Int(2)})})
     spec.parse(b"\x01\x02\x00", trace=True)
     err = capsys.readouterr().err
@@ -149,6 +205,9 @@ def test_trace(capsys):
 
 
 def test_trace_to_stream():
+    """
+    `parse(..., trace=stream)` writes the trace to the given stream.
+    """
     import io
 
     out = io.StringIO()
@@ -157,6 +216,10 @@ def test_trace_to_stream():
 
 
 def test_describe():
+    """
+    `describe()` lists each field's offset, size, name, type and docs, indenting nested
+    specifications and showing `?` for sizes or offsets that are not known statically.
+    """
     spec = pb.Spec(
         {
             "magic": pb.Const(b"PB", pb.Bytes(2)) / "Magic number",
@@ -179,6 +242,10 @@ def test_describe():
 
 
 def test_compiled_plan_is_used_and_matches():
+    """
+    A fixed-size specification compiles to a single `struct` format, parses and builds
+    the same as the slow path, and builds a `Flag` given as `1` or `True` as `1`.
+    """
     spec = pb.Spec(
         {
             "magic": pb.Const(b"AB", pb.Bytes(2)),
@@ -201,6 +268,10 @@ def test_compiled_plan_is_used_and_matches():
 
 
 def test_compiled_plan_falls_back_for_detailed_errors():
+    """
+    When the compiled plan hits a bad constant, short read, out-of-range integer or
+    wrong-length bytes, the error still names the failing field like the slow path.
+    """
     spec = pb.Spec(
         {"magic": pb.Const(b"AB", pb.Bytes(2)), "a": pb.u16, "d": pb.Bytes(2)}
     )
@@ -220,6 +291,10 @@ def test_compiled_plan_falls_back_for_detailed_errors():
 
 
 def test_no_plan_for_mixed_or_dynamic_fields():
+    """
+    No compiled plan is made for mixed endianness, dynamic sizes or an empty
+    specification.
+    """
     assert pb.Spec({"a": pb.u16le, "b": pb.u16be})._plan(pb.Context()) is None
     assert pb.Spec({"n": pb.u8, "d": pb.Bytes(pb.this.n)})._plan(pb.Context()) is None
     assert pb.Spec({})._plan(pb.Context()) is None
@@ -229,6 +304,10 @@ def test_no_plan_for_mixed_or_dynamic_fields():
 
 
 def test_wav_file(tmp_path):
+    """
+    A WAV file written by the `wave` module parses into the right format chunk and
+    samples, and building from those values (with `Rebuild` sizes) gives the same bytes.
+    """
     chunk = lambda tag, body: pb.Spec(
         {
             "id": pb.Const(tag, pb.Bytes(4)),
@@ -294,7 +373,15 @@ def test_wav_file(tmp_path):
 
 
 def _elfspec():
+    """
+    Return a specification for an ELF file header, switching endianness on the
+    identification's data byte and address width on its class byte.
+    """
+
     def body(endian):
+        """
+        Return the ELF header fields after the identification, in the given endianness.
+        """
         word = lambda ctx: ctx._.ident.cls == 2
         addr = pb.If(word, pb.u64, pb.u32)
         return pb.Spec(
@@ -337,6 +424,10 @@ def _elfspec():
 
 
 def test_elf_header_of_running_python():
+    """
+    The ELF header of the running Python executable parses with a valid class and
+    data byte and the expected header size; skipped when it is not an ELF binary.
+    """
     import sys
 
     if not sys.executable:
@@ -351,6 +442,10 @@ def test_elf_header_of_running_python():
 
 
 def test_elf_header_both_endians():
+    """
+    A 64-bit ELF header built in little and big endian is 64 bytes and parses back to
+    the same values; a 32-bit one is 52 bytes.
+    """
     elf = _elfspec()
     values = {
         "type": 2,
@@ -377,6 +472,10 @@ def test_elf_header_both_endians():
 
 
 def test_sigproc_filterbank_header():
+    """
+    A SIGPROC filterbank file: a keyword header built with `RepeatUntil` and `Switch`,
+    read back into a metadata dict, followed by 2-bit packed data sized from `nchans`.
+    """
     key = pb.PascalString(pb.i32)
     values = {
         "telescope_id": pb.i32,

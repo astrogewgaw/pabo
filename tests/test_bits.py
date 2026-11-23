@@ -6,6 +6,10 @@ import pabo as pb
 
 
 def test_bits_size_in_bytes():
+    """
+    `Bits.size` is in bytes, rounded up to cover a partial byte.
+    """
+
     assert pb.Bits(8).size == 1
     assert pb.Bits(12).size == 2
 
@@ -13,6 +17,11 @@ def test_bits_size_in_bytes():
 @pytest.mark.parametrize("bitorder", ["big", "little"])
 @pytest.mark.parametrize("count", [8, 12, 3])
 def test_bits_roundtrip(bitorder, count):
+    """
+    `Bits` of whole and partial bytes in both bit orders build to `size` bytes, parse
+    back to one 0/1 byte per bit, and accept a list as well as bytes.
+    """
+
     c = pb.Bits(count, bitorder=bitorder)
     bits = bytes(i % 2 for i in range(count))
     raw = c.build(bits)
@@ -22,16 +31,30 @@ def test_bits_roundtrip(bitorder, count):
 
 
 def test_bits_order():
+    """
+    Big bit order puts the first bit in the MSB, little in the LSB, and a partial
+    byte is read from its top bits.
+    """
+
     assert pb.Bits(8).parse(b"\x80") == b"\x01" + b"\x00" * 7
     assert pb.Bits(8, bitorder="little").parse(b"\x80") == b"\x00" * 7 + b"\x01"
     assert pb.Bits(3).parse(b"\xa0") == b"\x01\x00\x01"
 
 
 def test_bits_in_spec_size():
+    """
+    A `Spec` containing `Bits` counts them in bytes when computing its size.
+    """
+
     assert pb.Spec({"flags": pb.Bits(16), "n": pb.Int(2)}).size == 4
 
 
 def test_bits_validation():
+    """
+    `Bits` raises `PaboError` when building the wrong number of bits or a value that
+    is not 0 or 1.
+    """
+
     with pytest.raises(pb.PaboError):
         pb.Bits(8).build(b"\x01" * 7)
     with pytest.raises(pb.PaboError):
@@ -39,6 +62,11 @@ def test_bits_validation():
 
 
 def test_bitstruct_ipv4_header_byte():
+    """
+    A `BitStruct` of two 4-bit fields parses and builds the IPv4 version/IHL byte,
+    with the first field in the high nibble, and has a size of 1 byte.
+    """
+
     c = pb.BitStruct({"version": pb.BitInt(4), "ihl": pb.BitInt(4)})
     assert c.parse(b"\x45") == {"version": 4, "ihl": 5}
     assert c.build({"version": 4, "ihl": 5}) == b"\x45"
@@ -46,6 +74,11 @@ def test_bitstruct_ipv4_header_byte():
 
 
 def test_bitstruct_flags_padding_and_signed():
+    """
+    A `BitStruct` with a `BitFlag`, `BitPadding` and a signed `BitInt` builds the
+    expected bits (zero padding, two's complement negatives) and parses them back.
+    """
+
     c = pb.BitStruct(
         {
             "a": pb.BitFlag(),
@@ -60,6 +93,11 @@ def test_bitstruct_flags_padding_and_signed():
 
 
 def test_bitstruct_little_bitorder():
+    """
+    With little bit order, a `BitStruct`'s first field takes the least significant bits
+    of the little-endian integer formed by its bytes.
+    """
+
     c = pb.BitStruct({"lo": pb.BitInt(4), "hi": pb.BitInt(12)}, bitorder="little")
     raw = c.build({"lo": 0x1, "hi": 0xABC})
     assert int.from_bytes(raw, "little") == 0xABC1
@@ -67,6 +105,12 @@ def test_bitstruct_little_bitorder():
 
 
 def test_bitstruct_errors():
+    """
+    `BitStruct` rejects fields that are not a whole number of bytes and `BitInt(0)`,
+    raises `ValidationError` for out-of-range unsigned and signed values, `PaboError`
+    for a missing field and `StreamError` for empty input.
+    """
+
     with pytest.raises(pb.PaboError):
         pb.BitStruct({"a": pb.BitInt(3)})
     with pytest.raises(pb.PaboError):
@@ -83,6 +127,11 @@ def test_bitstruct_errors():
 
 
 def test_bitstruct_in_spec():
+    """
+    A `BitStruct` nested in a `Spec` parses into a nested container and adds its byte
+    size to the spec's.
+    """
+
     spec = pb.Spec({"flags": pb.BitStruct({"x": pb.BitInt(8)}), "n": pb.Int(1)})
     assert spec.parse(b"\x01\x02") == {"flags": {"x": 1}, "n": 2}
     assert spec.size == 2
@@ -90,12 +139,21 @@ def test_bitstruct_in_spec():
 
 @given(st.lists(st.integers(0, 1), max_size=100), st.sampled_from(["big", "little"]))
 def test_bits_roundtrip_property(bits, bitorder):
+    """
+    Any list of up to 100 bits round-trips through `Bits` in either bit order.
+    """
+
     c = pb.Bits(len(bits), bitorder)
     assert list(c.parse(c.build(bits))) == bits
 
 
 @given(st.lists(st.integers(1, 12), min_size=1, max_size=8), st.data())
 def test_bitstruct_roundtrip_property(widths, data):
+    """
+    For any set of `BitInt` widths (padded to whole bytes) and in-range values, a
+    `BitStruct` in either bit order parses back what it built.
+    """
+
     total = sum(widths)
     widths = widths + ([8 - total % 8] if total % 8 else [])
     fields = {f"f{ix}": pb.BitInt(n) for ix, n in enumerate(widths)}
