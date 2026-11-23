@@ -104,48 +104,6 @@ elf = pb.Spec(
 elf.parse("/bin/ls").header.machine
 ```
 
-## SIGPROC filterbank header
-
-SIGPROC headers, used for pulsar data, are a list of keyword/value pairs between
-`HEADER_START` and `HEADER_END`. The type of each value depends on its keyword.
-
-```python
-key = pb.PascalString(pb.i32)
-entry = pb.Spec(
-    {
-        "key": key,
-        "value": pb.Switch(
-            pb.this.key,
-            {
-                "telescope_id": pb.i32,
-                "machine_id": pb.i32,
-                "data_type": pb.i32,
-                "nchans": pb.i32,
-                "nbits": pb.i32,
-                "nifs": pb.i32,
-                "tsamp": pb.f64,
-                "tstart": pb.f64,
-                "fch1": pb.f64,
-                "foff": pb.f64,
-                "source_name": pb.PascalString(pb.i32),
-                "HEADER_END": pb.Computed(None),
-            },
-        ),
-    }
-)
-header = pb.Spec(
-    {
-        "start": pb.Const("HEADER_START", key),
-        "entries": pb.RepeatUntil(lambda e, ctx: e.key == "HEADER_END", entry),
-        "meta": pb.Computed(lambda ctx: {e.key: e.value for e in ctx.entries}),
-    },
-    endian="little",
-)
-```
-
-The data that follows can then be read as a (possibly bit-packed) `Array`, which
-is memory-mapped and read without copying when parsing a file.
-
 ## IPv4 header
 
 ```python

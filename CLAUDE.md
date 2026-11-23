@@ -180,7 +180,7 @@ which is not committed). Docstring coverage is checked by `interrogate`
 - Known-but-unfixed bugs may be marked `pytest.mark.xfail(strict=True)`, so a fix
   turns the test red until the marker is removed.
 - Test the C++ packer against `np.packbits`/`np.unpackbits` for both bit orders.
-- Property-based tests use hypothesis; real-world formats (WAV, ELF, SIGPROC) live
+- Property-based tests use hypothesis; real-world formats (WAV, ELF) live
   in `test_specify.py`.
 - When asserting on bad constructor arguments, accept both `pb.PaboError` and
   `BeartypeCallHintParamViolation`, since beartype may reject a bad `Literal` first
