@@ -26,7 +26,7 @@ from pabo.aliases import *
 from pabo.base import Construct
 from pabo.bits import BitFlag, BitInt, BitPadding, Bits, BitStruct
 from pabo.bytes import Bytes, Flag, GreedyBytes, Padding
-from pabo.context import Container, Context, this
+from pabo.context import Container, Context
 from pabo.control import (
     Check,
     Computed,
@@ -49,6 +49,7 @@ from pabo.errors import (
     StreamError,
     ValidationError,
 )
+from pabo.expressions import Expr, This, lenof, this
 from pabo.numeric import Array, Float, Int, VarInt, ZigZag
 from pabo.specify import Embedded, Specification
 from pabo.specify import Specification as Spec
@@ -82,6 +83,7 @@ __all__ = [
     "ContextError",
     "Embedded",
     "Enum",
+    "Expr",
     "Flag",
     "FlagsEnum",
     "Float",
@@ -119,6 +121,7 @@ __all__ = [
     "Switch",
     "Tell",
     "Terminated",
+    "This",
     "Timestamp",
     "Transformed",
     "Validated",
@@ -126,6 +129,7 @@ __all__ = [
     "VarInt",
     "ZigZag",
     "__version__",
+    "lenof",
     "this",
 ]
 __all__ += aliases.__all__

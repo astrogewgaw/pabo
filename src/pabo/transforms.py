@@ -13,8 +13,8 @@ from io import BytesIO
 from typing import Any, Literal
 
 from pabo.base import Construct, readexact
-from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Dynamic
 
 #: The compression formats `Compressed` supports.

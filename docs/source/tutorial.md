@@ -113,10 +113,18 @@ message = pb.Spec(
 message.parse(b"\x03abc")    # Container({'length': 3, 'payload': b'abc'})
 ```
 
-`this._.name` refers to a field of the enclosing specification. For anything more
-than a plain reference, pass a function of the context: `lambda ctx: ctx.n * 2`.
-(Comparisons such as `this.n == 0` don't build expressions, so write
-`lambda ctx: ctx.n == 0`.)
+`this._.name` refers to a field of the enclosing specification, and `this._root.name`
+to one at the top level. References combine into **expressions**, evaluated when
+the field is parsed or built: arithmetic (`this.n * 2`), bitwise operators
+(`this.flags & 0x80`), comparisons (`this.kind == 3`), indexing (`this.items[0]`)
+and `lenof(this.data)` all work.
+
+Python's `and`, `or` and `not` can't be overloaded, so use `&` and `|` with
+parentheses around each comparison, `(this.a == 1) & (this.b == 2)`, and `== 0`
+for "not". Using an expression where Python needs a plain `True`/`False` raises
+an error that says so. For anything else, pass a function of the context:
+`lambda ctx: ctx.a == 1 and ctx.b == 2`. Both work wherever a count, length,
+offset or condition is expected.
 
 When building, `Rebuild` computes a field from the others, so you don't have to
 fill in lengths yourself:
@@ -124,7 +132,7 @@ fill in lengths yourself:
 ```python
 message = pb.Spec(
     {
-        "length": pb.Rebuild(pb.u8, lambda ctx: len(ctx.payload)),
+        "length": pb.Rebuild(pb.u8, pb.lenof(this.payload)),
         "payload": pb.Bytes(this.length),
     }
 )

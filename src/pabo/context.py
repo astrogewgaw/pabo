@@ -1,8 +1,11 @@
 """
-Containers, contexts and references to previously parsed fields.
+Containers and contexts: the values parsed (or being built) so far.
+
+References to them (`this.length`, ...) live in `expressions.py`.
 
 pabo checks type hints at runtime with beartype (see `pabo/__init__.py`). A few
-internal functions here and in `specify.py` are marked `@no_type_check`, which
+internal functions here, in `expressions.py` and in `specify.py` are marked
+`@no_type_check`, which
 tells beartype to skip them: they run once per field (or per attribute access)
 during every parse, only ever receive arguments pabo itself created, and
 checking them made parsing about twice as slow (a PNG header went from about
@@ -11,8 +14,6 @@ are still checked.
 """
 
 from typing import Any, no_type_check
-
-from pabo.errors import ContextError
 
 
 class Container(dict):
@@ -95,81 +96,3 @@ class Context(Container):
                 return value
             ctx = ctx._
         return default
-
-
-class This:
-    """
-    A reference to a field parsed earlier, such as `this.length`.
-
-    `this.name` refers to a field of the current specification, `this._.name`
-    to a field of the enclosing one, and `this._root.name` to one at the top
-    level. Calling a reference with a context returns the referenced value. A
-    reference is just a callable taking the context, so anything more involved
-    (`this.n * 2`, say) is written as a function: `lambda ctx: ctx.n * 2`.
-    In particular, `this.n == 0` compares two references and gives a plain
-    bool; write `lambda ctx: ctx.n == 0` instead.
-    """
-
-    __slots__ = ("__path",)
-    __path: tuple[str, ...]
-
-    def __init__(self, path: tuple[str, ...] = ()):
-        object.__setattr__(self, "_This__path", path)
-
-    def __getattr__(self, name: str) -> "This":
-        if name.startswith("__"):
-            raise AttributeError(name)
-        return This((*self.__path, name))
-
-    def __getitem__(self, name: str) -> "This":
-        return This((*self.__path, name))
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        raise AttributeError("REFERENCES ARE READ-ONLY.")
-
-    # No runtime type check: runs for every `this` reference, once per field that
-    # uses one; the context always comes from pabo itself.
-    @no_type_check
-    def __call__(self, ctx: Context) -> Any:
-        value: Any = ctx
-        for name in self.__path:
-            try:
-                if name == "_":
-                    value = value._
-                elif name == "_root":
-                    value = value._root
-                else:
-                    value = value[name]
-            except (KeyError, AttributeError, TypeError):
-                raise ContextError(f"CANNOT RESOLVE {self!r}.") from None
-            if value is None and name in ("_", "_root"):
-                raise ContextError(f"CANNOT RESOLVE {self!r}: THERE IS NO PARENT.")
-        return value
-
-    def __repr__(self) -> str:
-        return ".".join(("this", *self.__path))
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, This) and self.__path == other.__path
-
-    def __hash__(self) -> int:
-        return hash(self.__path)
-
-
-this = This()
-
-
-# No runtime type check: runs for every dynamic parameter (counts, lengths,
-# conditions) of every field; it accepts Any, so a check would catch nothing.
-@no_type_check
-def evaluate(value: Any, ctx: Context) -> Any:
-    """
-    Return `value`, calling it with the context first if it is callable.
-    """
-
-    if not callable(value):
-        return value
-    try:
-        return value(ctx)
-    except (KeyError, AttributeError) as error:
-        raise ContextError(f"CANNOT EVALUATE {value!r}: {error!r}.") from error

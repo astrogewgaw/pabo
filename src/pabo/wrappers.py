@@ -8,8 +8,8 @@ from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, Stop, readexact, scope
-from pabo.context import evaluate
 from pabo.errors import ConstError, PaboError, SizeofError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Side, Target
 from pabo.numeric import Int
 

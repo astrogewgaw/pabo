@@ -6,6 +6,7 @@ Real formats, written with pabo. Each of these is also in pabo's test suite.
 
 ```python
 import pabo as pb
+from pabo import this
 
 png = pb.Spec(
     {
@@ -39,20 +40,20 @@ fmt = pb.Spec(
         "audio_format": pb.u16,
         "channels": pb.u16,
         "rate": pb.u32,
-        "byte_rate": pb.Rebuild(pb.u32, lambda ctx: ctx.rate * ctx.channels * ctx.bits // 8),
-        "block_align": pb.Rebuild(pb.u16, lambda ctx: ctx.channels * ctx.bits // 8),
+        "byte_rate": pb.Rebuild(pb.u32, this.rate * this.channels * this.bits // 8),
+        "block_align": pb.Rebuild(pb.u16, this.channels * this.bits // 8),
         "bits": pb.u16,
     }
 )
-samples = pb.Spec({"samples": pb.Array(pb.i16, count=lambda ctx: ctx.size // 2)})
+samples = pb.Spec({"samples": pb.Array(pb.i16, count=this.size // 2)})
 
 wav = pb.Spec(
     {
         "riff": pb.Const(b"RIFF", pb.Bytes(4)),
-        "size": pb.Rebuild(pb.u32, lambda ctx: 36 + 2 * len(ctx.data.samples)),
+        "size": pb.Rebuild(pb.u32, 36 + 2 * pb.lenof(this.data.samples)),
         "wave": pb.Const(b"WAVE", pb.Bytes(4)),
         "fmt": chunk(b"fmt ", fmt, lambda ctx: 16),
-        "data": chunk(b"data", samples, lambda ctx: 2 * len(ctx.samples)),
+        "data": chunk(b"data", samples, 2 * pb.lenof(this.samples)),
         "end": pb.Terminated(),
     },
     endian="little",
@@ -70,7 +71,7 @@ its addresses by another. `Switch` picks a body with the right endianness, and
 
 ```python
 def body(endian):
-    is64 = lambda ctx: ctx._.ident.cls == 2
+    is64 = this._.ident.cls == 2
     addr = pb.If(is64, pb.u64, pb.u32)
     return pb.Spec(
         {
@@ -96,7 +97,7 @@ elf = pb.Spec(
                 "pad": pb.Padding(7),
             }
         ),
-        "header": pb.Switch(lambda ctx: ctx.ident.data, {1: body("little"), 2: body("big")}),
+        "header": pb.Switch(this.ident.data, {1: body("little"), 2: body("big")}),
     }
 )
 
@@ -167,7 +168,7 @@ ipv4 = pb.Spec(
         "checksum": pb.u16,
         "source": pb.Bytes(4),
         "destination": pb.Bytes(4),
-        "options": pb.Bytes(lambda ctx: (ctx.vihl.ihl - 5) * 4),
+        "options": pb.Bytes((this.vihl.ihl - 5) * 4),
     },
     endian="big",
 )

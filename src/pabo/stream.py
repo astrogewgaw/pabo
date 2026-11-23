@@ -7,8 +7,9 @@ from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, readexact, tell
-from pabo.context import Context, evaluate
+from pabo.context import Context
 from pabo.errors import PaboError, SizeofError, StreamError
+from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Endian, Whence
 from pabo.specify import Specification
 

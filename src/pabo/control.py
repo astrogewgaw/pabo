@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pabo.base import Construct, Stop, scope, tell
-from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Condition, ContextFunction, Key, Predicate
 
 

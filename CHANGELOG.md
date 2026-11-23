@@ -10,9 +10,10 @@ This release is a rewrite. Code that defines its own constructs needs updating
 
 ### Added
 
-- Fields that depend on other fields: `this.name`, `this._.name`, or any
-  function of the context, accepted wherever a count, length, offset or
-  condition is expected.
+- Fields that depend on other fields: `this.name`, `this._.name`, expressions
+  such as `this.n * 2`, `this.kind == 3` or `lenof(this.data)`, or any function
+  of the context, accepted wherever a count, length, offset or condition is
+  expected.
 - Control flow: `Computed`, `Rebuild`, `If`, `Optional`, `Switch`,
   `RepeatUntil`, `StopIf`, `Terminated`, `Check` and `Validated`.
 - Numbers: integers of any width (`Int(3)`, `Int(16)`), half floats

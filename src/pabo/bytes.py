@@ -5,8 +5,8 @@ Byte manipulation.
 from dataclasses import dataclass
 
 from pabo.base import Construct, readexact
-from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Dynamic
 from pabo.wrappers import Const
 

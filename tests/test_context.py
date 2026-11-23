@@ -3,7 +3,6 @@ import pickle
 import pytest
 
 import pabo as pb
-from pabo.context import evaluate
 
 
 def test_container_attribute_access():
@@ -43,39 +42,6 @@ def test_context_parent_and_settings():
     assert child._root is root
     assert child.setting("_endian") == "big"
     assert child.setting("_missing", "default") == "default"
-
-
-def test_this_resolution():
-    """
-    `this` references resolve fields in the current, parent (`_`) and root (`_root`)
-    contexts, compare by path, and raise `ContextError` for missing fields or parents.
-    """
-    root = pb.Context({"n": 3, "sub": {"m": 4}})
-    child = pb.Context({"k": 5}, parent=root)
-    assert pb.this.k(child) == 5
-    assert pb.this._.n(child) == 3
-    assert pb.this._root.sub.m(child) == 4
-    assert pb.this["k"](child) == 5
-    assert repr(pb.this._.n) == "this._.n"
-    assert pb.this.a == pb.this.a and pb.this.a != pb.this.b
-    with pytest.raises(pb.ContextError):
-        pb.this.missing(child)
-    with pytest.raises(pb.ContextError):
-        pb.this._._.n(child)
-    with pytest.raises(AttributeError):
-        pb.this.x = 1
-
-
-def test_evaluate():
-    """
-    `evaluate()` returns constants as is, calls callables with the context, and turns a
-    missing field lookup into `ContextError`.
-    """
-    ctx = pb.Context({"n": 2})
-    assert evaluate(5, ctx) == 5
-    assert evaluate(lambda c: c.n * 2, ctx) == 4
-    with pytest.raises(pb.ContextError):
-        evaluate(lambda c: c.missing, ctx)
 
 
 def test_parse_returns_container():

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 from pabo.base import Construct, readexact
 from pabo.bytes import Bytes
-from pabo.context import evaluate
 from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Side
 from pabo.numeric import Int
 from pabo.wrappers import Prefixed

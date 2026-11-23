@@ -19,8 +19,9 @@ Be simple, but fast and full of features. **Deliberately avoid features that are
 magical or obscure**, which is where pabo differs from `construct`. The internals
 should stay clean enough that users can become contributors. When adding a feature
 that construct has, prefer the plainest design that covers real use cases over
-matching construct's API one to one. Don't add metaclass tricks, implicit global
-state, or operator overloading beyond what already exists.
+matching construct's API one to one. Don't add metaclass tricks or implicit global
+state. Operator overloading is limited to `Expr` (lazy expressions on `this`) and
+`construct / "docs"`.
 
 ## Layout
 
@@ -29,7 +30,9 @@ src/pabo/
   __init__.py   public API re-exports; beartype_this_package() unless PABO_BEARTYPE=0
   base.py       Construct ABC, readexact(), scope() (adds field paths to errors)
   errors.py     PaboError and subclasses (StreamError, SizeofError, ValidationError, ...)
-  context.py    Container, Context, `this` references, evaluate()
+  context.py    Container, Context
+  expressions.py `this`, Expr (lazy arithmetic/comparisons on the context), lenof,
+                evaluate()
   hints.py      shared type hints: Source/Target, Readable/Writable protocols, Endian,
                 BitOrder, Side, Whence, Dynamic, Condition, Key, Predicate
   numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional 1/2/4-bit packing)
@@ -74,8 +77,8 @@ Constructs that can be built with no value given override `_omittable()` to retu
 True (wrappers delegate it to what they wrap).
 
 `Specification` creates a child `Context` per level (`ctx._` is the parent) and
-stores each field's value under its name, so later fields can use `this.name`
-or any `lambda ctx: ...`. Parameters that may depend on other fields are typed
+stores each field's value under its name, so later fields can use `this.name`,
+expressions such as `this.n * 2` or `lenof(this.data)`, or any `lambda ctx: ...`. Parameters that may depend on other fields are typed
 `Dynamic` and resolved with `evaluate(value, ctx)`. When building, the context
 starts as a copy of the full input dict. Composite constructs wrap each child in
 `with scope(name, stream):` so errors carry the field path and offset.
@@ -197,6 +200,9 @@ which is not committed). Docstring coverage is checked by `interrogate`
 
 - Don't name a construct's dataclass field `size`: it would shadow the `size`
   property (use `length`, as `Transformed` does).
-- `this.n == 0` is a plain bool (references compare by path), not an expression.
+- `==` on an `Expr` builds an expression, so expressions have no truth value
+  (`bool()` raises `TypeError`) and constructs holding them can't be compared with
+  `==`. Don't add public methods or attributes to `Expr`: they would shadow field
+  names in `this.<name>`.
 - `Specification._plan` must give exactly the same results as the field-by-field
   path; when unsure, return None from `_Plan.compile` and let the slow path run.

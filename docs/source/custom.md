@@ -59,7 +59,7 @@ A few conventions keep custom constructs working well with the rest of pabo:
   rely on this to know when to stop.
 - Validate arguments in `__post_init__`.
 - If a parameter may depend on other fields, accept a value or a function and
-  resolve it with `pabo.context.evaluate(value, ctx)`.
+  resolve it with `pabo.expressions.evaluate(value, ctx)`.
 - If your construct wraps others, call their `_parse`/`_build`/`_size` methods
   with the same stream and context, and wrap each child in
   `with pabo.base.scope(name, stream):` so that errors carry the path to it.

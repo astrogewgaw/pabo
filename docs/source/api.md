@@ -17,11 +17,14 @@
    :members: Struct, StructConstruct
 ```
 
-## Context
+## Context and expressions
 
 ```{eval-rst}
 .. automodule:: pabo.context
-   :members: Container, Context, This, evaluate
+   :members: Container, Context
+
+.. automodule:: pabo.expressions
+   :members: Expr, This, lenof, evaluate
 ```
 
 ## Numbers

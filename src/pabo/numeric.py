@@ -11,8 +11,9 @@ from typing import Literal
 import numpy as np
 
 from pabo.base import Construct, T, readexact
-from pabo.context import Context, evaluate
+from pabo.context import Context
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import BitOrder, Dynamic, Endian, NBits
 from pabo.packing import WIDTHS, packbits, unpackbits
 
