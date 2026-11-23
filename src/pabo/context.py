@@ -1,5 +1,13 @@
 """
 Containers, contexts and references to previously parsed fields.
+
+pabo checks type hints at runtime with beartype (see `pabo/__init__.py`). A few
+internal functions here and in `specify.py` are marked `@no_type_check`, which
+tells beartype to skip them: they run once per field (or per attribute access)
+during every parse, only ever receive arguments pabo itself created, and
+checking them made parsing about twice as slow (a PNG header went from about
+2 µs to about 5 µs). Public functions, and the constructors of every construct,
+are still checked.
 """
 
 from collections.abc import Callable
@@ -17,6 +25,8 @@ class Container(dict):
     ordinary attributes and are never stored as keys.
     """
 
+    # No runtime type check (see the module docstring): runs on every attribute
+    # read of a parsed result or context, e.g. each `ctx.n` in a lambda.
     @no_type_check
     def __getattr__(self, name: str) -> Any:
         try:
@@ -25,6 +35,8 @@ class Container(dict):
             raise AttributeError(name) from None
         return Container(value) if type(value) is dict else value
 
+    # No runtime type check: runs on every attribute write, including the
+    # settings each specification stores on its context.
     @no_type_check
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_"):
@@ -55,6 +67,8 @@ class Context(Container):
     that are looked up through the parents with `setting`.
     """
 
+    # No runtime type check: a context is created for every specification parsed,
+    # and the forward reference in the hint is slow for beartype to resolve.
     @no_type_check
     def __init__(self, data: Any = (), parent: "Context | None" = None):
         super().__init__(data)
@@ -67,6 +81,8 @@ class Context(Container):
             ctx = ctx._
         return ctx
 
+    # No runtime type check: called for every specification parsed (endianness,
+    # tracing), and it only reads attributes pabo itself set.
     @no_type_check
     def setting(self, name: str, default: Any = None) -> Any:
         """
@@ -112,6 +128,8 @@ class This:
     def __setattr__(self, name: str, value: Any) -> None:
         raise AttributeError("REFERENCES ARE READ-ONLY.")
 
+    # No runtime type check: runs for every `this` reference, once per field that
+    # uses one; the context always comes from pabo itself.
     @no_type_check
     def __call__(self, ctx: Context) -> Any:
         value: Any = ctx
@@ -145,6 +163,8 @@ this = This()
 Dynamic = int | Callable[[Context], Any]
 
 
+# No runtime type check: runs for every dynamic parameter (counts, lengths,
+# conditions) of every field; it accepts Any, so a check would catch nothing.
 @no_type_check
 def evaluate(value: Any, ctx: Context) -> Any:
     """

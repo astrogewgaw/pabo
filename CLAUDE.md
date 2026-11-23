@@ -177,7 +177,9 @@ which is not committed). Docstring coverage is checked by `interrogate`
 - Code style: `ruff format` and `ruff check` (config in `pyproject.toml`), pyright in
   basic mode, and docstrings on everything public (interrogate enforces this).
 - Hot internal paths (`Context`, `Specification._parsefields`, ...) are marked
-  `@typing.no_type_check` so beartype skips them; keep it that way for speed.
+  `@typing.no_type_check` so beartype skips them; keep it that way for speed. Every
+  such site has a comment saying why (the reasoning is in `context.py`'s docstring).
+  Don't add it to unannotated functions: beartype already ignores those.
 - Commits use [gitmoji](https://gitmoji.dev) prefixes in `:code:` form, for example
   `:bug: Fix bug when reading in arrays.` or `:recycle: Refactoring.`.
 - When you fix a bug or implement a feature listed in `TODO.md`, tick it off there.

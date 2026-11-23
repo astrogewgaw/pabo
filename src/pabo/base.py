@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Generic, TypeVar, no_type_check
+from typing import Any, Generic, TypeVar
 
 from pabo.context import Context
 from pabo.errors import ContextError, PaboError, SizeofError, StreamError
@@ -70,17 +70,14 @@ class scope:
 
     __slots__ = ("docs", "name", "start")
 
-    @no_type_check
     def __init__(self, name, stream, docs=""):
         self.name = name
         self.docs = docs
         self.start = tell(stream)
 
-    @no_type_check
     def __enter__(self):
         return None
 
-    @no_type_check
     def __exit__(self, kind, error, traceback):
         if isinstance(error, PaboError):
             error.path.insert(0, self.name)

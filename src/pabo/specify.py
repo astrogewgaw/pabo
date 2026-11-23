@@ -36,6 +36,7 @@ class Specification(Construct[Container]):
     def __post_init__(self):
         _checkendian(self.endian)
 
+    # No runtime type check: runs for every specification parsed or built.
     @no_type_check
     def _child(self, data, parent) -> Context:
         child = Context(data, parent=parent)
@@ -45,6 +46,7 @@ class Specification(Construct[Container]):
     def _size(self, ctx):
         return self._sizefields(self._child(ctx, ctx._))
 
+    # No runtime type check: internal, called only by pabo with its own context.
     @no_type_check
     def _sizefields(self, child: Context) -> int:
         total = 0
@@ -57,6 +59,8 @@ class Specification(Construct[Container]):
             total += member._size(sub)
         return total
 
+    # No runtime type check: runs on every parse/build of a specification, and its
+    # result is cached, so the check would cost more than the work.
     @no_type_check
     def _plan(self, ctx) -> "_Plan | None":
         """
@@ -68,6 +72,7 @@ class Specification(Construct[Container]):
             self._plans[endian] = _Plan.compile(self.fields, endian)
         return self._plans[endian]
 
+    # No runtime type check: part of the bulk fast path for `Repeat`.
     @no_type_check
     def _parsemany(self, stream, ctx, count: int) -> list | None:
         """
@@ -105,6 +110,7 @@ class Specification(Construct[Container]):
             pass
         return Container(child)
 
+    # No runtime type check: the per-field loop of every build; internal only.
     @no_type_check
     def _buildfields(self, stream, child: Context) -> None:
         for name, member in self.fields.items():
@@ -138,6 +144,7 @@ class Specification(Construct[Container]):
             pass
         return Container(child)
 
+    # No runtime type check: the per-field loop of every parse; internal only.
     @no_type_check
     def _parsefields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
@@ -283,6 +290,7 @@ class _Plan:
             lengths,
         )
 
+    # No runtime type check: the compiled fast path, which exists only for speed.
     @no_type_check
     def unpack(self, stream, ctx: Context) -> bool:
         start = stream.tell()
@@ -298,6 +306,7 @@ class _Plan:
         ctx.update(zip(self.names, values))
         return True
 
+    # No runtime type check: the compiled fast path, which exists only for speed.
     @no_type_check
     def pack(self, ctx: Context) -> bytes | None:
         values = []
