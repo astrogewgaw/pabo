@@ -797,3 +797,631 @@ def test_midi_file():
     assert events[1].body == {"note": 60, "velocity": 64}
     assert events[3].body == {"type": 0x2F, "data": b""}
     assert midi.build(song) == raw
+
+
+# Astronomy and space.
+
+
+def _fitsvalue(text):
+    """
+    The value of a FITS header card (the text after `= `): a string, a logical,
+    an int or a float. Comments after `/` are dropped.
+    """
+    text = text.strip()
+    if text.startswith("'"):
+        return text[1:].split("'")[0].rstrip()
+    text = text.split("/")[0].strip()
+    if text in ("T", "F"):
+        return text == "T"
+    try:
+        return int(text)
+    except ValueError:
+        return float(text)
+
+
+def _fitsheader():
+    """
+    A FITS header: 80-character cards up to `END`, padded with spaces to a
+    multiple of 2880 bytes, plus a dict of its keyword values.
+    """
+    card = pb.PaddedString(80, "ascii", pad=" ")
+    return pb.Spec(
+        {
+            "cards": pb.Aligned(
+                2880,
+                pb.RepeatUntil(lambda c, ctx: c.rstrip() == "END", card),
+                fill=b" ",
+            ),
+            "meta": pb.Computed(
+                lambda ctx: {
+                    c[:8].rstrip(): _fitsvalue(c[10:])
+                    for c in ctx.cards
+                    if c[8:10] == "= "
+                }
+            ),
+        }
+    )
+
+
+def _fitscards(pairs):
+    """
+    Fixed-format FITS cards for (keyword, value) pairs, followed by `END`.
+    """
+    cards = []
+    for key, value in pairs:
+        if isinstance(value, bool):
+            cards.append(f"{key:<8}= {'T' if value else 'F':>20}")
+        elif isinstance(value, str):
+            cards.append(f"{key:<8}= '{value:<8}'")
+        else:
+            cards.append(f"{key:<8}= {value:>20}")
+    return [*cards, "END"]
+
+
+def test_fits_image():
+    """
+    A FITS file with a 16-bit image: the header's cards parse into a dict, `BITPIX`
+    picks the big-endian type, the `NAXISn` values give the number of pixels, and
+    both parts are padded to 2880 bytes.
+    """
+    import math
+
+    import numpy as np
+
+    BITPIX = {8: pb.u8, 16: pb.i16, 32: pb.i32, 64: pb.i64, -32: pb.f32, -64: pb.f64}
+
+    def pixels(ctx):
+        meta = ctx.header.meta
+        return math.prod(meta[f"NAXIS{i}"] for i in range(1, meta["NAXIS"] + 1))
+
+    fits = pb.Spec(
+        {
+            "header": _fitsheader(),
+            "data": pb.Aligned(
+                2880,
+                pb.Switch(
+                    lambda ctx: ctx.header.meta["BITPIX"],
+                    {
+                        bitpix: pb.Array(dtype, count=pixels)
+                        for bitpix, dtype in BITPIX.items()
+                    },
+                ),
+            ),
+        },
+        endian="big",
+    )
+    image = np.arange(12, dtype=">i2").reshape(3, 4) - 6
+    cards = _fitscards(
+        [
+            ("SIMPLE", True),
+            ("BITPIX", 16),
+            ("NAXIS", 2),
+            ("NAXIS1", 4),
+            ("NAXIS2", 3),
+            ("OBJECT", "M31"),
+            ("EXPTIME", 30.5),
+        ]
+    )
+    raw = fits.build({"header": {"cards": cards}, "data": image.ravel()})
+    assert len(raw) == 2 * 2880
+    assert raw[:30] == b"SIMPLE  =                    T"
+    assert raw[8 * 80 : 8 * 80 + 3] == b"   " and raw[-1:] == b"\x00"
+
+    data = fits.parse(raw)
+    assert data.header.meta == {
+        "SIMPLE": True,
+        "BITPIX": 16,
+        "NAXIS": 2,
+        "NAXIS1": 4,
+        "NAXIS2": 3,
+        "OBJECT": "M31",
+        "EXPTIME": 30.5,
+    }
+    # NAXIS1 varies fastest, so the array is (NAXIS2, NAXIS1).
+    assert np.array_equal(data.data.reshape(3, 4), image)
+
+
+def test_fits_binary_table():
+    """
+    A FITS binary table extension, in two steps: the header is parsed first, a row
+    specification is made from its `TFORMn` and `TTYPEn` cards, and the rows are
+    parsed from the table's bytes with it.
+    """
+    TFORM = {
+        "B": pb.u8,
+        "I": pb.i16,
+        "J": pb.i32,
+        "K": pb.i64,
+        "E": pb.f32,
+        "D": pb.f64,
+    }
+
+    def rowspec(meta):
+        fields = {}
+        for i in range(1, meta["TFIELDS"] + 1):
+            form = meta[f"TFORM{i}"]
+            repeat, code = int(form[:-1] or 1), form[-1]
+            if code == "A":
+                field = pb.PaddedString(repeat, "ascii", pad=" ")
+            elif repeat == 1:
+                field = TFORM[code]
+            else:
+                field = pb.Array(TFORM[code], count=repeat)
+            fields[meta.get(f"TTYPE{i}", f"COL{i}")] = field
+        return pb.Spec(fields, endian="big")
+
+    table = pb.Spec(
+        {
+            "header": _fitsheader(),
+            "data": pb.Aligned(
+                2880,
+                pb.Bytes(
+                    lambda ctx: ctx.header.meta["NAXIS1"] * ctx.header.meta["NAXIS2"]
+                ),
+            ),
+        }
+    )
+    cards = _fitscards(
+        [
+            ("XTENSION", "BINTABLE"),
+            ("BITPIX", 8),
+            ("NAXIS", 2),
+            ("NAXIS1", 20),
+            ("NAXIS2", 3),
+            ("PCOUNT", 0),
+            ("GCOUNT", 1),
+            ("TFIELDS", 3),
+            ("TTYPE1", "ID"),
+            ("TFORM1", "1J"),
+            ("TTYPE2", "NAME"),
+            ("TFORM2", "8A"),
+            ("TTYPE3", "FLUX"),
+            ("TFORM3", "1D"),
+        ]
+    )
+    rows = [{"ID": i, "NAME": f"SRC{i}", "FLUX": 1.5 * i} for i in range(3)]
+    header = _fitsheader()
+    meta = header.parse(header.build({"cards": cards})).meta
+    data = pb.Repeat(rowspec(meta), len(rows)).build(rows)
+    raw = table.build({"header": {"cards": cards}, "data": data})
+    assert len(raw) == 2 * 2880
+
+    hdu = table.parse(raw)
+    meta = hdu.header.meta
+    assert meta["XTENSION"] == "BINTABLE" and meta["NAXIS1"] == 20
+    assert pb.Repeat(rowspec(meta), meta["NAXIS2"]).parse(hdu.data) == rows
+
+
+def test_ccsds_space_packets():
+    """
+    CCSDS space packets: a 6-byte header of bit fields whose length field is the
+    data length minus one. A packet builds to the expected bytes and a stream of
+    them parses with `Greedy`.
+    """
+    this = pb.this
+    packet = pb.Spec(
+        {
+            "header": pb.BitStruct(
+                {
+                    "version": pb.BitInt(3),
+                    "type": pb.BitInt(1),
+                    "secondary": pb.BitFlag(),
+                    "apid": pb.BitInt(11),
+                    "sequence": pb.BitInt(2),
+                    "count": pb.BitInt(14),
+                }
+            ),
+            "length": pb.Rebuild(pb.u16, pb.lenof(this.data) - 1),
+            "data": pb.Bytes(this.length + 1),
+        },
+        endian="big",
+    )
+    header = {
+        "version": 0,
+        "type": 0,
+        "secondary": True,
+        "apid": 0x123,
+        "sequence": 3,
+        "count": 42,
+    }
+    raw = packet.build({"header": header, "data": b"hello"})
+    # 000 0 1 00100100011 | 11 00000000101010 | length 4
+    assert raw == bytes.fromhex("0923 c02a 0004") + b"hello"
+    stream = raw + packet.build({"header": {**header, "count": 43}, "data": b"!"})
+    packets = pb.Greedy(packet).parse(stream)
+    assert [p.header.count for p in packets] == [42, 43]
+    assert packets[1].length == 0 and packets[1].data == b"!"
+
+
+def test_vdif_frame():
+    """
+    A VDIF frame: a header of four little-endian words of bit fields (and four
+    more of extended data, unless the legacy bit is set), with its time computed
+    from the reference epoch, then 2-bit samples, oldest in the lowest bits.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    import numpy as np
+
+    this = pb.this
+
+    def word(fields):
+        return pb.BitStruct(fields, bitorder="little")
+
+    def start(ctx):
+        epoch = ctx.header.w1.epoch  # half-years since 2000
+        origin = datetime(
+            2000 + epoch // 2, 1 + 6 * (epoch % 2), 1, tzinfo=timezone.utc
+        )
+        return origin + timedelta(seconds=ctx.header.w0.seconds)
+
+    header = pb.Spec(
+        {
+            "w0": word(
+                {
+                    "seconds": pb.BitInt(30),
+                    "legacy": pb.BitFlag(),
+                    "invalid": pb.BitFlag(),
+                }
+            ),
+            "w1": word(
+                {
+                    "frame": pb.BitInt(24),
+                    "epoch": pb.BitInt(6),
+                    "unassigned": pb.BitPadding(2),
+                }
+            ),
+            "w2": word(
+                {
+                    "length": pb.BitInt(24),
+                    "log2nchan": pb.BitInt(5),
+                    "version": pb.BitInt(3),
+                }
+            ),
+            "w3": word(
+                {
+                    "station": pb.BitInt(16),
+                    "thread": pb.BitInt(10),
+                    "bitsm1": pb.BitInt(5),
+                    "complex": pb.BitFlag(),
+                }
+            ),
+            "extended": pb.If(this.w0.legacy == 0, pb.Bytes(16)),
+        }
+    )
+    frame = pb.Spec(
+        {
+            "header": header,
+            "time": pb.Computed(start),
+            "samples": pb.Array(
+                pb.u8,
+                count=lambda ctx: (
+                    4 * (8 * ctx.header.w2.length - header.sizeof(ctx.header))
+                ),
+                packing=2,
+                bitorder="little",
+            ),
+        }
+    )
+    samples = (np.arange(128) % 4).astype(np.uint8)
+    values = {
+        "header": {
+            "w0": {"seconds": 12345, "legacy": False, "invalid": False},
+            "w1": {"frame": 7, "epoch": 49},
+            "w2": {"length": 8, "log2nchan": 0, "version": 0},
+            "w3": {"station": 0x4767, "thread": 1, "bitsm1": 1, "complex": False},
+            "extended": bytes(16),
+        },
+        "samples": samples,
+    }
+    raw = frame.build(values)
+    assert len(raw) == 8 * 8
+    assert raw[:4] == (12345).to_bytes(4, "little")
+    assert raw[4:8] == (7 | 49 << 24).to_bytes(4, "little")
+    assert raw[12:16] == (0x4767 | 1 << 16 | 1 << 26).to_bytes(4, "little")
+    assert raw[32] == 0b11_10_01_00  # samples 0, 1, 2, 3 from bit 0 up
+    data = frame.parse(raw)
+    # Epoch 49 is the second half of 2024.
+    assert data.time == datetime(2024, 7, 1, 3, 25, 45, tzinfo=timezone.utc)
+    assert data.header.w3.bitsm1 + 1 == 2 and np.array_equal(data.samples, samples)
+
+    # In legacy mode, the header is 16 bytes and the data 48.
+    values["header"]["w0"]["legacy"] = True
+    del values["header"]["extended"]
+    values["samples"] = (np.arange(4 * 48) % 4).astype(np.uint8)
+    legacy = frame.parse(frame.build(values))
+    assert legacy.header.extended is None and len(legacy.samples) == 4 * 48
+
+
+def _dafspec():
+    """
+    A SPICE DAF (here an SPK ephemeris): the file record, then the first summary
+    record and its names, in the byte order the file record states.
+    """
+    this = pb.this
+
+    def body(endian):
+        summary = pb.Spec(
+            {
+                "start": pb.f64,  # TDB seconds past J2000
+                "stop": pb.f64,
+                "target": pb.i32,
+                "center": pb.i32,
+                "frame": pb.i32,
+                "type": pb.i32,
+                "begin": pb.i32,  # 1-based 8-byte word addresses
+                "end": pb.i32,
+            }
+        )
+        return pb.Spec(
+            {
+                "nd": pb.Const(2, pb.i32),
+                "ni": pb.Const(6, pb.i32),
+                "name": pb.PaddedString(60, "ascii", pad=" "),
+                "fward": pb.i32,
+                "bward": pb.i32,
+                "free": pb.i32,
+                "format": pb.Bytes(8),
+                "prenul": pb.Padding(603),
+                "ftp": pb.Const(
+                    b"FTPSTR:\r:\n:\r\n:\r\x00:\x81:\x10\xce:ENDFTP", pb.Bytes(28)
+                ),
+                "pstnul": pb.Padding(297),
+                "record": pb.Pointer(
+                    (this.fward - 1) * 1024,
+                    pb.Spec(
+                        {
+                            "next": pb.f64,
+                            "prev": pb.f64,
+                            "nsum": pb.f64,
+                            "summaries": pb.Repeat(summary, lambda ctx: int(ctx.nsum)),
+                        }
+                    ),
+                ),
+                "names": pb.Pointer(
+                    this.fward * 1024,
+                    pb.Repeat(
+                        pb.PaddedString(40, "ascii", pad=" "),
+                        lambda ctx: int(ctx.record.nsum),
+                    ),
+                ),
+            },
+            endian=endian,
+        )
+
+    return pb.Spec(
+        {
+            "id": pb.PaddedString(8, "ascii", pad=" "),
+            "format": pb.Peek(pb.Pointer(88, pb.PaddedString(8, "ascii"))),
+            "body": pb.Switch(
+                this.format, {"LTL-IEEE": body("little"), "BIG-IEEE": body("big")}
+            ),
+        }
+    )
+
+
+def test_spice_daf():
+    """
+    A small SPK file, written by hand in both byte orders: the file record's byte
+    order string picks the endianness, and pointers follow it to the summary and
+    name records.
+    """
+    import struct
+
+    daf = _dafspec()
+    ftp = b"FTPSTR:\r:\n:\r\n:\r\x00:\x81:\x10\xce:ENDFTP"
+    for prefix, fmt in (("<", b"LTL-IEEE"), (">", b"BIG-IEEE")):
+        record = (
+            b"DAF/SPK "
+            + struct.pack(prefix + "ii", 2, 6)
+            + b"NIO2SPK".ljust(60)
+            + struct.pack(prefix + "iii", 2, 2, 1000)
+            + fmt
+            + bytes(603)
+            + ftp
+            + bytes(297)
+        )
+        summaries = struct.pack(prefix + "ddd", 0, 0, 2) + b"".join(
+            struct.pack(prefix + "dd6i", -3e9, 3e9, target, 0, 1, 2, begin, begin + 99)
+            for target, begin in ((399, 385), (301, 485))
+        )
+        names = b"EARTH".ljust(40) + b"MOON".ljust(40)
+        raw = record + summaries.ljust(1024, b"\x00") + names.ljust(1024, b" ")
+        assert len(record) == 1024
+
+        data = daf.parse(raw)
+        assert data.id == "DAF/SPK" and data.format == fmt.decode()
+        body = data.body
+        assert body.name == "NIO2SPK" and body.fward == 2 and body.free == 1000
+        assert [s.target for s in body.record.summaries] == [399, 301]
+        assert (
+            body.record.summaries[1].begin == 485
+            and body.record.summaries[0].start == -3e9
+        )
+        assert body.names == ["EARTH", "MOON"]
+
+
+def test_ser_video():
+    """
+    A SER video (from planetary cameras): a 178-byte little-endian header, 16-bit
+    frames, and the optional trailer of per-frame UTC times, stored as 100 ns ticks
+    since the year 1 (of which only the low 62 bits are used).
+    """
+    import struct
+    from datetime import datetime, timedelta, timezone
+
+    import numpy as np
+
+    this = pb.this
+    ticks = pb.Timestamp(
+        pb.Adapted(
+            pb.i64,
+            lambda t: (t & (2**62 - 1)) // 10,  # 100 ns ticks to microseconds
+            lambda us: us * 10,
+        ),
+        epoch=datetime(1, 1, 1),
+        unit="us",
+    )
+    ser = pb.Spec(
+        {
+            "id": pb.Const(b"LUCAM-RECORDER", pb.Bytes(14)),
+            "luid": pb.i32,
+            "color": pb.i32,  # 0 is mono, 8-19 Bayer patterns, 100 RGB, 101 BGR
+            "littleendian": pb.i32,
+            "width": pb.i32,
+            "height": pb.i32,
+            "depth": pb.i32,  # bits per pixel per plane
+            "nframes": pb.i32,
+            "observer": pb.PaddedString(40, "ascii"),
+            "instrument": pb.PaddedString(40, "ascii"),
+            "telescope": pb.PaddedString(40, "ascii"),
+            "start": ticks,  # local time
+            "start_utc": ticks,
+            "frames": pb.Repeat(
+                pb.Array(pb.u16, count=this.width * this.height), this.nframes
+            ),
+            "times": pb.Optional(pb.Repeat(ticks, this.nframes)),
+        },
+        endian="little",
+    )
+    start = datetime(2024, 3, 1, 21, 0, tzinfo=timezone.utc)
+    frames = [np.full(6, 1000 * i, dtype="<u2") for i in range(3)]
+    values = {
+        "luid": 0,
+        "color": 0,
+        "littleendian": 0,
+        "width": 3,
+        "height": 2,
+        "depth": 12,
+        "nframes": 3,
+        "observer": "pabo",
+        "instrument": "camera",
+        "telescope": "C11",
+        "start": start,
+        "start_utc": start,
+        "frames": frames,
+        "times": [start + timedelta(milliseconds=20 * i) for i in range(3)],
+    }
+    raw = ser.build(values)
+    assert len(raw) == 178 + 3 * 12 + 3 * 8
+    assert raw[42:46] == b"pabo" and raw[46:82] == bytes(36)
+    # 2024-03-01T21:00 as .NET ticks.
+    elapsed = start.replace(tzinfo=None) - datetime(1, 1, 1)
+    expected = (elapsed.days * 86400 + elapsed.seconds) * 10**7
+    assert struct.unpack("<q", raw[170:178])[0] == expected
+
+    data = ser.parse(raw)
+    assert data.depth == 12 and data.frames[2][0] == 2000
+    assert data.times[1] == start + timedelta(milliseconds=20)
+    # The trailer is optional.
+    assert ser.parse(raw[: -3 * 8]).times is None
+    # The top two bits of a timestamp (a .NET DateTimeKind) are ignored.
+    flagged = raw[:170] + struct.pack("<q", expected | 1 << 62) + raw[178:]
+    assert ser.parse(flagged).start_utc == start
+
+
+def test_mark5b_frame():
+    """
+    A Mark 5B frame: four little-endian header words (a sync word, bit fields,
+    and a BCD time code whose day is the MJD modulo 1000), then 10,000 bytes of
+    data. The time needs the thousands of the MJD from elsewhere.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    def bcd(wraps):
+        """
+        Decimal digits stored one per 4 bits (BCD), as an int.
+        """
+        return pb.Adapted(wraps, lambda v: int(f"{v:x}"), lambda d: int(str(d), 16))
+
+    mark5b = pb.Spec(
+        {
+            "sync": pb.Const(0xABADDEED, pb.u32),
+            "w1": pb.BitStruct(
+                {
+                    "frame": pb.BitInt(15),
+                    "tvg": pb.BitFlag(),
+                    "user": pb.BitInt(12),
+                    "years": pb.BitInt(4),  # since 2000, in later recorders
+                },
+                bitorder="little",
+            ),
+            "jjjsssss": bcd(pb.u32),  # MJD % 1000, then seconds of the day
+            "crc": pb.u16,
+            "fraction": bcd(pb.u16),  # .SSSS, in units of 0.1 ms
+            "data": pb.Bytes(10000),
+        },
+        endian="little",
+    )
+    header = {
+        "w1": {"frame": 5, "tvg": False, "user": 0xABC, "years": 4},
+        "jjjsssss": 46012345,  # MJD ...460, second 12345
+        "crc": 0xBEEF,
+        "fraction": 1250,
+    }
+    raw = mark5b.build({**header, "data": bytes(10000)})
+    assert len(raw) == 10016
+    assert raw[:4] == b"\xed\xde\xad\xab"
+    assert raw[8:12] == bytes.fromhex("45230146")  # BCD 0x46012345, little-endian
+    assert raw[12:16] == bytes.fromhex("efbe 5012")
+
+    data = mark5b.parse(raw)
+    assert data.w1.frame == 5 and data.w1.years == 4 and data.fraction == 1250
+    mjd = 60000 + data.jjjsssss // 100000  # the thousands come from elsewhere
+    seconds = data.jjjsssss % 100000 + data.fraction / 10000
+    time = datetime(1858, 11, 17, tzinfo=timezone.utc) + timedelta(mjd, seconds)
+    assert time == datetime(2024, 5, 30, 3, 25, 45, 125000, tzinfo=timezone.utc)
+
+
+def test_psrdada_file():
+    """
+    A PSRDADA file: an ASCII header of `KEY value` lines (with `#` comments),
+    padded with NULs to `HDR_SIZE` bytes, a size given in the header itself, then
+    8-bit samples.
+    """
+    import numpy as np
+
+    this = pb.this
+
+    def parse(text):
+        pairs = (line.split("#")[0].split(None, 1) for line in text.splitlines())
+        return {pair[0]: pair[1].strip() for pair in pairs if len(pair) == 2}
+
+    def format(header):
+        return "".join(f"{key} {value}\n" for key, value in header.items())
+
+    dada = pb.Spec(
+        {
+            # HDR_SIZE is inside the header, so peek at the text up to the first
+            # NUL to find it before reading the whole block.
+            "size": pb.Peek(
+                pb.Adapted(
+                    pb.CString("ascii"), lambda t: int(parse(t)["HDR_SIZE"]), str
+                )
+            ),
+            "header": pb.Adapted(pb.PaddedString(this.size, "ascii"), parse, format),
+            "data": pb.Array(pb.i8),
+        }
+    )
+    text = (
+        "# A test observation\n"
+        "HDR_VERSION 1.0\n"
+        "HDR_SIZE    4096\n"
+        "UTC_START   2024-03-01-21:00:00\n"
+        "OBS_OFFSET  0\n"
+        "NBIT        8\n"
+        "NCHAN       4\n"
+        "NPOL        1\n"
+        "NDIM        1\n"
+        "TSAMP       64.0     # microseconds\n"
+        "SOURCE      J0437-4715\n"
+    )
+    samples = np.arange(-8, 8, dtype=np.int8)
+    raw = text.encode().ljust(4096, b"\x00") + samples.tobytes()
+
+    data = dada.parse(raw)
+    assert data.size == 4096
+    assert data.header["TSAMP"] == "64.0" and data.header["SOURCE"] == "J0437-4715"
+    assert int(data.header["NCHAN"]) == 4 and np.array_equal(data.data, samples)
+    rebuilt = dada.build({"size": 4096, "header": data.header, "data": samples})
+    assert len(rebuilt) == 4096 + 16 and dada.parse(rebuilt).header == data.header
