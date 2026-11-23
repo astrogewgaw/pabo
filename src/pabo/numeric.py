@@ -13,8 +13,8 @@ import numpy as np
 from pabo.base import Construct, T, readexact
 from pabo.context import Context, evaluate
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
-from pabo.hints import BitOrder, Dynamic, Endian
-from pabo.packing import packbits, unpackbits
+from pabo.hints import BitOrder, Dynamic, Endian, NBits
+from pabo.packing import WIDTHS, packbits, unpackbits
 
 ENDIANS = {"little": "<", "big": ">", "native": "="}
 INT_CODES = {1: "b", 2: "h", 4: "i", 8: "q"}
@@ -228,16 +228,15 @@ class Array(Construct[np.ndarray]):
     Represents an array of fixed-width numbers.
 
     A negative `count` reads until the end of the stream. If `packing` is set
-    (any number of bits from 1 up to the width of `dtype`), each element is
-    stored in that many bits, `bitorder` decides whether the first element sits
-    in the most ("big") or least ("little") significant bits of each byte, and
-    the values are returned as `dtype`. Packings of 1, 2 and 4 bits use the
-    fast C++ extension. See `pabo.packing` for the exact layout.
+    (1, 2 or 4 bits), each element is stored in that many bits, `bitorder`
+    decides whether the first element sits in the most ("big") or least
+    ("little") significant bits of each byte, and the values are returned as
+    `dtype`. Packing uses the C++ extension; see `pabo.packing` for the layout.
     """
 
     dtype: Int | Float
     count: Dynamic = -1
-    packing: int | None = None
+    packing: NBits | None = None
     bitorder: BitOrder = "big"
 
     def __post_init__(self):
@@ -246,10 +245,9 @@ class Array(Construct[np.ndarray]):
         if self.packing is not None:
             if not isinstance(self.dtype, Int):
                 raise PaboError("ONLY INTEGER ARRAYS CAN BE PACKED.")
-            if not 1 <= self.packing <= 8 * self.dtype.width:
+            if self.packing not in WIDTHS:
                 raise PaboError(
-                    f"UNSUPPORTED PACKING {self.packing}. MUST BE FROM 1 TO "
-                    f"{8 * self.dtype.width} BITS FOR {self.dtype.width}-BYTE ELEMENTS."
+                    f"UNSUPPORTED PACKING {self.packing}. MUST BE 1, 2 OR 4 BITS."
                 )
         _checkbitorder(self.bitorder)
 

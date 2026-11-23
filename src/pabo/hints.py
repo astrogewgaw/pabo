@@ -13,6 +13,7 @@ The aliases are:
 - ``Target``: where ``build`` writes to (None, a path, or a ``Writable``).
 - ``Endian``: ``"little"``, ``"big"`` or ``"native"``.
 - ``BitOrder``: ``"big"`` or ``"little"``.
+- ``NBits``: 1, 2 or 4, the bit widths that can be packed.
 - ``Side``: ``"right"`` or ``"left"``.
 - ``Whence``: 0, 1 or 2, as for ``io.IOBase.seek``.
 - ``ContextFunction``: a function of the context.
@@ -69,6 +70,9 @@ Endian = Literal["little", "big", "native"]
 
 # Order of bits within a byte: "big" puts the first value in the most significant bits.
 BitOrder = Literal["big", "little"]
+
+# How many bits each value takes when packed.
+NBits = Literal[1, 2, 4]
 
 # Which side padding goes on.
 Side = Literal["right", "left"]

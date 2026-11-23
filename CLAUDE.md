@@ -32,7 +32,7 @@ src/pabo/
   context.py    Container, Context, `this` references, evaluate()
   hints.py      shared type hints: Source/Target, Readable/Writable protocols, Endian,
                 BitOrder, Side, Whence, Dynamic, Condition, Key, Predicate
-  numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional packing)
+  numeric.py    Int (any width), Float, VarInt, ZigZag, Array (numpy, optional 1/2/4-bit packing)
   bits.py       Bits (one 0/1 byte per bit), BitStruct with BitInt/BitFlag/BitPadding
   bytes.py      Bytes, GreedyBytes, Flag, Padding
   strings.py    CString, Line, PaddedString, PascalString, GreedyString
@@ -46,7 +46,7 @@ src/pabo/
   control.py    Computed, Rebuild, If, Optional, Switch, RepeatUntil, StopIf, Check, ...
   adapters.py   Enum, FlagsEnum, Timestamp
   stream.py     Seek, Tell, Pointer, Peek, Aligned, Lazy/LazyValue
-  packing.py    packbits/unpackbits: any nbits (C++ fast path for 1/2/4, else numpy)
+  packing.py    packbits/unpackbits for 1, 2 or 4 bits (C++); other widths are rejected
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
 tests/          one test_<module>.py per source module (incl. test_packed.py)

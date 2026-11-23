@@ -8,18 +8,17 @@ from pabo.errors import PaboError
 from pabo.packing import packbits, unpackbits
 
 
-@pytest.mark.parametrize("nbits", [1, 2, 3, 4, 5, 7, 8, 12, 16, 33, 64])
+@pytest.mark.parametrize("nbits", [1, 2, 4])
 @pytest.mark.parametrize("bitorder", ["big", "little"])
 def test_roundtrip(nbits, bitorder):
     """
-    `packbits` and `unpackbits` round-trip random values for widths from 1 to 64 bits,
-    including the fast-path ones, in both bit orders, using `count * nbits / 8` bytes.
+    `packbits` and `unpackbits` round-trip random values for 1, 2 and 4 bits, in both
+    bit orders, using `count * nbits / 8` bytes.
     """
 
     rng = np.random.default_rng(nbits)
     count = 8 * 3
-    high = 2**nbits if nbits < 64 else 2**63
-    values = rng.integers(0, high, size=count, dtype=np.uint64)
+    values = rng.integers(0, 2**nbits, size=count, dtype=np.uint8)
     raw = packbits(values, nbits, bitorder)
     assert len(raw) == count * nbits // 8
     np.testing.assert_array_equal(unpackbits(raw, nbits, bitorder)[:count], values)
@@ -55,33 +54,36 @@ def test_fast_path_layout_matches_documented_bit_order():
 
 def test_errors():
     """
-    `packbits` raises `PaboError` for values too large or negative, and `unpackbits` for
-    `nbits` of zero or an unknown bit order.
+    `packbits` raises `PaboError` for values too large or negative, and both reject
+    any width other than 1, 2 or 4 bits, and an unknown bit order.
     """
 
     with pytest.raises(PaboError):
         packbits([4], 2)
     with pytest.raises(PaboError):
-        packbits([-1], 3)
-    with pytest.raises(PaboError):
-        unpackbits(b"\x00", 0)
+        packbits([-1], 2)
+    for nbits in (0, 3, 8, 12):
+        with pytest.raises((PaboError, BeartypeCallHintParamViolation)):
+            unpackbits(b"\x00", nbits)
+        with pytest.raises((PaboError, BeartypeCallHintParamViolation)):
+            packbits([0], nbits)
     with pytest.raises((PaboError, BeartypeCallHintParamViolation)):
         unpackbits(b"\x00", 3, "middle")
 
 
 @given(
-    nbits=st.integers(1, 64),
+    nbits=st.sampled_from([1, 2, 4]),
     bitorder=st.sampled_from(["big", "little"]),
     data=st.data(),
 )
 def test_roundtrip_property(nbits, bitorder, data):
     """
-    For any width from 1 to 64 bits, either bit order and any values that fit,
+    For 1, 2 and 4 bits, either bit order and any values that fit,
     `packbits` uses the fewest whole bytes and `unpackbits` recovers the values.
     """
 
     values = data.draw(st.lists(st.integers(0, 2**nbits - 1), max_size=40))
-    raw = packbits(np.array(values, dtype=np.uint64), nbits, bitorder)
+    raw = packbits(np.array(values, dtype=np.uint8), nbits, bitorder)
     assert len(raw) == -(-len(values) * nbits // 8)
     np.testing.assert_array_equal(
         unpackbits(raw, nbits, bitorder)[: len(values)], values

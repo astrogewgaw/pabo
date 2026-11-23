@@ -49,8 +49,8 @@ is none. There are short aliases for common numbers: `pb.u8`, `pb.u16be`,
 endianness of the enclosing specification.
 
 An `Array` with a negative `count` (the default) reads to the end of the stream.
-With `packing`, each element is stored in that many bits (1, 2 and 4 bits use a
-fast C++ extension; other widths work too):
+With `packing`, each element is stored in 1, 2 or 4 bits, unpacked by a fast
+C++ extension (other widths raise an error):
 
 ```python
 nibbles = pb.Array(pb.u8, count=4, packing=4)

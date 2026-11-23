@@ -10,7 +10,7 @@ most of the same ground. The two differ mainly in how much magic they use.
 | Results | `Container` | `Container` (a `dict`), or a dataclass with `Struct` |
 | Default endianness | per field | per field, or per `Spec(..., endian=...)` |
 | Large arrays | lists of Python objects | numpy arrays, zero-copy from memory-mapped files |
-| Bit-packed data | `BitStruct`, `Bitwise` | `BitStruct`, and `Array(..., packing=n)` with a C++ fast path |
+| Bit-packed data | `BitStruct`, `Bitwise` | `BitStruct`, and `Array(..., packing=n)` for 1, 2 or 4 bits, in C++ |
 | Speed | interpreted, or `.compile()` | fixed-size specifications are compiled automatically |
 | Errors | path in the message | path, offset and docs, plus `trace=True` and `describe()` |
 | Type checking | none | public API checked at runtime with beartype, ships `py.typed` |

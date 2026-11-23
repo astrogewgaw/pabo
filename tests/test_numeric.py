@@ -296,37 +296,17 @@ def test_packed_array_validation():
         pb.Array(pb.Int(1), count=2, packing=2).build([1, 4])
     with pytest.raises(pb.PaboError):
         pb.Array(pb.Float(4), packing=2)
-    with pytest.raises(pb.PaboError):
-        pb.Array(pb.Int(1), packing=9)
-    with pytest.raises(pb.PaboError):
-        pb.Array(pb.Int(1), packing=0)
 
 
-@pytest.mark.parametrize("packing", [3, 5, 12, 16])
-@pytest.mark.parametrize("bitorder", ["big", "little"])
-def test_arbitrary_packing(packing, bitorder):
+@pytest.mark.parametrize("packing", [0, 3, 5, 8, 12, 16])
+def test_unsupported_packing_is_rejected(packing):
     """
-    `Array`s packed at widths without a fast path (3, 5, 12, 16 bits) round-trip in both
-    bit orders, and values that do not fit raise `ValidationError`.
+    Only 1, 2 and 4-bit packing is supported; any other width is rejected when the
+    `Array` is created.
     """
 
-    c = pb.Array(pb.Int(2), count=7, packing=packing, bitorder=bitorder)
-    values = [(i * 37) % (1 << packing) for i in range(7)]
-    raw = c.build(values)
-    assert len(raw) == c.size == -(-7 * packing // 8)
-    np.testing.assert_array_equal(c.parse(raw), values)
-    with pytest.raises(pb.ValidationError):
-        c.build([1 << packing] * 7)
-
-
-def test_12_bit_packing_layout():
-    """
-    12-bit packing with the default big bit order lays values out MSB first across
-    byte boundaries.
-    """
-
-    c = pb.Array(pb.Int(2), count=2, packing=12)
-    assert c.build([0xABC, 0x123]) == b"\xab\xc1\x23"
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Array(pb.Int(2), count=7, packing=packing)
 
 
 def test_packed_array_greedy():
@@ -433,7 +413,7 @@ def test_zigzag_roundtrip_property(value):
 
 
 @given(
-    packing=st.integers(1, 16),
+    packing=st.sampled_from([1, 2, 4]),
     bitorder=st.sampled_from(["big", "little"]),
     data=st.data(),
 )

@@ -22,8 +22,9 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - `Enum`, `FlagsEnum` and `Timestamp` (Unix, MJD or any epoch).
 - `GreedyBytes`, `GreedyString`, and a configurable pad character and side for
   `Padded` and `PaddedString`.
-- `BitStruct` with `BitInt`, `BitFlag` and `BitPadding`, and bit packing of any
-  width in `Array` (1, 2 and 4 bits use the C++ extension).
+- `BitStruct` with `BitInt`, `BitFlag` and `BitPadding` (fields of any number
+  of bits), and a `bitorder` option for bit-packed `Array`s, which support 1, 2
+  and 4 bits per value (other widths raise an error).
 - Stream positioning: `Seek`, `Tell`, `Pointer`, `Peek`, `Aligned`,
   `AlignedSpec` and `Lazy`.
 - `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed`.
