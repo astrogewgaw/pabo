@@ -46,17 +46,19 @@ png = pb.Spec(
             b"\x89PNG\x0d\x0a\x1a\x0a",
             pb.Bytes(8),
         ),
-        "ihdr_size": pb.Int(4, endian="big"),
+        "ihdr_size": pb.Int(4),
         "ihdr_id": pb.Const(b"IHDR", pb.Bytes(4)),
-        "width": pb.Int(4, endian="big"),
-        "height": pb.Int(4, endian="big"),
-    }
+        "width": pb.Int(4),
+        "height": pb.Int(4),
+    },
+    endian="big",
 )
 
 data = png.parse("example.png")
 ```
 
-which would return a dictionary with the parsed data, like so:
+which would return a dictionary (whose keys are also attributes, so
+`data.width` works too) with the parsed data, like so:
 
 ```python
 {
@@ -67,6 +69,52 @@ which would return a dictionary with the parsed data, like so:
     "height": 172,
 }
 ```
+
+The same specification turns data back into bytes. Constants can be left out:
+
+```python
+png.build({"ihdr_size": 13, "width": 602, "height": 172})
+```
+
+Fields can depend on the ones before them, for formats that store a length or
+a type ahead of the data:
+
+```python
+from pabo import lenof, this
+
+message = pb.Spec(
+    {
+        "length": pb.Rebuild(pb.u8, lenof(this.payload)),
+        "payload": pb.Bytes(this.length),
+        "checksum": pb.If(this.length > 2, pb.u16),
+    }
+)
+
+message.parse(b"\x03abc\x01\x00")  # {'length': 3, 'payload': b'abc', 'checksum': 1}
+message.build({"payload": b"ab"})  # b'\x02ab'
+```
+
+You can also write specifications as classes, and get typed dataclasses back:
+
+```python
+class PNGHeader(pb.Struct, endian="big"):
+    magic: bytes = pb.Const(b"\x89PNG\r\n\x1a\n", pb.Bytes(8))
+    ihdr_size: int = pb.u32
+    ihdr_id: bytes = pb.Const(b"IHDR", pb.Bytes(4))
+    width: int = pb.u32
+    height: int = pb.u32
+
+
+header = PNGHeader.parse("example.png")
+header.width  # 602
+```
+
+Besides numbers, bytes and strings, `pabo` has conditionals (`If`, `Switch`),
+repetition (`Repeat`, `RepeatUntil`, `Greedy`), bit fields (`BitStruct`),
+bit-packed numpy arrays, stream positioning (`Pointer`, `Seek`, `Peek`,
+`Aligned`, `Lazy`), compression and checksums, enums and timestamps. Errors say
+which field failed and at what offset, `spec.describe()` prints the layout,
+and `spec.parse(data, trace=True)` shows every field as it is parsed.
 
 For more real examples, check out the [**`priwo`**][priwo] package, which uses
 `pabo` to parse pulsar data from binary files (in fact, many of `pabo`'s
