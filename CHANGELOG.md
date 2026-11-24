@@ -58,7 +58,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   and encode, predicates, checksum functions, functions of the context) are
   turned into these too, so `Greedy` stops on them and they carry the path.
 - Docs attached with `/` are shown in `repr`, error messages and `describe()`.
-- `describe()`, `parse(..., trace=True)` and `Probe` for debugging, and
+- `describe()`, `parse(..., trace=True)`, `parse(..., offsets=True)` (which
+  records where each field was) and `Probe` for debugging, and
   `sizeof(ctx)` for sizes that depend on the data.
 - Arrays are parsed without copying, like `np.frombuffer`: from bytes (or a
   `bytearray` or `memoryview`) they are read-only views of them, and files

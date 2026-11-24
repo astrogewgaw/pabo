@@ -301,13 +301,16 @@ class Construct(ABC, Generic[T]):
         dst: Source,
         trace: bool | Writable = False,
         strict: bool = False,
+        offsets: bool = False,
         **params: Any,
     ) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
 
         With `strict=True`, bytes left over after the data raise a `StreamError`
-        (by default they are ignored).
+        (by default they are ignored). With `offsets=True`, every `Container`
+        parsed from a specification gets an `_offsets` attribute: a dict from
+        each field's name to its (start, end) offsets in the stream.
 
         Other keyword arguments are parameters: values the data depends on but
         doesn't contain (such as a number of channels known from elsewhere),
@@ -330,6 +333,7 @@ class Construct(ABC, Generic[T]):
 
         ctx = Context()
         ctx.__dict__["_trace"] = trace or None
+        ctx.__dict__["_offsets"] = offsets or None
         if params:
             ctx.__dict__["_params"] = Container(params)
         if isinstance(dst, (bytes, bytearray, memoryview)):

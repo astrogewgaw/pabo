@@ -264,6 +264,8 @@ All errors are subclasses of `PaboError`: `StreamError`, `SizeofError`,
 - `spec.describe()` prints a table of offsets, sizes, types and docs.
 - `spec.parse(data, trace=True)` prints every field as it is parsed, with a hex
   dump of its bytes.
+- `spec.parse(data, offsets=True)` gives every parsed specification an `_offsets`
+  attribute: the (start, end) offsets of each of its fields.
 - `Probe()` prints the context and the next few bytes wherever you put it.
 - `construct / "some docs"` attaches docs to a field; they show up in errors, in
   `describe()` and in the construct's `repr`.

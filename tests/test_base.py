@@ -286,3 +286,27 @@ def test_strict_parse_rejects_leftover_bytes(tmp_path):
         c.parse(path, strict=True)
     with pytest.raises(pb.StreamError):
         c.parse(BytesIO(b"\x01\x00!"), strict=True)
+
+
+def test_parse_with_offsets():
+    """
+    `parse(..., offsets=True)` gives each parsed specification an `_offsets`
+    attribute mapping its fields to their (start, end) offsets, also for nested
+    and repeated ones, and the values are the same as without it.
+    """
+
+    inner = pb.Spec({"x": pb.u16, "y": pb.u8})
+    spec = pb.Spec(
+        {
+            "n": pb.u8,
+            "text": pb.Bytes(pb.this.n),
+            "points": pb.Repeat(inner, 2),
+            "_pad": pb.Padding(1),
+        }
+    )
+    raw = b"\x02hi\x01\x00\x02\x03\x00\x04\x00"
+    data = spec.parse(raw, offsets=True)
+    assert data == spec.parse(raw)
+    assert data._offsets == {"n": (0, 1), "text": (1, 3), "points": (3, 9)}
+    assert data.points[1]._offsets == {"x": (6, 8), "y": (8, 9)}
+    assert not hasattr(spec.parse(raw), "_offsets")

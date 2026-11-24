@@ -149,7 +149,7 @@ class Specification(Construct[Container]):
         and an iterator of value tuples, or return None.
         """
 
-        if ctx.setting("_trace"):
+        if ctx.setting("_trace") or ctx.setting("_offsets"):
             return None
         plan = self._plan(ctx)
         if plan is None or plan.consts or tell(stream) is None:
@@ -240,7 +240,7 @@ class Specification(Construct[Container]):
                 child[name] = member._build(value, stream, child)
 
     def _parse(self, stream, ctx):
-        if not ctx.setting("_trace"):
+        if not ctx.setting("_trace") and not ctx.setting("_offsets"):
             plan = self._plan(ctx)
             if plan is not None:
                 values = plan.unpack(stream)
@@ -253,7 +253,13 @@ class Specification(Construct[Container]):
             pass
         if self._checks is None or self._checks:
             self._checkrebuilds(stream, child)
-        return self._result(Container(child))
+        result = self._result(Container(child))
+        if child.setting("_offsets"):
+            positions = child.__dict__.get("_positions", {})
+            result._offsets = {
+                name: span for name, span in positions.items() if name in result
+            }
+        return result
 
     def _checkrebuilds(self, stream, child: Context) -> None:
         """
@@ -283,13 +289,18 @@ class Specification(Construct[Container]):
     @no_type_check
     def _parsefields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
+        record = child.setting("_offsets")
+        if record:
+            positions = child.__dict__.setdefault("_positions", {})
         for name, member, embedded in self._members():
             if embedded:
                 member.wraps._parsefields(stream, child)
                 continue
-            start = tell(stream) if trace else None
+            start = tell(stream) if trace or record else None
             with scope(name, stream, member.docs):
                 child[name] = member._parse(stream, child)
+            if record:
+                positions[name] = (start, tell(stream))
             if trace:
                 _tracefield(trace, stream, child, name, start, child[name])
 
