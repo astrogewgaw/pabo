@@ -96,16 +96,3 @@ first.
   `PrefixedArray`.)
 - [ ] **Return one field of a sequence**, such as "skip the header, return the
   payload". (construct `FocusedSeq`.)
-
-## Left out on purpose
-
-These go against pabo's aim of being plain, not magical:
-
-- Generating Python code at runtime (construct `compile()`, duckparse, dissect.cstruct):
-  pabo's `_Plan` gets most of the speed without it.
-- Exporting to Kaitai Struct, and reading C declarations or other description
-  languages.
-- Global settings, such as a default endianness (pystructs `configure()`).
-- Operator shorthands such as `Flag()[2:5]` for repeats (structures).
-- Checking values when attributes are set on parsed objects (binmap): it slows
-  every assignment, and `build()` already checks.

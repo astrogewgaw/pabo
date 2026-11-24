@@ -54,7 +54,7 @@ src/pabo/
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)
 tests/          one test_<module>.py per source module (incl. test_packed.py), plus
                 test_cookbook.py for the real formats in the docs' cookbook
-benchmarks/     pytest-benchmark comparisons with struct, numpy and construct;
+benchmarks/     pytest-benchmark comparisons with struct, construct and other libraries;
                 plot.py summarizes a run into results.json and draws the docs plots
                 (ultraplot) into docs/source/_static/benchmarks/
 docs/source/    Sphinx (furo + MyST) docs: tutorial, cookbook, custom, comparison, api
