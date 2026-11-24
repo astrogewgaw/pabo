@@ -9,12 +9,17 @@ from collections.abc import Mapping
 from typing import Any, ClassVar, TypeVar
 
 from pabo.base import Construct
+from pabo.bits import BitFlag, BitInt, BitPadding, BitStruct
 from pabo.context import Container
-from pabo.hints import Endian, Source, Target
+from pabo.errors import PaboError
+from pabo.hints import BitOrder, Endian, Source, Target
 from pabo.specify import Specification
 from pabo.wrappers import Const, Default
 
 S = TypeVar("S", bound="Struct")
+
+# The bit fields, which make a class-based struct a `BitStruct`.
+BITS = (BitInt, BitFlag, BitPadding)
 
 if sys.version_info >= (3, 11):
     from typing import dataclass_transform
@@ -62,7 +67,13 @@ class Struct:
         header.build()                          # back to bytes
 
     Constants and `Default`s default to their value, and other fields that can
-    be built without a value (`Computed`, `Rebuild`, ...) default to None. Subclasses
+    be built without a value (`Computed`, `Rebuild`, ...) default to None. A
+    class whose fields are all bit fields (`BitInt`, `BitFlag`, `BitPadding`)
+    is a `BitStruct`, with its bit order given in the class statement:
+
+        class VersionIHL(pb.Struct, bitorder="big"):
+            version: int = pb.BitInt(4)
+            ihl: int = pb.BitInt(4) Subclasses
     add fields after those of their parents. Use `OtherStruct.construct()` to
     nest one struct in another. The endianness given in the class statement
     applies to the numbers inside that don't set their own. Field names must
@@ -73,27 +84,46 @@ class Struct:
     `# type: ignore[assignment]` to those lines if that matters to you.
     """
 
-    __pabo_fields__: ClassVar[dict[str, Construct]] = {}
-    __pabo_spec__: ClassVar[Specification]
+    __pabo_fields__: ClassVar[dict[str, Any]] = {}
+    __pabo_spec__: ClassVar[Construct]
     __pabo_names__: ClassVar[tuple[str, ...]] = ()
 
-    def __init_subclass__(cls, endian: Endian | None = None, **kwargs: Any):
+    def __init_subclass__(
+        cls,
+        endian: Endian | None = None,
+        bitorder: BitOrder = "big",
+        **kwargs: Any,
+    ):
         super().__init_subclass__(**kwargs)
         inherited = getattr(cls, "__pabo_spec__", None)
-        fields = dict(cls.__pabo_fields__)
+        fields: dict[str, Any] = dict(cls.__pabo_fields__)
         own = {
             name: value
             for name, value in vars(cls).items()
-            if isinstance(value, Construct)
+            if isinstance(value, (Construct, *BITS))
         }
         # Fields starting with an underscore are left out of the result, so they
-        # are not dataclass fields either (and must build without a value).
-        hidden = {name for name in own if name.startswith("_")}
+        # are not dataclass fields either (and must build without a value), and
+        # neither is bit padding.
+        hidden = {
+            name
+            for name, value in own.items()
+            if name.startswith("_") or isinstance(value, BitPadding)
+        }
         fields.update(own)
         cls.__pabo_fields__ = fields
         if endian is None and inherited is not None:
-            endian = inherited.endian
-        cls.__pabo_spec__ = Specification(fields, endian=endian)
+            endian = getattr(inherited, "endian", None)
+        bits = [isinstance(value, BITS) for value in fields.values()]
+        if any(bits) and not all(bits):
+            raise PaboError(
+                f"THE FIELDS OF {cls.__name__} MUST BE ALL BIT FIELDS (BitInt, "
+                "BitFlag, BitPadding) OR NONE."
+            )
+        if fields and all(bits):
+            cls.__pabo_spec__ = BitStruct(fields, bitorder=bitorder)
+        else:
+            cls.__pabo_spec__ = Specification(fields, endian=endian)
 
         try:
             hints = inspect.get_annotations(cls)
@@ -107,7 +137,7 @@ class Struct:
                 continue
             if isinstance(value, (Const, Default)) and _plain(value):
                 setattr(cls, name, dataclasses.field(default=value.value))
-            elif value._omittable():
+            elif isinstance(value, Construct) and value._omittable():
                 setattr(cls, name, dataclasses.field(default=None))
             else:
                 delattr(cls, name)
@@ -191,7 +221,8 @@ class StructConstruct(Construct):
         Parse `count` instances in one go, as `Specification._parsemany` does.
         """
 
-        unpacked = self.cls.__pabo_spec__._unpackmany(stream, ctx, count)
+        many = getattr(self.cls.__pabo_spec__, "_unpackmany", None)
+        unpacked = None if many is None else many(stream, ctx, count)
         if unpacked is None:
             return None
         names, rows = unpacked

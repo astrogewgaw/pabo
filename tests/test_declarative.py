@@ -173,3 +173,35 @@ def test_struct_fields_starting_with_an_underscore():
     assert Packet.parse(raw) == Packet(a=1, b=2)
     assert Packet(a=1, b=2).build() == raw
     assert pb.Repeat(Packet.construct(), 2).parse(raw * 2) == [Packet(a=1, b=2)] * 2
+
+
+def test_struct_of_bit_fields():
+    """
+    A `Struct` whose fields are all bit fields is a `BitStruct` parsing into a
+    dataclass, with the bit order of the class statement; bit padding is not a
+    dataclass field; mixing bit fields with other constructs raises.
+    """
+
+    class Flags(pb.Struct, bitorder="little"):
+        """
+        A byte of flags, least significant bit first.
+        """
+
+        ready: bool = pb.BitFlag()
+        _gap: int = pb.BitPadding(3)
+        level: int = pb.BitInt(4)
+
+    assert [f.name for f in dataclasses.fields(Flags)] == ["ready", "level"]
+    assert Flags.parse(b"\x51") == Flags(ready=True, level=5)
+    assert Flags(ready=True, level=5).build() == b"\x51"
+    nested = pb.Spec({"flags": Flags.construct(), "n": pb.u8})
+    assert nested.parse(b"\x51\x07") == {"flags": Flags(ready=True, level=5), "n": 7}
+    with pytest.raises(pb.PaboError, match="ALL BIT FIELDS"):
+
+        class Mixed(pb.Struct):
+            """
+            Bit fields and bytes together.
+            """
+
+            a: int = pb.BitInt(8)
+            b: int = pb.u8

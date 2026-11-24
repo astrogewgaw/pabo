@@ -48,7 +48,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   `AlignedSpec` and `Lazy`.
 - `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed` (with
   the checksum after or before the data).
-- Class-based specifications with `Struct`, which parse into dataclasses.
+- Class-based specifications with `Struct`, which parse into dataclasses (also
+  for bit fields, as a `BitStruct`).
 - `Embedded`, to merge one specification into another.
 - Results are `Container`s: dicts whose keys are also attributes.
 - Errors say which field failed (`header.sizes[2]`), at what offset, and give

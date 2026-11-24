@@ -13,8 +13,6 @@ first.
   bitstruct, bread, duckparse `Bits[n]`.)
 - [ ] **C alignment**: pad every field to its natural alignment, as a C compiler
   does, for reading memory dumps. (dissect.cstruct `align=True`.)
-- [ ] **`BitStruct`s that parse into dataclasses.** (construct-typing
-  `DataclassBitStruct`.)
 - [ ] **A count-prefixed array**, as shorthand for `Rebuild` + `Repeat`. (construct
   `PrefixedArray`.)
 - [ ] **Return one field of a sequence**, such as "skip the header, return the
