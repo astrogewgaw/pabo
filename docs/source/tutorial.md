@@ -197,7 +197,8 @@ ip_first_byte.parse(b"\x45")    # Container({'version': 4, 'ihl': 5})
 ## Moving around the stream
 
 `Seek`, `Tell`, `Pointer` (parse at an offset and come back), `Peek` (look ahead),
-`Aligned` and `AlignedSpec` (pad to a multiple of some bytes), and `Lazy` (skip a
+`Aligned` and `AlignedSpec` (pad to a multiple of some bytes), `FixedSized` (parse
+inside a window of so many bytes, skipping what isn't used), and `Lazy` (skip a
 field and parse it when asked for) handle formats with offsets and alignment.
 
 ## Transforms and adapters

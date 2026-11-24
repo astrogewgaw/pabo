@@ -8,10 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **A fixed-size window**, `FixedSized(length, wraps)`: parse `wraps` inside
-  `length` bytes and skip what it doesn't use (C structs with reserved tails).
-  `Padded` adds a number of bytes instead of padding to a total. (construct
-  `FixedSized`, Kaitai `size:`.)
 - [ ] **`Union`**: several views of the same bytes, moving on by the largest.
   And `Select`: the first of several alternatives that parses. (construct
   `Union`/`Select`, dissect.cstruct `union`.)

@@ -353,6 +353,49 @@ class Delimited(Construct):
 
 
 @dataclass
+class FixedSized(Construct):
+    """
+    Represents a binary construct inside a window of exactly `length` bytes.
+
+    When parsing, `length` bytes are read and `wraps` is parsed from them; the
+    bytes it doesn't use (such as the reserved tail of a C struct) are skipped.
+    When building, `wraps` is padded with `fill` up to `length` bytes, and may
+    not be longer. Unlike `Padded`, which adds a number of bytes, this pads to
+    a total, so its size is always `length`, even if `wraps` varies in size.
+    """
+
+    length: Dynamic
+    wraps: Construct
+    fill: bytes = b"\x00"
+
+    def __post_init__(self):
+        if len(self.fill) != 1:
+            raise PaboError("THE FILL MUST BE A SINGLE BYTE.")
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        return _int(self.length, ctx, "length")
+
+    def _build(self, data, stream, ctx):
+        length = _int(self.length, ctx, "length")
+        buffer = BytesIO()
+        built = self.wraps._build(data, buffer, ctx)
+        raw = buffer.getvalue()
+        if len(raw) > length:
+            raise ValidationError(
+                f"THE DATA TAKES {len(raw)} BYTES, MORE THAN THE {length} AVAILABLE."
+            )
+        stream.write(raw + self.fill * (length - len(raw)))
+        return built
+
+    def _parse(self, stream, ctx):
+        length = _int(self.length, ctx, "length")
+        return self.wraps._parse(BytesIO(readexact(stream, length)), ctx)
+
+
+@dataclass
 class Padded(Construct):
     """
     Represents a binary construct with `pad` bytes of padding.

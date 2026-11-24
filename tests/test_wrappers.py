@@ -317,3 +317,26 @@ def test_delimited_on_a_stream_that_cannot_seek():
     assert c.parse(stream) == b"ab" and stream.raw == b"cd"
     with pytest.raises(pb.StreamError, match="CANNOT SEEK"):
         pb.Delimited(pb.GreedyBytes(), term=b";", consume=False).parse(Forward(b"a;"))
+
+
+def test_fixedsized():
+    """
+    `FixedSized` parses `wraps` from a window of `length` bytes, skipping what it
+    doesn't use, and pads it to `length` bytes when building; its size is
+    `length`.
+    """
+
+    c = pb.FixedSized(8, pb.Spec({"a": pb.u16, "name": pb.CString()}))
+    raw = b"\x01\x00hi\x00\xff\xff\xff"
+    spec = pb.Spec({"head": c, "next": pb.u8})
+    assert spec.parse(raw + b"\x07") == {"head": {"a": 1, "name": "hi"}, "next": 7}
+    assert c.build({"a": 1, "name": "hi"}) == b"\x01\x00hi\x00\x00\x00\x00"
+    assert c.size == 8 and spec.size == 9
+    dynamic = pb.Spec({"n": pb.u8, "body": pb.FixedSized(pb.this.n, pb.GreedyBytes())})
+    assert dynamic.parse(b"\x03abcd") == {"n": 3, "body": b"abc"}
+    with pytest.raises(pb.ValidationError, match="MORE THAN THE 8"):
+        c.build({"a": 1, "name": "much too long"})
+    with pytest.raises(pb.StreamError):
+        c.parse(b"\x01\x00hi")
+    with pytest.raises(pb.PaboError):
+        pb.FixedSized(4, pb.u8, fill=b"")
