@@ -12,8 +12,6 @@ first.
 
 ## Debugging
 
-- [ ] **A hex dump of parsed data with each field highlighted.** (dissect.cstruct
-  `dumpstruct`.)
 - [ ] **Drop into the debugger when a field fails.** (construct `Debugger`,
   structures `Debug`.)
 

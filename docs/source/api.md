@@ -4,7 +4,7 @@
 
 ```{eval-rst}
 .. autoclass:: pabo.Construct
-   :members: parse, build, size, sizeof, describe
+   :members: parse, build, size, sizeof, describe, dump
 ```
 
 ## Specifications

@@ -3,6 +3,7 @@ Base classes.
 """
 
 import mmap
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields, replace
@@ -64,6 +65,33 @@ def hexdump(raw: BytesLike, offset: int = 0) -> str:
         text = "".join(chr(byte) if 32 <= byte < 127 else "." for byte in chunk)
         lines.append(f"{offset + start:08x}  {hexed:<47}  {text}")
     return "\n".join(lines)
+
+
+# Terminal colours for `Construct.dump`, cycled through the fields.
+COLORS = ("\x1b[31m", "\x1b[32m", "\x1b[33m", "\x1b[34m", "\x1b[35m", "\x1b[36m")
+RESET = "\x1b[0m"
+
+
+def _leaves(value: Any, path: str = "") -> list:
+    """
+    The (path, start, end) of every field of a result parsed with offsets, in
+    order, going into nested and repeated specifications.
+    """
+
+    found = []
+    if isinstance(value, list):
+        for ix, element in enumerate(value):
+            found += _leaves(element, f"{path}[{ix}]")
+        return found
+    offsets = getattr(value, "_offsets", None) if isinstance(value, dict) else None
+    if offsets is None:
+        return found
+    for name, (start, end) in offsets.items():
+        child = value[name]
+        here = f"{path}.{name}" if path else name
+        inner = _leaves(child, here)
+        found += inner if inner else [(here, start, end)]
+    return found
 
 
 class BufferStream(BytesIO):
@@ -266,6 +294,50 @@ class Construct(ABC, Generic[T]):
         for row in [header, *rows]:
             line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths))
             lines.append(line.rstrip())
+        return "\n".join(lines)
+
+    def dump(self, src: Source, color: bool = False, **params: Any) -> str:
+        """
+        A hex dump of the data, with the fields that start on each line named at
+        its end, for debugging. With `color=True`, each field's bytes and name
+        are shown in the same terminal colour. Other keyword arguments are
+        parameters, as in `parse`.
+        """
+
+        if isinstance(src, (bytes, bytearray, memoryview)):
+            raw = bytes(src)
+        elif isinstance(src, (str, os.PathLike)):
+            raw = Path(src).read_bytes()
+        else:
+            raw = src.read()
+        fields = _leaves(self.parse(raw, offsets=True, **params))
+        owner: dict[int, int] = {}
+        for ix, (_, start, end) in enumerate(fields):
+            for at in range(start, end):
+                owner.setdefault(at, ix)
+        lines = []
+        for base in range(0, len(raw), 16):
+            chunk = raw[base : base + 16]
+            cells, text = [], []
+            for at, byte in enumerate(chunk, base):
+                char = chr(byte) if 32 <= byte < 127 else "."
+                ix = owner.get(at)
+                if color and ix is not None:
+                    paint = COLORS[ix % len(COLORS)]
+                    cells.append(f"{paint}{byte:02x}{RESET}")
+                    text.append(f"{paint}{char}{RESET}")
+                else:
+                    cells.append(f"{byte:02x}")
+                    text.append(char)
+            names = [
+                f"{COLORS[ix % len(COLORS)]}{name}{RESET}" if color else name
+                for ix, (name, start, _) in enumerate(fields)
+                if base <= start < base + 16
+            ]
+            pad = "   " * (16 - len(chunk))
+            line = f"{base:08x}  {' '.join(cells)}{pad}  {''.join(text)}"
+            pad = " " * (16 - len(chunk))
+            lines.append(f"{line}{pad}  {', '.join(names)}".rstrip())
         return "\n".join(lines)
 
     def build(

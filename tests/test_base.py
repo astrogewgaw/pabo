@@ -310,3 +310,28 @@ def test_parse_with_offsets():
     assert data._offsets == {"n": (0, 1), "text": (1, 3), "points": (3, 9)}
     assert data.points[1]._offsets == {"x": (6, 8), "y": (8, 9)}
     assert not hasattr(spec.parse(raw), "_offsets")
+
+
+def test_dump_names_the_fields_on_each_line():
+    """
+    `dump` shows a hex dump with the fields that start on each line (with their
+    full paths) at its end, and colours each field when asked.
+    """
+
+    spec = pb.Spec(
+        {
+            "magic": pb.Bytes(8),
+            "size": pb.u32,
+            "points": pb.Repeat(pb.Spec({"x": pb.u16, "y": pb.u16}), 2),
+        }
+    )
+    raw = b"\x89PNG\r\n\x1a\n" + bytes(4) + bytes(range(8))
+    lines = spec.dump(raw).splitlines()
+    assert lines[0].startswith(
+        "00000000  89 50 4e 47 0d 0a 1a 0a 00 00 00 00 00 01 02 03"
+    )
+    assert lines[0].endswith(".PNG............  magic, size, points[0].x, points[0].y")
+    assert lines[1].startswith("00000010  04 05 06 07")
+    assert lines[1].endswith("points[1].x, points[1].y")
+    colored = spec.dump(raw, color=True)
+    assert "\x1b[31m89\x1b[0m" in colored and "\x1b[31mmagic\x1b[0m" in colored
