@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **A 100-nanosecond unit for `Timestamp`**, as used by Windows `FILETIME` and
-  .NET ticks. (Found writing the SER cookbook recipe.)
-
 ## API and typing
 
 - [ ] **`Struct.parse()` should return the subclass**, not `Struct`, so type

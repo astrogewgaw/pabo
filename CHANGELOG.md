@@ -29,7 +29,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
   endianness per specification, and short aliases (`u8`, `u16be`, `i32le`,
   `f64`, ...).
 - `Enum` (which can keep unknown values with `strict=False`), `FlagsEnum` and
-  `Timestamp` (Unix, MJD or any epoch).
+  `Timestamp` (Unix, MJD, Windows FILETIME, .NET ticks or any epoch).
 - `Array` of a fixed-size specification, which parses into a numpy structured
   array (a view of the data, like other arrays).
 - `GreedyBytes`, `GreedyString`, and a configurable pad character and side for

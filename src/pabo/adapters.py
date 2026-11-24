@@ -17,6 +17,9 @@ from pabo.numeric import Float
 EPOCHS = {
     "unix": (datetime(1970, 1, 1, tzinfo=timezone.utc), "s"),
     "mjd": (datetime(1858, 11, 17, tzinfo=timezone.utc), "day"),
+    # Windows FILETIME and .NET DateTime ticks count 100 ns.
+    "filetime": (datetime(1601, 1, 1, tzinfo=timezone.utc), "100ns"),
+    "dotnet": (datetime(1, 1, 1, tzinfo=timezone.utc), "100ns"),
 }
 
 #: The length of each unit, in microseconds (exact, so no precision is lost).
@@ -25,11 +28,12 @@ UNITS = {
     "ms": Fraction(10**3),
     "us": Fraction(1),
     "ns": Fraction(1, 1000),
+    "100ns": Fraction(1, 10),
     "day": Fraction(86400 * 10**6),
 }
 
-Epoch = Literal["unix", "mjd"] | datetime
-Unit = Literal["s", "ms", "us", "ns", "day"]
+Epoch = Literal["unix", "mjd", "filetime", "dotnet"] | datetime
+Unit = Literal["s", "ms", "us", "ns", "100ns", "day"]
 
 
 @dataclass
@@ -105,11 +109,13 @@ class Timestamp(Construct[datetime]):
     """
     Map the numbers parsed by `wraps` to timezone-aware (UTC) datetimes.
 
-    `epoch` is "unix" (1970-01-01), "mjd" (Modified Julian Date: 1858-11-17) or a
-    datetime. `unit` is what one tick counts: "s", "ms", "us", "ns" or "day". It
-    defaults to "s" for "unix" and for datetimes, and to "day" for "mjd", but
-    many formats store Unix time in milliseconds, microseconds or nanoseconds.
-    Datetimes only resolve microseconds, so nanoseconds are rounded. When
+    `epoch` is "unix" (1970-01-01), "mjd" (Modified Julian Date: 1858-11-17),
+    "filetime" (Windows: 1601-01-01), "dotnet" (.NET ticks: 0001-01-01) or a
+    datetime. `unit` is what one tick counts: "s", "ms", "us", "ns", "100ns" or
+    "day". It defaults to "s" for "unix" and for datetimes, to "day" for "mjd",
+    and to "100ns" for "filetime" and "dotnet", but many formats store Unix
+    time in milliseconds, microseconds or nanoseconds. Datetimes only resolve
+    microseconds, so smaller units are rounded. When
     building, the value is rounded to the nearest whole tick, unless `wraps`
     is a `Float`. Naive datetimes are taken to be in UTC.
     """

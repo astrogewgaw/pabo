@@ -185,3 +185,24 @@ def test_enum_that_keeps_unknown_values():
         c.build("C")
     with pytest.raises(pb.ValidationError):
         pb.Enum(pb.u8, Kind).parse(b"\x07")
+
+
+def test_timestamp_in_100ns_ticks():
+    """
+    The "filetime" and "dotnet" epochs count 100-nanosecond ticks, from 1601 and
+    from the year 1.
+    """
+
+    moment = datetime(2024, 3, 1, 21, 0, 0, 500000, tzinfo=timezone.utc)
+    dotnet = pb.Timestamp(pb.i64, "dotnet")
+    elapsed = moment - datetime(1, 1, 1, tzinfo=timezone.utc)
+    ticks = (elapsed.days * 86400 + elapsed.seconds) * 10**7 + elapsed.microseconds * 10
+    assert dotnet.build(moment) == ticks.to_bytes(8, "little")
+    assert dotnet.parse(dotnet.build(moment)) == moment
+    filetime = pb.Timestamp(pb.u64, "filetime")
+    assert filetime.parse((116444736000000000).to_bytes(8, "little")) == datetime(
+        1970, 1, 1, tzinfo=timezone.utc
+    )
+    assert pb.Timestamp(pb.u32, unit="100ns").parse(
+        (10).to_bytes(4, "little")
+    ) == datetime(1970, 1, 1, 0, 0, 0, 1, tzinfo=timezone.utc)

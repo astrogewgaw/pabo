@@ -1287,13 +1287,7 @@ def test_ser_video():
 
     this = pb.this
     ticks = pb.Timestamp(
-        pb.Adapted(
-            pb.i64,
-            lambda t: (t & (2**62 - 1)) // 10,  # 100 ns ticks to microseconds
-            lambda us: us * 10,
-        ),
-        epoch=datetime(1, 1, 1),
-        unit="us",
+        pb.Adapted(pb.i64, lambda t: t & (2**62 - 1), lambda t: t), epoch="dotnet"
     )
     ser = pb.Spec(
         {

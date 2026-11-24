@@ -228,7 +228,7 @@ asked for) handle formats with offsets and alignment.
 `Compressed` (zlib, gzip, bz2, lzma), `Transformed` (any bytes-to-bytes encoding),
 and `Checksummed` (CRC32, Adler-32, any hashlib digest, or your own function,
 stored after the data or, with `first=True`, before it) deal with encoded data. `Enum` (with `strict=False`, unknown values are kept as
-plain ints), `FlagsEnum`, `Timestamp` (Unix, MJD or your own epoch) and `Adapted`
+plain ints), `FlagsEnum`, `Timestamp` (Unix, MJD, Windows, .NET or your own epoch) and `Adapted`
 turn raw values into richer Python objects.
 
 ## Class-based specifications

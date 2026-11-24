@@ -917,15 +917,12 @@ doubles and 6 integers). Larger files chain more summary records through `next`.
 SER files hold video from the cameras used for planetary and lunar imaging. A
 178-byte little-endian header is followed by the frames and an optional trailer
 with the time of each frame. Times are .NET ticks (100 ns since the year 1), of
-which only the low 62 bits are used; `Timestamp` counts in microseconds here.
+which only the low 62 bits are used.
 
 ```python
-from datetime import datetime
-
+# The top two bits hold the kind of time (local or UTC), which is ignored.
 ticks = pb.Timestamp(
-    pb.Adapted(pb.i64, lambda t: (t & (2**62 - 1)) // 10, lambda us: us * 10),
-    epoch=datetime(1, 1, 1),
-    unit="us",
+    pb.Adapted(pb.i64, lambda t: t & (2**62 - 1), lambda t: t), epoch="dotnet"
 )
 ser = pb.Spec(
     {
