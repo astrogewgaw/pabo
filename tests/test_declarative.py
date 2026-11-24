@@ -134,3 +134,20 @@ def test_repeat_of_structs_is_parsed_in_bulk():
     assert one_by_one == points
     with pytest.raises(pb.StreamError):
         pb.Repeat(Point.construct(), 6).parse(raw)
+
+
+def test_default_with_a_mutable_value_in_a_struct():
+    """
+    A `Default` whose value is mutable (a list) defaults to None in a `Struct`,
+    and is still filled in when building.
+    """
+
+    class Frame(pb.Struct):
+        """
+        A frame with a default list of samples.
+        """
+
+        samples: list = pb.Default(pb.Repeat(pb.u8, 2), [1, 2])
+
+    assert Frame().samples is None
+    assert Frame().build() == b"\x01\x02"

@@ -11,7 +11,21 @@ from pabo.base import Construct
 from pabo.context import Container
 from pabo.hints import Endian, Source, Target
 from pabo.specify import Specification
-from pabo.wrappers import Const
+from pabo.wrappers import Const, Default
+
+
+def _plain(construct: Const | Default) -> bool:
+    """
+    Whether the value of a `Const` or `Default` can be a dataclass default.
+
+    A `Default` whose value is a function, or mutable (which dataclasses reject
+    as a default), defaults to None instead, and is filled in when building.
+    """
+
+    value = construct.value
+    if isinstance(construct, Const):
+        return True
+    return not callable(value) and type(value).__hash__ is not None
 
 
 class Struct:
@@ -30,8 +44,8 @@ class Struct:
         header.width
         header.build()                          # back to bytes
 
-    Constants default to their value, and other fields that can be built
-    without a value (`Computed`, `Rebuild`, ...) default to None. Subclasses
+    Constants and `Default`s default to their value, and other fields that can
+    be built without a value (`Computed`, `Rebuild`, ...) default to None. Subclasses
     add fields after those of their parents. Use `OtherStruct.construct()` to
     nest one struct in another. The endianness given in the class statement
     applies to the numbers inside that don't set their own. Field names must
@@ -63,7 +77,7 @@ class Struct:
             hints = {}
         annotations = {name: hints.get(name, Any) for name in own}
         for name, value in own.items():
-            if isinstance(value, Const):
+            if isinstance(value, (Const, Default)) and _plain(value):
                 setattr(cls, name, dataclasses.field(default=value.value))
             elif value._omittable():
                 setattr(cls, name, dataclasses.field(default=None))

@@ -72,6 +72,7 @@ from pabo.transforms import Checksummed, Compressed, Transformed
 from pabo.wrappers import (
     Adapted,
     Const,
+    Default,
     Delimited,
     FixedSized,
     Greedy,
@@ -104,6 +105,7 @@ __all__ = [
     "Container",
     "Context",
     "ContextError",
+    "Default",
     "Deferred",
     "Delimited",
     "Embedded",

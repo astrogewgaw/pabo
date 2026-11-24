@@ -69,6 +69,31 @@ class Const(Construct):
 
 
 @dataclass
+class Default(Construct):
+    """
+    `wraps`, which may be left out when building: `value` (or, if it is a
+    function, `value(ctx)`) is built instead of a missing or None value.
+    """
+
+    wraps: Construct
+    value: Any
+
+    def _omittable(self):
+        return True
+
+    def _size(self, ctx):
+        return self.wraps._size(ctx)
+
+    def _build(self, data, stream, ctx):
+        if data is None:
+            data = evaluate(self.value, ctx)
+        return self.wraps._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        return self.wraps._parse(stream, ctx)
+
+
+@dataclass
 class Greedy(Construct[list]):
     """
     Represents a binary construct that builds/parses greedily.

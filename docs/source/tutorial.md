@@ -107,7 +107,8 @@ header.build({"version": 1, "count": 3})      # b'PB\x01\x00\x03'
 ```
 
 `Const` values can be left out when building, and they are checked when
-parsing. Specifications nest, and `Embedded` puts the fields of one specification
+parsing. Fields wrapped in `Default(construct, value)` can be left out too, and
+are built with `value` (or `value(ctx)`, if it is a function). Specifications nest, and `Embedded` puts the fields of one specification
 straight into another.
 
 ## Fields that depend on other fields

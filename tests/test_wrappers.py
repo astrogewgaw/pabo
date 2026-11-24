@@ -340,3 +340,40 @@ def test_fixedsized():
         c.parse(b"\x01\x00hi")
     with pytest.raises(pb.PaboError):
         pb.FixedSized(4, pb.u8, fill=b"")
+
+
+def test_default():
+    """
+    A `Default` field can be left out (or None) when building, giving its value
+    or a function of the context; parsing reads it as usual.
+    """
+
+    spec = pb.Spec(
+        {
+            "version": pb.Default(pb.u8, 3),
+            "count": pb.u8,
+            "double": pb.Default(pb.u8, lambda ctx: ctx.count * 2),
+        }
+    )
+    assert spec.build({"count": 5}) == b"\x03\x05\x0a"
+    assert spec.build({"version": 1, "count": 5, "double": None}) == b"\x01\x05\x0a"
+    assert spec.build({"version": 1, "count": 5, "double": 7}) == b"\x01\x05\x07"
+    assert spec.parse(b"\x01\x05\x07") == {"version": 1, "count": 5, "double": 7}
+    assert pb.Default(pb.u16, 0).size == 2
+
+
+def test_default_in_a_struct():
+    """
+    A `Default` with a plain value becomes the dataclass default of a `Struct`.
+    """
+
+    class Header(pb.Struct):
+        """
+        A header with a default version.
+        """
+
+        version: int = pb.Default(pb.u8, 3)
+        length: int = pb.u16
+
+    assert Header(length=4).version == 3
+    assert Header(length=4).build() == b"\x03\x04\x00"
