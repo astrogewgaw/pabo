@@ -42,7 +42,7 @@ from pabo.control import (
     Union,
     Validated,
 )
-from pabo.debug import Probe
+from pabo.debug import Debug, Probe
 from pabo.declarative import Struct, StructConstruct
 from pabo.errors import (
     ConstError,
@@ -105,6 +105,7 @@ __all__ = [
     "Container",
     "Context",
     "ContextError",
+    "Debug",
     "Default",
     "Deferred",
     "Delimited",

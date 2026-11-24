@@ -6,15 +6,6 @@ binmap, dataclasses-struct, bitstruct, bread) and by writing the cookbook. Each
 item says where the idea comes from. Within each section, the most useful come
 first.
 
-## Constructs
-
-## API and typing
-
-## Debugging
-
-- [ ] **Drop into the debugger when a field fails.** (construct `Debugger`,
-  structures `Debug`.)
-
 ## Maybe
 
 - [ ] **Bit fields anywhere**, not only inside a `BitStruct` that adds up to

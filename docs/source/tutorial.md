@@ -268,7 +268,8 @@ All errors are subclasses of `PaboError`: `StreamError`, `SizeofError`,
   attribute: the (start, end) offsets of each of its fields.
 - `print(spec.dump(data, color=True))` shows a hex dump with each field's bytes
   in its own colour, and the fields named at the end of each line.
-- `Probe()` prints the context and the next few bytes wherever you put it.
+- `Probe()` prints the context and the next few bytes wherever you put it, and
+  `Debug(construct)` opens the Python debugger where `construct` fails.
 - `construct / "some docs"` attaches docs to a field; they show up in errors, in
   `describe()` and in the construct's `repr`.
 

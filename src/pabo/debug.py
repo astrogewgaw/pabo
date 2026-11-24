@@ -54,3 +54,42 @@ class Probe(Construct):
     def _parse(self, stream, ctx):
         self._report(stream, ctx, "parsing")
         return None
+
+
+@dataclass
+class Debug(Construct):
+    """
+    `wraps`, opening the Python debugger (pdb) where it fails.
+
+    If parsing or building `wraps` raises an exception, `pdb.post_mortem` is
+    started at the point of failure (the context is the `ctx` of the frames
+    there), and the exception is raised again once you leave the debugger.
+    """
+
+    wraps: Construct
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        return self.wraps._size(ctx)
+
+    def _debug(self, error: BaseException) -> None:
+        import pdb
+
+        print(f"pabo: {error}", file=sys.stderr)
+        pdb.post_mortem(error.__traceback__)
+
+    def _build(self, data, stream, ctx):
+        try:
+            return self.wraps._build(data, stream, ctx)
+        except Exception as error:
+            self._debug(error)
+            raise
+
+    def _parse(self, stream, ctx):
+        try:
+            return self.wraps._parse(stream, ctx)
+        except Exception as error:
+            self._debug(error)
+            raise

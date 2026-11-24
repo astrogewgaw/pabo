@@ -38,3 +38,22 @@ def test_probe_rejects_non_streams():
     """
     with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
         pb.Probe(file="stderr")
+
+
+def test_debug_opens_the_debugger_where_parsing_fails(monkeypatch):
+    """
+    `Debug` starts `pdb.post_mortem` with the traceback of a failure, then raises
+    the error again; it is transparent when nothing fails.
+    """
+    import pdb
+
+    seen = []
+    monkeypatch.setattr(pdb, "post_mortem", lambda tb: seen.append(tb))
+    c = pb.Spec({"a": pb.u8, "b": pb.Debug(pb.u16)})
+    assert c.parse(b"\x01\x02\x00") == {"a": 1, "b": 2}
+    assert c.build({"a": 1, "b": 2}) == b"\x01\x02\x00"
+    with pytest.raises(pb.StreamError):
+        c.parse(b"\x01\x02")
+    with pytest.raises(pb.ValidationError):
+        c.build({"a": 1, "b": -1})
+    assert len(seen) == 2 and all(tb is not None for tb in seen)

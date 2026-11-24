@@ -60,7 +60,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Docs attached with `/` are shown in `repr`, error messages and `describe()`.
 - `describe()`, `dump()` (a hex dump with the fields marked),
   `parse(..., trace=True)`, `parse(..., offsets=True)` (which records where
-  each field was) and `Probe` for debugging, and
+  each field was), `Probe` and `Debug` (which opens pdb where a field fails)
+  for debugging, and
   `sizeof(ctx)` for sizes that depend on the data.
 - Arrays are parsed without copying, like `np.frombuffer`: from bytes (or a
   `bytearray` or `memoryview`) they are read-only views of them, and files
