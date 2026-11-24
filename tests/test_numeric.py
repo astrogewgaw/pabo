@@ -534,3 +534,64 @@ def test_packed_array_roundtrip_property(packing, bitorder, data):
     values = data.draw(st.lists(st.integers(0, 2**packing - 1), max_size=50))
     c = pb.Array(pb.Int(2), count=len(values), packing=packing, bitorder=bitorder)
     np.testing.assert_array_equal(c.parse(c.build(values)), values)
+
+
+def test_array_of_records():
+    """
+    An `Array` of a fixed-size specification parses into a numpy structured
+    array viewing the bytes, with a field per field (bytes as `S`, flags as
+    bools), and builds from it or from a list of dicts.
+    """
+
+    record = pb.Spec({"id": pb.u16, "name": pb.Bytes(3), "ok": pb.Flag(), "x": pb.f32})
+    rows = [
+        {"id": i, "name": b"ab" + bytes([65 + i]), "ok": i % 2 == 0, "x": i / 2}
+        for i in range(3)
+    ]
+    raw = b"".join(record.build(row) for row in rows)
+    c = pb.Array(record, count=3)
+    data = c.parse(raw)
+    assert data.dtype.names == ("id", "name", "ok", "x")
+    assert data.dtype.itemsize == 10 and c.size == 30
+    np.testing.assert_array_equal(data["id"], [0, 1, 2])
+    assert list(data["name"]) == [b"abA", b"abB", b"abC"]
+    assert data["ok"].tolist() == [True, False, True] and data["x"][2] == 1.0
+    assert np.shares_memory(data, np.frombuffer(raw, np.uint8))
+    assert c.build(rows) == raw
+    assert c.build(data) == raw
+    np.testing.assert_array_equal(pb.Array(record).parse(raw), data)
+
+
+def test_array_of_records_endianness_and_constants():
+    """
+    The records take the endianness in effect, their constants are checked when
+    parsing (with the record that fails) and filled in when building.
+    """
+
+    record = pb.Spec({"magic": pb.Const(b"R", pb.Bytes(1)), "n": pb.u16})
+    outer = pb.Spec({"rows": pb.Array(record, count=2)}, endian="big")
+    raw = b"R\x00\x01R\x00\x02"
+    data = outer.parse(raw)["rows"]
+    assert data.dtype["n"] == np.dtype(">u2")
+    np.testing.assert_array_equal(data["n"], [1, 2])
+    assert outer.build({"rows": [{"n": 1}, {"n": 2}]}) == raw
+    with pytest.raises(pb.ConstError, match="RECORD 1"):
+        outer.parse(b"R\x00\x01X\x00\x02")
+    with pytest.raises(pb.ValidationError, match="MISSING FIELD 'n'"):
+        outer.build({"rows": [{"n": 1}, {}]})
+
+
+def test_array_rejects_records_that_are_not_fixed_size():
+    """
+    A specification with a field of variable size, or of mixed endianness,
+    can't be the element of an `Array`; nor can other constructs.
+    """
+
+    with pytest.raises(pb.PaboError, match="ARRAY ELEMENTS"):
+        pb.Array(pb.Spec({"n": pb.u8, "data": pb.Bytes(pb.this.n)}))
+    with pytest.raises(pb.PaboError, match="ARRAY ELEMENTS"):
+        pb.Array(pb.Spec({"a": pb.u16le, "b": pb.u16be}))
+    with pytest.raises((pb.PaboError, BeartypeCallHintParamViolation)):
+        pb.Array(pb.CString())
+    with pytest.raises(pb.PaboError, match="PACKED"):
+        pb.Array(pb.Spec({"a": pb.u8}), packing=4)

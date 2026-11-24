@@ -7,6 +7,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import no_type_check
 
+import numpy as np
+
 from pabo.base import Construct, Stop, hexdump, scope, tell
 from pabo.bytes import Bytes, Flag
 from pabo.context import Container, Context
@@ -14,6 +16,22 @@ from pabo.errors import PaboError
 from pabo.hints import Endian
 from pabo.numeric import ENDIANS, INT_CODES, Float, Int, _checkendian
 from pabo.wrappers import Const
+
+# numpy's codes for the struct codes a compiled plan uses (bytes are "S<n>").
+NUMPY_CODES = {
+    "b": "i1",
+    "B": "u1",
+    "h": "i2",
+    "H": "u2",
+    "i": "i4",
+    "I": "u4",
+    "q": "i8",
+    "Q": "u8",
+    "e": "f2",
+    "f": "f4",
+    "d": "f8",
+    "?": "?",
+}
 
 
 @dataclass
@@ -211,6 +229,26 @@ class Specification(Construct[Container]):
             if trace:
                 _tracefield(trace, stream, child, name, start, child[name])
 
+    def _numpydtype(self, ctx) -> "np.dtype | None":
+        """
+        The numpy structured dtype of one record (for `Array`), or None if the
+        fields can't be compiled into one.
+        """
+
+        plan = self._plan(ctx)
+        return None if plan is None else plan.numpydtype()
+
+    def _constants(self) -> dict:
+        """
+        The constant fields and their values (for `Array`).
+        """
+
+        return {
+            name: member.value
+            for name, member in self.fields.items()
+            if isinstance(member, Const)
+        }
+
     def _label(self) -> str:
         return "Specification" + (f"(endian={self.endian!r})" if self.endian else "")
 
@@ -305,6 +343,7 @@ class _Plan:
         self.consts = consts
         self.lengths = lengths
         self.flags = "?" in layout
+        self._numpy = None
         # The positions of the constants among the values, and their values.
         self.checks = [
             (ix, consts[name]) for ix, name in enumerate(names) if name in consts
@@ -347,6 +386,26 @@ class _Plan:
             consts,
             lengths,
         )
+
+    def numpydtype(self) -> np.dtype:
+        """
+        The numpy structured dtype with the same layout, made once.
+        """
+
+        if self._numpy is None:
+            order = self.struct.format[0]
+            self._numpy = np.dtype(
+                [
+                    (
+                        name,
+                        f"S{code[:-1]}"
+                        if code.endswith("s")
+                        else order + NUMPY_CODES[code],
+                    )
+                    for name, code in zip(self.names, self.layout)
+                ]
+            )
+        return self._numpy
 
     # No runtime type check: the compiled fast path, which exists only for speed.
     @no_type_check

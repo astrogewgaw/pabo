@@ -42,7 +42,7 @@ like `np.frombuffer`, `parse` returns read-only views of the bytes or the file
 | `Int(width, signed=False, endian=None)` | An integer of any number of bytes. |
 | `Float(width, endian=None)` | A 2, 4 or 8-byte float. |
 | `VarInt(order="little")`, `ZigZag()` | Variable-length integers, unsigned (LEB128, or most significant first with `order="big"`, as in MIDI) and signed. |
-| `Array(dtype, count=-1, packing=None, bitorder="big")` | A numpy array. |
+| `Array(dtype, count=-1, packing=None, bitorder="big")` | A numpy array of numbers, or of records. |
 
 `endian` is `"little"`, `"big"` or `"native"`. If you leave it out, the number
 takes the endianness of the enclosing specification, or little-endian if there
@@ -57,6 +57,17 @@ C++ extension (other widths raise an error):
 ```python
 nibbles = pb.Array(pb.u8, count=4, packing=4)
 nibbles.parse(b"\x12\x34")    # array([1, 2, 3, 4], dtype=uint8)
+```
+
+The elements can also be records: a specification made only of fixed-size
+numbers, bytes, flags and constants gives a numpy structured array, with a named
+field for each of its fields. This is much faster than a `Repeat`, which makes a
+dict per record:
+
+```python
+point = pb.Spec({"x": pb.f32, "y": pb.f32, "id": pb.u16})
+points = pb.Array(point, count=1000).parse(raw)
+points["x"].mean(), points[0]["id"]
 ```
 
 ## Bytes, strings and flags

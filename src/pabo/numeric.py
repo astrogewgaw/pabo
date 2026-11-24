@@ -5,14 +5,14 @@ Numerical constructs.
 import mmap
 import struct
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, no_type_check
 
 import numpy as np
 
 from pabo.base import Construct, T, buffer, readexact
 from pabo.context import Context
-from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
+from pabo.errors import ConstError, PaboError, SizeofError, StreamError, ValidationError
 from pabo.expressions import evaluate
 from pabo.hints import BitOrder, Dynamic, Endian, NBits
 from pabo.packing import WIDTHS, packbits, unpackbits
@@ -69,6 +69,15 @@ class _Fixed(Construct[T]):
         """
 
         return self.formatfor(self.endian or "little")
+
+    def _numpydtype(self, ctx) -> np.dtype:
+        """
+        The numpy dtype of this number, with the endianness resolved from `ctx`.
+        """
+
+        return np.dtype(
+            self.formatfor(self.endian or ctx.setting("_endian") or "little")
+        )
 
     def _size(self, ctx):
         return self.width
@@ -259,9 +268,14 @@ class ZigZag(Construct[int]):
 @dataclass
 class Array(Construct[np.ndarray]):
     """
-    Represents an array of fixed-width numbers.
+    Represents an array of fixed-width numbers, or of records.
 
-    A negative `count` reads until the end of the stream. If `packing` is set
+    `dtype` is an `Int` (of 1, 2, 4 or 8 bytes) or a `Float`, or a
+    specification made only of fixed-size numbers, bytes, flags and constants,
+    which gives a numpy structured array with a named field for each of its
+    fields (`array["width"]`). Constants in the records are checked when
+    parsing, and filled in when building from a list of dicts. A negative
+    `count` reads until the end of the stream. If `packing` is set
     (1, 2 or 4 bits), each element is stored in that many bits, `bitorder`
     decides whether the first element sits in the most ("big") or least
     ("little") significant bits of each byte, and the values are returned as
@@ -273,14 +287,23 @@ class Array(Construct[np.ndarray]):
     are new arrays.
     """
 
-    dtype: Int | Float
+    dtype: Construct
     count: Dynamic = -1
     packing: NBits | None = None
     bitorder: BitOrder = "big"
+    _width: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         if isinstance(self.dtype, Int) and self.dtype.width not in INT_CODES:
             raise PaboError("ARRAY ELEMENTS MUST BE 1, 2, 4 OR 8 BYTES WIDE.")
+        dtype = self.dtype._numpydtype(Context())
+        if dtype is None:
+            raise PaboError(
+                "ARRAY ELEMENTS MUST BE AN Int, A Float, OR A SPECIFICATION WHOSE "
+                "FIELDS ARE ALL FIXED-SIZE NUMBERS, BYTES, FLAGS OR CONSTANTS, WITH "
+                "ONE ENDIANNESS."
+            )
+        self._width = dtype.itemsize
         if self.packing is not None:
             if not isinstance(self.dtype, Int):
                 raise PaboError("ONLY INTEGER ARRAYS CAN BE PACKED.")
@@ -296,19 +319,32 @@ class Array(Construct[np.ndarray]):
         The numpy dtype of the elements (little-endian if no endianness was given).
         """
 
-        return np.dtype(self.dtype.format)
+        return self.dtypefor(Context())
 
     def dtypefor(self, ctx) -> np.dtype:
         """
         The numpy dtype of the elements, with the endianness resolved from `ctx`.
         """
 
-        return np.dtype(self.dtype.formatfor(resolveendian(self.dtype.endian, ctx)))
+        dtype = self.dtype._numpydtype(ctx)
+        if dtype is None:
+            raise PaboError(
+                "THE RECORDS OF THIS ARRAY HAVE FIELDS OF MORE THAN ONE ENDIANNESS."
+            )
+        return dtype
 
     def _nbytes(self, count: int) -> int:
         if self.packing is None:
-            return count * self.dtype.width
+            return count * self._width
         return -(-count * self.packing // 8)
+
+    def _constants(self) -> dict:
+        """
+        The constant fields of the records (empty for an array of numbers).
+        """
+
+        constants = getattr(self.dtype, "_constants", None)
+        return constants() if constants is not None else {}
 
     def _parseview(
         self, stream, memory: "mmap.mmap | memoryview", count: int, dtype: np.dtype
@@ -366,6 +402,8 @@ class Array(Construct[np.ndarray]):
 
     def _build(self, data, stream, ctx):
         dtype = self.dtypefor(ctx)
+        if dtype.names and isinstance(data, (list, tuple)):
+            data = [self._row(element, dtype.names) for element in data]
         try:
             array = np.asarray(data, dtype=dtype).ravel()
         except (OverflowError, TypeError, ValueError) as error:
@@ -388,7 +426,37 @@ class Array(Construct[np.ndarray]):
             raise ValidationError(error.msg) from None
         return array
 
+    def _row(self, element, names) -> tuple:
+        """
+        One record to build, as a tuple, from a dict (with its constants filled
+        in) or anything else numpy understands.
+        """
+
+        if not isinstance(element, dict):
+            return element
+        constants = self._constants()
+        try:
+            return tuple(
+                element[name] if element.get(name) is not None else constants[name]
+                for name in names
+            )
+        except KeyError as error:
+            raise ValidationError(
+                f"MISSING FIELD {error.args[0]!r} IN A RECORD."
+            ) from None
+
     def _parse(self, stream, ctx):
+        array = self._parsearray(stream, ctx)
+        for name, value in self._constants().items():
+            wrong = np.flatnonzero(array[name] != value)
+            if wrong.size:
+                raise ConstError(
+                    f"EXPECTED {value!r} FOR {name!r}, GOT {array[name][wrong[0]]!r} "
+                    f"IN RECORD {wrong[0]}."
+                )
+        return array
+
+    def _parsearray(self, stream, ctx):
         count = self._count(ctx)
         memory = buffer(stream) if self.packing is None else None
         if memory is not None:
@@ -397,10 +465,10 @@ class Array(Construct[np.ndarray]):
             return self._parseinto(stream, count, self.dtypefor(ctx))
         raw = readexact(stream, self._nbytes(count)) if count >= 0 else stream.read()
         if self.packing is None:
-            if len(raw) % self.dtype.width:
+            if len(raw) % self._width:
                 raise StreamError(
                     f"{len(raw)} BYTES IS NOT A WHOLE NUMBER OF "
-                    f"{self.dtype.width}-BYTE ELEMENTS."
+                    f"{self._width}-BYTE ELEMENTS."
                 )
             return np.frombuffer(raw, dtype=self.dtypefor(ctx))
         values = unpackbits(raw, self.packing, self.bitorder)

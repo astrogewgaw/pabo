@@ -6,12 +6,6 @@ binmap, dataclasses-struct, bitstruct, bread) and by writing the cookbook. Each
 item says where the idea comes from. Within each section, the most useful come
 first.
 
-## Performance
-
-- [ ] **Structured arrays for fixed-size specifications**, such as
-  `Array(record_spec, count=n)` returning a numpy structured array (a view, like
-  `np.frombuffer`), for tables of records. Their `_Plan` already has the format.
-
 ## Constructs
 
 - [ ] **Bytes and strings ending in any terminator**, not just a null (`CString`)

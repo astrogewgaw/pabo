@@ -178,6 +178,14 @@ class Construct(ABC, Generic[T]):
     def _parse(self, stream, ctx: Context) -> T:
         pass
 
+    def _numpydtype(self, ctx: Context) -> Any:
+        """
+        The numpy dtype of this construct as an `Array` element, or None if it
+        can't be one (the default).
+        """
+
+        return None
+
     def _omittable(self) -> bool:
         """
         Whether a specification may build this field without being given a value.
