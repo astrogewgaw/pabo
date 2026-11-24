@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Enums that keep unknown values**, such as `Enum(..., strict=False)`
-  returning the plain int, for formats that add values over time. (construct-typing
-  `EnumBase`, structures and bread enum defaults.)
 - [ ] **Check `Rebuild` values when parsing**, such as `Rebuild(..., check=True)`,
   so a stored length or count that doesn't match raises. (binmap
   `calculatedfield`.)

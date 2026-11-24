@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum as PyEnum
 from enum import IntFlag
 from fractions import Fraction
-from typing import Literal
+from typing import Any, Literal
 
 from pabo.base import Construct
 from pabo.errors import PaboError, ValidationError
@@ -37,29 +37,35 @@ class Enum(Construct):
     """
     Map the integers parsed by `wraps` to members of an `enum.Enum`.
 
-    Parsing a value that is not a member raises a `ValidationError`. Building
-    accepts a member, its value, or its name.
+    Parsing a value that is not a member raises a `ValidationError`, unless
+    `strict` is False: then the plain value is returned (and can be built),
+    for formats that add new values over time. Building accepts a member, its
+    value, or its name.
     """
 
     wraps: Construct
     enum: type[PyEnum]
+    strict: bool = True
 
     def _size(self, ctx):
         return self.wraps._size(ctx)
 
-    def _member(self, data) -> PyEnum:
+    def _member(self, data) -> Any:
         try:
             if isinstance(data, str) and not isinstance(data, self.enum):
                 return self.enum[data]
             return self.enum(data)
         except (KeyError, ValueError):
+            if not self.strict and not isinstance(data, str):
+                return data
             raise ValidationError(
                 f"{data!r} IS NOT A MEMBER OF {self.enum.__name__}."
             ) from None
 
     def _build(self, data, stream, ctx):
         member = self._member(data)
-        self.wraps._build(member.value, stream, ctx)
+        value = member.value if isinstance(member, self.enum) else member
+        self.wraps._build(value, stream, ctx)
         return member
 
     def _parse(self, stream, ctx):

@@ -161,3 +161,27 @@ def test_flagsenum_rejects_values_that_are_not_ints():
 
     with pytest.raises(pb.ValidationError, match="NOT A VALUE OF Mode"):
         pb.FlagsEnum(pb.u8, Mode).build("read")
+
+
+def test_enum_that_keeps_unknown_values():
+    """
+    With `strict=False`, an `Enum` returns values that are not members as plain
+    ints, and builds them back; names must still be members.
+    """
+
+    class Kind(enum.IntEnum):
+        """
+        Two known kinds.
+        """
+
+        A = 1
+        B = 2
+
+    c = pb.Enum(pb.u8, Kind, strict=False)
+    assert c.parse(b"\x02") is Kind.B
+    assert c.parse(b"\x07") == 7 and type(c.parse(b"\x07")) is int
+    assert c.build(7) == b"\x07" and c.build("A") == b"\x01"
+    with pytest.raises(pb.ValidationError):
+        c.build("C")
+    with pytest.raises(pb.ValidationError):
+        pb.Enum(pb.u8, Kind).parse(b"\x07")
