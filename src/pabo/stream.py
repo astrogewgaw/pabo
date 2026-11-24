@@ -1,0 +1,392 @@
+"""
+Constructs that move around the stream: seeking, peeking, alignment and laziness.
+"""
+
+from dataclasses import dataclass
+from io import BytesIO
+from typing import Any
+
+from pabo.base import Construct, readexact, tell
+from pabo.bytes import Padding
+from pabo.context import Context
+from pabo.errors import PaboError, SizeofError, StreamError
+from pabo.expressions import evaluate
+from pabo.hints import Dynamic, Endian, Whence
+from pabo.numeric import Array, Float, Int
+from pabo.specify import Embedded, Specification
+from pabo.wrappers import Const
+
+
+def _offset(value, ctx) -> int:
+    offset = evaluate(value, ctx)
+    if not isinstance(offset, int):
+        raise PaboError(f"THE OFFSET MUST BE AN INTEGER, GOT {offset!r}.")
+    return offset
+
+
+def _checkwhence(whence) -> None:
+    if whence not in (0, 1, 2):
+        raise PaboError(f"INVALID WHENCE {whence!r}. MUST BE 0, 1 OR 2.")
+
+
+def _seek(stream, offset: int, whence: int = 0) -> int:
+    try:
+        stream.seek(offset, whence)
+        return stream.tell()
+    except (AttributeError, OSError, ValueError) as error:
+        raise StreamError(
+            f"CANNOT SEEK TO {offset} (whence={whence}): {error}."
+        ) from error
+
+
+@dataclass
+class Seek(Construct[int]):
+    """
+    Move the stream to `offset` (relative to `whence`, as in `io.IOBase.seek`).
+
+    Parses and builds the new position. Takes no value when building.
+    """
+
+    offset: Dynamic
+    whence: Whence = 0
+
+    def __post_init__(self):
+        _checkwhence(self.whence)
+
+    def _omittable(self):
+        return True
+
+    def _size(self, ctx):
+        raise SizeofError("A SEEK HAS NO MEANINGFUL SIZE.")
+
+    def _build(self, data, stream, ctx):
+        return _seek(stream, _offset(self.offset, ctx), self.whence)
+
+    def _parse(self, stream, ctx):
+        return _seek(stream, _offset(self.offset, ctx), self.whence)
+
+
+@dataclass
+class Tell(Construct[int]):
+    """
+    The current stream position. Takes no bytes and no value when building.
+    """
+
+    def _omittable(self):
+        return True
+
+    def _size(self, ctx):
+        return 0
+
+    def _position(self, stream) -> int:
+        position = tell(stream)
+        if position is None:
+            raise StreamError("THE STREAM CANNOT TELL ITS POSITION.")
+        return position
+
+    def _build(self, data, stream, ctx):
+        return self._position(stream)
+
+    def _parse(self, stream, ctx):
+        return self._position(stream)
+
+
+@dataclass
+class Pointer(Construct):
+    """
+    Parse/build `wraps` at `offset`, then return to where the stream was.
+
+    `offset` counts from the start of the stream (`whence=0`), the current
+    position (1) or the end (2), as in `io.IOBase.seek`: `Pointer(-8, trailer,
+    whence=2)` reads the last 8 bytes. Takes no space where it appears, since
+    the data lives elsewhere.
+    """
+
+    offset: Dynamic
+    wraps: Construct
+    whence: Whence = 0
+
+    def __post_init__(self):
+        _checkwhence(self.whence)
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        return 0
+
+    def _build(self, data, stream, ctx):
+        back = stream.tell()
+        _seek(stream, _offset(self.offset, ctx), self.whence)
+        try:
+            return self.wraps._build(data, stream, ctx)
+        finally:
+            stream.seek(back)
+
+    def _parse(self, stream, ctx):
+        back = stream.tell()
+        _seek(stream, _offset(self.offset, ctx), self.whence)
+        try:
+            return self.wraps._parse(stream, ctx)
+        finally:
+            stream.seek(back)
+
+
+@dataclass
+class Peek(Construct):
+    """
+    Parse `wraps` without moving the stream (look ahead). Builds nothing.
+    """
+
+    wraps: Construct
+
+    def _omittable(self):
+        return True
+
+    def _size(self, ctx):
+        return 0
+
+    def _build(self, data, stream, ctx):
+        return data
+
+    def _parse(self, stream, ctx):
+        back = stream.tell()
+        try:
+            return self.wraps._parse(stream, ctx)
+        finally:
+            stream.seek(back)
+
+
+@dataclass
+class Aligned(Construct):
+    """
+    Pad `wraps` with `fill` bytes up to the next multiple of `modulus` bytes.
+    """
+
+    modulus: int
+    wraps: Construct
+    fill: bytes = b"\x00"
+
+    def __post_init__(self):
+        if self.modulus < 1:
+            raise PaboError("THE MODULUS MUST BE POSITIVE.")
+        if len(self.fill) != 1:
+            raise PaboError("THE FILL MUST BE A SINGLE BYTE.")
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        size = self.wraps._size(ctx)
+        return size + (-size % self.modulus)
+
+    def _build(self, data, stream, ctx):
+        buffer = BytesIO()
+        built = self.wraps._build(data, buffer, ctx)
+        raw = buffer.getvalue()
+        stream.write(raw + self.fill * (-len(raw) % self.modulus))
+        return built
+
+    def _parse(self, stream, ctx):
+        start = stream.tell()
+        data = self.wraps._parse(stream, ctx)
+        readexact(stream, -(stream.tell() - start) % self.modulus)
+        return data
+
+
+def AlignedSpec(
+    modulus: int, fields: dict[str, Construct], endian: Endian | None = None
+) -> Specification:
+    """
+    A specification with every field aligned to a multiple of `modulus` bytes.
+    """
+
+    return Specification(
+        {name: Aligned(modulus, member) for name, member in fields.items()},
+        endian=endian,
+    )
+
+
+def _alignment(construct: Construct) -> int:
+    """
+    The alignment a C compiler gives a field: a number's size, an array's
+    element's, a specification's largest; 1 for bytes and anything else.
+    """
+
+    if isinstance(construct, Const):
+        return _alignment(construct.wraps)
+    if isinstance(construct, (Int, Float)):
+        return construct.width if construct.width in (1, 2, 4, 8) else 1
+    if isinstance(construct, Array):
+        return _alignment(construct.dtype)
+    if isinstance(construct, Specification):
+        members = [
+            _alignment(member.wraps if isinstance(member, Embedded) else member)
+            for member in construct.fields.values()
+        ]
+        return max(members, default=1)
+    return 1
+
+
+def CSpec(fields: dict[str, Construct], endian: Endian | None = None) -> Specification:
+    """
+    A specification laid out as a C compiler lays out a struct.
+
+    Each field is aligned to its own alignment (a number's size, an array's
+    element's, a nested specification's largest field's), and the whole is
+    padded to a multiple of the largest. The padding goes into fields named
+    `_pad0`, `_pad1`, ..., which are left out of the result. Every field must
+    have a fixed size. (Compilers may differ for unusual targets; this is the
+    usual layout on x86 and ARM.)
+    """
+
+    laid: dict[str, Construct] = {}
+    offset, largest, pads = 0, 1, 0
+    for name, member in fields.items():
+        alignment = _alignment(member)
+        try:
+            size = member.size
+        except PaboError:
+            raise PaboError(
+                f"C ALIGNMENT NEEDS FIELDS OF FIXED SIZE, BUT {name!r} HAS NONE."
+            ) from None
+        gap = -offset % alignment
+        if gap:
+            laid[f"_pad{pads}"] = Padding(gap)
+            pads += 1
+        laid[name] = member
+        offset += gap + size
+        largest = max(largest, alignment)
+    if -offset % largest:
+        laid[f"_pad{pads}"] = Padding(-offset % largest)
+    return Specification(laid, endian=endian)
+
+
+class LazyValue:
+    """
+    A value that is parsed from the stream the first time it is asked for.
+
+    Call `get()` (or read `value`) to parse it. The stream must still be open
+    then: files parsed from a path are memory-mapped, so they stay readable.
+    """
+
+    def __init__(self, construct: Construct, stream, offset: int, ctx: Context):
+        self._construct = construct
+        self._stream = stream
+        self._offset = offset
+        self._ctx = ctx
+        self._parsed = False
+        self._value: Any = None
+
+    @property
+    def offset(self) -> int:
+        """
+        Where the value starts in the stream.
+        """
+
+        return self._offset
+
+    def get(self) -> Any:
+        """
+        Parse (once) and return the value.
+        """
+
+        if not self._parsed:
+            back = self._stream.tell()
+            self._stream.seek(self._offset)
+            try:
+                self._value = self._construct._parse(self._stream, self._ctx)
+            finally:
+                self._stream.seek(back)
+            self._parsed = True
+        return self._value
+
+    @property
+    def value(self) -> Any:
+        """
+        The parsed value (the same as `get()`).
+        """
+
+        return self.get()
+
+    def __repr__(self) -> str:
+        state = repr(self._value) if self._parsed else "not parsed yet"
+        return f"LazyValue({state}, offset={self._offset})"
+
+
+@dataclass
+class Lazy(Construct):
+    """
+    Skip over `wraps` when parsing, and return a `LazyValue` that parses it on demand.
+
+    `wraps` must have a size that is known when it is reached (it may depend
+    on earlier fields). Building accepts a `LazyValue` or a plain value.
+    """
+
+    wraps: Construct
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        return self.wraps._size(ctx)
+
+    def _build(self, data, stream, ctx):
+        if isinstance(data, LazyValue):
+            data = data.get()
+        return self.wraps._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        offset = stream.tell()
+        size = self.wraps._size(ctx)
+        end = _seek(stream, 0, 2)
+        stream.seek(offset)
+        if end - offset < size:
+            raise StreamError(
+                f"STREAM ENDED EARLY: EXPECTED {size} BYTES, GOT {end - offset}."
+            )
+        stream.seek(offset + size)
+        return LazyValue(self.wraps, stream, offset, ctx)
+
+
+@dataclass
+class Remaining(Construct):
+    """
+    `wraps`, parsed from the rest of the stream except its last `leave` bytes.
+
+    For data that runs up to a trailer of fixed size, such as the compressed
+    data of a gzip file before its 8-byte trailer: the trailer's fields follow
+    it as usual. `wraps` is usually greedy (`GreedyBytes()`, `Array(...)`).
+    Parsing needs a stream that can seek, to find its end. Building simply
+    writes `wraps`, and the fields after it write the rest.
+    """
+
+    wraps: Construct
+    leave: int = 0
+
+    def __post_init__(self):
+        if self.leave < 0:
+            raise PaboError("THE NUMBER OF BYTES TO LEAVE CANNOT BE NEGATIVE.")
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        raise SizeofError("THE SIZE OF Remaining DEPENDS ON THE STREAM.")
+
+    def _build(self, data, stream, ctx):
+        return self.wraps._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        start = tell(stream)
+        if start is None:
+            raise StreamError("Remaining NEEDS A STREAM THAT CAN SEEK.")
+        end = _seek(stream, 0, 2)
+        stream.seek(start)
+        if end - start < self.leave:
+            raise StreamError(
+                f"STREAM ENDED EARLY: EXPECTED AT LEAST {self.leave} BYTES, "
+                f"GOT {end - start}."
+            )
+        raw = readexact(stream, end - start - self.leave)
+        return self.wraps._parse(BytesIO(raw), ctx)

@@ -1,14 +1,131 @@
 [build-system]
-requires = [
-    "wheel",
-    "setuptools>=42",
-    "pybind11>=2.6.0",
-    "setuptools_scm[toml]>=3.4",
+build-backend = "scikit_build_core.build"
+requires = ["scikit-build-core>=0.10", "nanobind>=2.4", "setuptools-scm>=8"]
+
+[project]
+name = "pabo"
+readme = "README.md"
+dynamic = ["version"]
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = ["numpy", "beartype"]
+description = "Binary parsing for dummies!"
+authors = [{name = "Ujjwal Panda", email = "ujjwalpanda97@gmail.com"}]
+
+classifiers = [
+  "Operating System :: Unix",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
-build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov", "hypothesis"]
+bench = [
+  "pytest-benchmark",
+  "ultraplot",
+  # The libraries compared with pabo. (duckparse, only on GitHub, and pystructs
+  # 0.4, which needs Python 3.13, are installed by hand.)
+  "construct",
+  "dissect.cstruct",
+  "kaitaistruct",
+  "bitstruct",
+  "structures",
+  "bread",
+  "bitstring<5",  # bread breaks with bitstring 5
+  "binmap",
+  "dataclasses-struct",
+]
+docs = [
+  "sphinx",
+  "furo",
+  "myst-parser",
+  "sphinx-sitemap",
+  "sphinx-copybutton",
+  "sphinx-autodoc-typehints",
+]
+dev = ["pabo[test,bench,docs]", "ruff", "pyright", "pre-commit", "interrogate"]
+
+[project.urls]
+Source = "https://github.com/astrogewgaw/pabo"
+Homepage = "https://github.com/astrogewgaw/pabo"
+Issues = "https://github.com/astrogewgaw/pabo/issues"
+Documentation = "https://astrogewgaw.github.io/pabo/"
+
+[tool.scikit-build]
+wheel.py-api = "cp312"
+cmake.build-type = "Release"
+wheel.packages = ["src/pabo"]
+wheel.exclude = ["pabo/*.cpp"]
+build-dir = "build/{wheel_tag}"
+minimum-version = "build-system.requires"
+
+[tool.scikit-build.metadata]
+version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.setuptools_scm]
 write_to = "src/pabo/_version.py"
+
+[tool.cibuildwheel]
+# Python 3.12 and later share one stable-ABI (abi3) wheel.
+build = ["cp310-*", "cp311-*", "cp312-*"]
+skip = ["pp*", "*-win32", "*-manylinux_i686", "*-musllinux_i686"]
+test-extras = ["test"]
+test-command = "pytest {project}/tests -p no:cacheprovider"
+build-verbosity = 1
+
+[tool.cibuildwheel.macos.environment]
+# nanobind needs C++17 aligned allocation, which macOS only has from 10.13 on;
+# nanobind recommends 10.14. (Python 3.10 and 3.11 would otherwise target 10.9.)
+MACOSX_DEPLOYMENT_TARGET = "10.14"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = ["src/pabo/_version.py", "docs", "benchmarks/kaitai"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+  "E501",    # Long lines are left to the formatter.
+  "B905",    # zip() without strict= is fine where lengths are already checked.
+  "RUF001",  # The Korean in error messages is intentional.
+  "RUF012",  # Mutable class attributes are fine on dataclasses here.
+  "SIM105",  # try/except/pass is clearer than contextlib.suppress in hot paths.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pabo/__init__.py" = ["E402", "F401", "F403"]
+"tests/*" = ["B018", "E731"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pabo"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["src/pabo/_version.py"]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportPrivateImportUsage = false
+reportMissingModuleSource = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.coverage.run]
+source = ["pabo"]
+branch = true
+omit = ["*/_version.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "@abstractmethod"]
 
 [tool.interrogate]
 verbose = 0
@@ -19,17 +136,17 @@ badge-format = "svg"
 whitelist-regex = []
 ignore-magic = true
 ignore-module = false
-ignore-private = false
+ignore-private = true
 ignore-setters = false
 ignore-init-method = true
-ignore-semiprivate = false
+ignore-semiprivate = true
 omit-covered-files = false
 ignore-init-module = false
 ignore-nested-classes = true
 badge-style = "for-the-badge"
 ignore-nested-functions = false
 ignore-property-decorators = false
-generate-badge = "assets/doc_cov.svg"
+generate-badge = "assets/interrogate.svg"
 
 exclude = [
     "docs",

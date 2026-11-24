@@ -2,52 +2,87 @@
 Byte manipulation.
 """
 
-from attrs import define
+from dataclasses import dataclass
+
+from pabo.base import Construct, readexact
+from pabo.errors import PaboError, SizeofError, ValidationError
+from pabo.expressions import evaluate
+from pabo.hints import Dynamic
 from pabo.wrappers import Const
-from pabo.base import Construct
 
 
-@define
-class Bytes(Construct):
+def _count(value, ctx) -> int:
+    count = evaluate(value, ctx)
+    if not isinstance(count, int):
+        raise PaboError(f"THE COUNT MUST BE AN INTEGER, GOT {count!r}.")
+    return count
 
+
+@dataclass
+class Bytes(Construct[bytes]):
     """
-    Represents bytes.
+    Represents `count` raw bytes.
+
+    `count` may depend on other fields (`Bytes(this.length)`). A negative
+    `count` reads until the end of the stream. Building checks that the data
+    has exactly `count` bytes.
     """
 
-    size: int
+    count: Dynamic
 
-    def __size__(self):
-        return self.size
+    def _size(self, ctx):
+        count = _count(self.count, ctx)
+        if count < 0:
+            raise SizeofError("GREEDY BYTES HAVE NO FIXED SIZE.")
+        return count
 
-    def __build__(self, data, stream) -> None:
+    def _build(self, data, stream, ctx):
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise ValidationError(f"EXPECTED BYTES, GOT {type(data).__name__}.")
+        count = _count(self.count, ctx)
+        if count >= 0 and len(data) != count:
+            raise ValidationError(f"EXPECTED {count} BYTES, GOT {len(data)}.")
         stream.write(data)
+        return data
 
-    def __parse__(self, stream):
-        return stream.read(self.size)
+    def _parse(self, stream, ctx) -> bytes:
+        count = _count(self.count, ctx)
+        if count < 0:
+            return stream.read()
+        return readexact(stream, count)
 
 
-@define
-class Flag(Construct):
-
+@dataclass
+class Flag(Construct[bool]):
     """
     Represents a single byte as a boolean.
+
+    Any non-zero byte parses as True. Building writes 1 for a true value and 0
+    for a false one.
     """
 
-    def __size__(self) -> int:
+    def _size(self, ctx) -> int:
         return 1
 
-    def __build__(self, data, stream) -> None:
+    def _build(self, data, stream, ctx):
         stream.write(b"\x01" if data else b"\x00")
+        return bool(data)
 
-    def __parse__(self, stream):
-        data = stream.read(1)
-        return data != b"\x00"
+    def _parse(self, stream, ctx) -> bool:
+        return readexact(stream, 1) != b"\x00"
 
 
-def Padding(size):
-
+def GreedyBytes() -> Bytes:
     """
-    Represents padding via zero bytes (b"\x00").
+    Represents all the bytes up to the end of the stream.
+    """
+
+    return Bytes(-1)
+
+
+def Padding(size: int) -> Const:
+    """
+    Represents padding via zero bytes (b"\\x00").
     """
 
     return Const(b"\x00" * size, Bytes(size))

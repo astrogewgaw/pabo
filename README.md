@@ -1,7 +1,7 @@
 <div align="center">
 <img 
     alt="pabo: Binary parsing for dummies!"
-    src="https://raw.githubusercontent.com/astrogewgaw/logos/main/rasters/pabo.png"
+    src="https://raw.githubusercontent.com/astrogewgaw/logos/refs/heads/main/pabo/pabo.png"
 />
 </div>
 <br/><br/>
@@ -13,7 +13,7 @@
 ![Stars][stars-badge]
 
 [![Gitmoji][gitmoji-badge]][gitmoji]
-[![Code style: black][black-badge]][black]
+[![Ruff][ruff-badge]][ruff]
 
 </div>
 
@@ -46,32 +46,81 @@ png = pb.Spec(
             b"\x89PNG\x0d\x0a\x1a\x0a",
             pb.Bytes(8),
         ),
-        "ihdr_size": pb.Int(4, endian="big"),
+        "ihdr_size": pb.Int(4),
         "ihdr_id": pb.Const(b"IHDR", pb.Bytes(4)),
-        "width": pb.Int(4, endian="big"),
-        "height": pb.Int(4, endian="big"),
-    }
+        "width": pb.Int(4),
+        "height": pb.Int(4),
+    },
+    endian="big",
 )
 
 data = png.parse("example.png")
 ```
 
-which would return a dictionary with the parsed data, like so:
+which would return a dictionary (whose keys are also attributes, so
+`data.width` works too) with the parsed data, like so:
 
 ```python
 {
-     'magic': b'\x89PNG\r\n\x1a\n',
-     'ihdr_size': 13,
-     'ihdr_id': b'IHDR',
-     'width': 602,
-     'height': 172,
+    "magic": b"\x89PNG\r\n\x1a\n",
+    "ihdr_size": 13,
+    "ihdr_id": b"IHDR",
+    "width": 602,
+    "height": 172,
 }
 ```
 
+The same specification turns data back into bytes. Constants can be left out:
+
+```python
+png.build({"ihdr_size": 13, "width": 602, "height": 172})
+```
+
+Fields can depend on the ones before them, for formats that store a length or
+a type ahead of the data:
+
+```python
+from pabo import lenof, this
+
+message = pb.Spec(
+    {
+        "length": pb.Rebuild(pb.u8, lenof(this.payload)),
+        "payload": pb.Bytes(this.length),
+        "checksum": pb.If(this.length > 2, pb.u16),
+    }
+)
+
+message.parse(b"\x03abc\x01\x00")  # {'length': 3, 'payload': b'abc', 'checksum': 1}
+message.build({"payload": b"ab"})  # b'\x02ab'
+```
+
+You can also write specifications as classes, and get typed dataclasses back:
+
+```python
+class PNGHeader(pb.Struct, endian="big"):
+    magic: bytes = pb.Const(b"\x89PNG\r\n\x1a\n", pb.Bytes(8))
+    ihdr_size: int = pb.u32
+    ihdr_id: bytes = pb.Const(b"IHDR", pb.Bytes(4))
+    width: int = pb.u32
+    height: int = pb.u32
+
+
+header = PNGHeader.parse("example.png")
+header.width  # 602
+```
+
+Besides numbers, bytes and strings, `pabo` has conditionals (`If`, `Switch`),
+repetition (`Repeat`, `RepeatUntil`, `Greedy`), bit fields (`BitStruct`),
+bit-packed numpy arrays, stream positioning (`Pointer`, `Seek`, `Peek`,
+`Aligned`, `Lazy`), compression and checksums, enums and timestamps. Errors say
+which field failed and at what offset, `spec.describe()` prints the layout,
+and `spec.parse(data, trace=True)` shows every field as it is parsed.
+
 For more real examples, check out the [**`priwo`**][priwo] package, which uses
 `pabo` to parse pulsar data from binary files (in fact, many of `pabo`'s
-features are directly motivated by their need in `priwo`!). Documentation is in
-development, so stay tuned!
+features are directly motivated by their need in `priwo`!). The
+[**documentation**][docs] has a tutorial, a cookbook of real formats, and a
+comparison with `construct` and other libraries, including benchmarks.
 
 <h2>Installation</h2>
 
@@ -91,10 +140,9 @@ clean and easy-to-understand.
 
 </div>
 
-[numpy]: https://numpy.org
-[attrs]: https://www.attrs.org
+[docs]: https://astrogewgaw.github.io/pabo/
+[ruff]: https://github.com/astral-sh/ruff
 [gitmoji]: https://gitmoji.dev
-[black]: https://github.com/psf/black
 [bread]: https://github.com/alexras/bread
 [pabo]: https://github.com/astrogewgaw/pabo
 [priwo]: https://github.com/astrogewgaw/priwo
@@ -103,8 +151,8 @@ clean and easy-to-understand.
 [structures]: https://github.com/malinoff/structures
 [interrogate]: https://github.com/econchick/interrogate
 [struct]: https://docs.python.org/3/library/struct.html
-[doc_cov]: https://raw.githubusercontent.com/astrogewgaw/pabo/main/assets/doc_cov.svg
+[doc_cov]: https://raw.githubusercontent.com/astrogewgaw/pabo/main/assets/interrogate.svg
 [license]: https://img.shields.io/github/license/astrogewgaw/pabo?style=for-the-badge
 [stars-badge]: https://img.shields.io/github/stars/astrogewgaw/pabo?style=for-the-badge
-[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
+[ruff-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge
 [gitmoji-badge]: https://img.shields.io/badge/gitmoji-%20😜%20😍-FFDD67.svg?style=for-the-badge

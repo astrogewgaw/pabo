@@ -2,41 +2,173 @@
 Bit manipulation.
 """
 
+from dataclasses import dataclass, field
+
 import numpy as np
 
-from attrs import define
-from pabo.base import Construct
-from pabo.core import pack, unpack, swap
+from pabo.base import Construct, readexact
+from pabo.context import Container
+from pabo.errors import PaboError, ValidationError
+from pabo.hints import BitOrder
+from pabo.numeric import _checkbitorder
+from pabo.packing import packbits, unpackbits
 
 
-@define
-class Bits(Construct):
-
+@dataclass
+class Bits(Construct[bytes]):
     """
-    Represents bits.
+    Represents `count` bits, as bytes with one 0 or 1 per bit.
+
+    The bits occupy ceil(count / 8) bytes, so `size` is in bytes, like every
+    other construct. Unused trailing bits are zero when building and ignored
+    when parsing. `bitorder` decides whether the first bit is the most ("big")
+    or least ("little") significant bit of each byte.
     """
 
-    size: int
-    swap: bool = False
+    count: int
+    bitorder: BitOrder = "big"
 
-    def __size__(self):
-        return self.size
+    def __post_init__(self):
+        if self.count < 0:
+            raise PaboError("THE NUMBER OF BITS CANNOT BE NEGATIVE.")
+        _checkbitorder(self.bitorder)
 
-    def __build__(self, bits, stream):
-        data = np.frombuffer(bits, dtype=np.uint8)
-        data = data[: self.size]
-        data = pack(data, nbits=1)
-        if self.swap:
-            data = swap(data)
-        data = data.tobytes()
-        stream.write(data)
+    def _size(self, ctx):
+        return -(-self.count // 8)
 
-    def __parse__(self, stream):
-        raw = stream.read(self.size // 8)
-        data = np.frombuffer(raw, dtype=np.uint8)
-        data = data[: self.size]
-        data = unpack(data, nbits=1)
-        if self.swap:
-            data = swap(data)
-        data = data.tobytes()
+    def _build(self, bits, stream, ctx):
+        if isinstance(bits, (bytes, bytearray, memoryview)):
+            values = np.frombuffer(bits, dtype=np.uint8)
+        else:
+            values = np.asarray(bits, dtype=np.uint8).ravel()
+        if values.size != self.count:
+            raise ValidationError(f"EXPECTED {self.count} BITS, GOT {values.size}.")
+        if (values > 1).any():
+            raise ValidationError("BITS MUST BE 0 OR 1.")
+        padded = np.zeros(self.size * 8, dtype=np.uint8)
+        padded[: self.count] = values
+        stream.write(packbits(padded, 1, self.bitorder))
+        return bits
+
+    def _parse(self, stream, ctx):
+        raw = readexact(stream, self.size)
+        bits = unpackbits(raw, 1, self.bitorder)
+        return bits[: self.count].tobytes()
+
+
+@dataclass
+class BitInt:
+    """
+    An integer of `nbits` bits inside a `BitStruct`.
+    """
+
+    nbits: int
+    signed: bool = False
+
+    def __post_init__(self):
+        if self.nbits < 1:
+            raise PaboError("A BIT FIELD NEEDS AT LEAST ONE BIT.")
+
+
+@dataclass
+class BitFlag:
+    """
+    A single bit inside a `BitStruct`, as a boolean.
+    """
+
+    nbits: int = field(default=1, init=False)
+    signed: bool = field(default=False, init=False)
+
+
+@dataclass
+class BitPadding:
+    """
+    `nbits` zero bits inside a `BitStruct`, left out of the parsed result.
+    """
+
+    nbits: int
+    signed: bool = field(default=False, init=False)
+
+    def __post_init__(self):
+        if self.nbits < 1:
+            raise PaboError("BIT PADDING NEEDS AT LEAST ONE BIT.")
+
+
+@dataclass
+class BitStruct(Construct[Container]):
+    """
+    Named integer fields narrower than a byte, packed together.
+
+    The fields (`BitInt`, `BitFlag`, `BitPadding`) take as many whole bytes as
+    they need: if they don't fill the last one, the bits left over come after
+    them, and are zero when building and ignored when parsing. With
+    `bitorder="big"` (network order, as in IP and most file formats), the
+    bytes are read as a big-endian integer and the first field takes its most
+    significant bits. With `bitorder="little"` (C bit fields on little-endian
+    machines), the bytes are read as a little-endian integer and the first
+    field takes its least significant bits.
+    """
+
+    fields: dict[str, BitInt | BitFlag | BitPadding]
+    bitorder: BitOrder = "big"
+
+    def __post_init__(self):
+        _checkbitorder(self.bitorder)
+        if not self.fields:
+            raise PaboError("A BitStruct NEEDS AT LEAST ONE FIELD.")
+
+    def _layout(self):
+        """
+        Yield (name, spec, shift) for every field.
+        """
+
+        total = 8 * self._nbytes()
+        used = 0
+        for name, spec in self.fields.items():
+            shift = total - used - spec.nbits if self.bitorder == "big" else used
+            used += spec.nbits
+            yield name, spec, shift
+
+    def _nbytes(self) -> int:
+        """
+        The number of whole bytes the fields take.
+        """
+
+        return -(-sum(spec.nbits for spec in self.fields.values()) // 8)
+
+    def _size(self, ctx):
+        return self._nbytes()
+
+    def _build(self, data, stream, ctx):
+        value = 0
+        for name, spec, shift in self._layout():
+            if isinstance(spec, BitPadding):
+                continue
+            if name not in data:
+                raise PaboError(f"MISSING BIT FIELD {name!r}.")
+            field_value = int(data[name])
+            lo, hi = (
+                (-(1 << (spec.nbits - 1)), 1 << (spec.nbits - 1))
+                if spec.signed
+                else (0, 1 << spec.nbits)
+            )
+            if not lo <= field_value < hi:
+                raise ValidationError(
+                    f"THE VALUE {field_value} OF BIT FIELD {name!r} DOES NOT FIT IN {spec.nbits} BITS."
+                )
+            value |= (field_value & ((1 << spec.nbits) - 1)) << shift
+        stream.write(value.to_bytes(self._size(ctx), self.bitorder))
         return data
+
+    def _parse(self, stream, ctx):
+        raw = readexact(stream, self._size(ctx))
+        value = int.from_bytes(raw, self.bitorder)
+        out = Container()
+        for name, spec, shift in self._layout():
+            if isinstance(spec, BitPadding):
+                continue
+            field_value = (value >> shift) & ((1 << spec.nbits) - 1)
+            if spec.signed and field_value >> (spec.nbits - 1):
+                field_value -= 1 << spec.nbits
+            out[name] = bool(field_value) if isinstance(spec, BitFlag) else field_value
+        return out

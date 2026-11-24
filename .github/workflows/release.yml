@@ -1,13 +1,19 @@
 name: Build and upload pabo to PyPI.
 
 on:
+  workflow_dispatch:
   release:
     types:
       - published
-      
+
+# Never cancel a release halfway through: a second trigger waits its turn.
 concurrency:
-  cancel-in-progress: true
+  cancel-in-progress: false
   group: ${{ github.workflow }}-${{ github.ref }}
+
+# Read-only by default; only the upload job gets more (an OIDC token for PyPI).
+permissions:
+  contents: read
 
 jobs:
 
@@ -15,24 +21,25 @@ jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macos-15-intel builds the Intel (x86_64) wheels, macos-latest the Apple
+        # silicon (arm64) ones. (The macos-13 runners were retired in December 2025.)
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-15-intel, macos-latest]
       fail-fast: false
-    
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.2
-      
+        uses: pypa/cibuildwheel@v3.1.4
       - name: Verify clean directory
         run: git diff --exit-code
         shell: bash
-      
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
 
   # Build the source distribution.
@@ -40,26 +47,30 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Build sdist
         run: pipx run build --sdist
       - name: Check metadata
         run: pipx run twine check dist/*
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: sdist
           path: dist/*.tar.gz
-  
-  # Upload the wheels and source distribution to PyPI.
+
+  # Upload the wheels and source distribution to PyPI, with trusted publishing.
   upload_pypi:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
+    environment: pypi
+    permissions:
+      id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: dist
-          name: artifact
-      - uses: pypa/gh-action-pypi-publish@v1.5.1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_PASSWORD }}
+          pattern: "*"
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1

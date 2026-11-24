@@ -2,81 +2,436 @@
 Base classes.
 """
 
-from abc import ABC
+import mmap
+import os
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
+from dataclasses import dataclass, field, fields, replace
 from io import BytesIO
 from pathlib import Path
-from abc import abstractmethod
-from attrs import define, field
+from typing import Any, Generic, TypeVar, no_type_check
+
+from pabo.context import Container, Context
+from pabo.errors import ContextError, PaboError, SizeofError, StreamError
+from pabo.hints import BytesLike, Readable, Source, Target, Writable
+
+T = TypeVar("T")
 
 
-@define
-class PaboError(Exception):
-
+class Stop(Exception):
     """
-    Base class for all errors in pabo.
+    Raised by `StopIf` to end a `Specification` or `Sequential` early.
     """
 
-    def __init__(self, msg: str):
-        super().__init__(f"바보! {msg}")
+
+# No runtime type check (see `context.py`): called for nearly every field read,
+# and checking the `Readable` protocol slowed field-by-field parsing by ~20%.
+@no_type_check
+def readexact(stream: Readable, size: int) -> bytes:
+    """
+    Read exactly `size` bytes from a stream, or raise a `StreamError`.
+    """
+
+    data = stream.read(size)
+    if len(data) != size:
+        raise StreamError(
+            f"STREAM ENDED EARLY: EXPECTED {size} BYTES, GOT {len(data)}."
+        )
+    return data
 
 
-@define
-class Construct(ABC):
+# No runtime type check (see `context.py`): called for every field parsed or built.
+@no_type_check
+def tell(stream) -> int | None:
+    """
+    Return the stream position, or None if the stream cannot tell.
+    """
 
+    try:
+        return stream.tell()
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def hexdump(raw: BytesLike, offset: int = 0) -> str:
+    """
+    Format bytes as a hex dump: offset, 16 hex bytes, and their ASCII.
+    """
+
+    lines = []
+    for start in range(0, len(raw), 16):
+        chunk = raw[start : start + 16]
+        hexed = " ".join(f"{byte:02x}" for byte in chunk)
+        text = "".join(chr(byte) if 32 <= byte < 127 else "." for byte in chunk)
+        lines.append(f"{offset + start:08x}  {hexed:<47}  {text}")
+    return "\n".join(lines)
+
+
+# Terminal colours for `Construct.dump`, cycled through the fields.
+COLORS = ("\x1b[31m", "\x1b[32m", "\x1b[33m", "\x1b[34m", "\x1b[35m", "\x1b[36m")
+RESET = "\x1b[0m"
+
+
+def _leaves(value: Any, path: str = "") -> list:
+    """
+    The (path, start, end) of every field of a result parsed with offsets, in
+    order, going into nested and repeated specifications.
+    """
+
+    found = []
+    if isinstance(value, list):
+        for ix, element in enumerate(value):
+            found += _leaves(element, f"{path}[{ix}]")
+        return found
+    offsets = getattr(value, "_offsets", None) if isinstance(value, dict) else None
+    if offsets is None:
+        return found
+    for name, (start, end) in offsets.items():
+        child = value[name]
+        here = f"{path}.{name}" if path else name
+        inner = _leaves(child, here)
+        found += inner if inner else [(here, start, end)]
+    return found
+
+
+class BufferStream(BytesIO):
+    """
+    A stream over bytes in memory that keeps the original buffer as `source`.
+
+    `parse` reads `bytes`, `bytearray` and contiguous `memoryview`s through one
+    (setting `source` after creating it), so that `Array` can return a
+    read-only view of the buffer instead of a copy, just as `np.frombuffer`
+    does. The view itself is only made when an array asks for it.
+    """
+
+    __slots__ = ("source",)
+
+
+def buffer(stream) -> "mmap.mmap | memoryview | None":
+    """
+    The memory behind a stream, if arrays can be viewed in it without copying:
+    the map of a memory-mapped file, or the buffer behind a `BufferStream`.
+    """
+
+    if isinstance(stream, mmap.mmap):
+        return stream
+    if isinstance(stream, BufferStream):
+        return memoryview(stream.source).cast("B").toreadonly()
+    return None
+
+
+class scope:
+    """
+    Add `name` to the path (and the start offset) of any `PaboError` raised inside.
+
+    Use it as `with scope(name, stream):`. `docs` is recorded too, if no field
+    further in already gave one. (A plain class rather than `@contextmanager`,
+    which is faster here and has no generator return hint for beartype to check.)
+    """
+
+    __slots__ = ("docs", "name", "start")
+
+    def __init__(self, name, stream, docs=""):
+        self.name = name
+        self.docs = docs
+        self.start = tell(stream)
+
+    def __enter__(self):
+        return None
+
+    def __exit__(self, kind, error, traceback):
+        if isinstance(error, PaboError):
+            error.path.insert(0, self.name)
+            if error.offset is None:
+                error.offset = self.start
+            if self.docs and not error.docs:
+                error.docs = self.docs
+        return False
+
+
+@dataclass
+class Construct(ABC, Generic[T]):
     """
     Abstract base class for all binary constructs.
 
-    This class implements the basic functinality required by all binary
-    constructs. When creating a new construct, the user has to implement
-    just 3 magic methods: `__size__`, `__parse__`, and `__build__`. The
-    user may look at the constructs already implemented in this package
-    for inspiration.
+    When creating a new construct, implement three methods:
+
+    - `_size(ctx)`: the size in bytes. Raise `SizeofError` if it is variable.
+    - `_parse(stream, ctx)`: read the value from a binary stream and return it.
+    - `_build(data, stream, ctx)`: write `data` to a binary stream, and return
+      the value that was actually written (usually `data` itself).
+
+    `ctx` is the `Context` holding the fields parsed or being built so far.
+    Constructs that can be built without a value (constants, computed
+    fields, ...) also override `_omittable` to return True. Look at the
+    constructs in this package for inspiration.
     """
 
-    docs: str = field(kw_only=True, default="")
+    docs: str = field(default="", kw_only=True, repr=False)
+
+    def __init_subclass__(cls, **kwargs: Any):
+        # Give every construct the shared `__repr__` below. It is set on the class
+        # itself, before `@dataclass` runs, and dataclasses never replace a
+        # `__repr__` that the class already has.
+        super().__init_subclass__(**kwargs)
+        if "__repr__" not in cls.__dict__:
+            cls.__repr__ = Construct.__repr__
+
+    def __repr__(self) -> str:
+        return self._repr(docs=True)
+
+    def _repr(self, docs: bool) -> str:
+        """
+        The dataclass-style repr, with `docs` at the end if asked for and set.
+        """
+
+        parts = [
+            f"{member.name}={getattr(self, member.name)!r}"
+            for member in fields(self)
+            if member.repr
+        ]
+        if docs and self.docs:
+            parts.append(f"docs={self.docs!r}")
+        return f"{type(self).__name__}({', '.join(parts)})"
 
     @abstractmethod
-    def __size__(self):
+    def _size(self, ctx: Context) -> int:
         pass
 
     @abstractmethod
-    def __build__(self, data, stream):
+    def _build(self, data: Any, stream, ctx: Context) -> Any:
         pass
 
     @abstractmethod
-    def __parse__(self, stream):
+    def _parse(self, stream, ctx: Context) -> T:
         pass
+
+    def _numpydtype(self, ctx: Context) -> Any:
+        """
+        The numpy dtype of this construct as an `Array` element, or None if it
+        can't be one (the default).
+        """
+
+        return None
+
+    def _omittable(self) -> bool:
+        """
+        Whether a specification may build this field without being given a value.
+        """
+
+        return False
 
     def __truediv__(self, operand):
         if not isinstance(operand, str):
-            raise PaboError(f"{operand} not a str. Cannot be used as docs.")
-        self.docs = operand
-        return self
+            raise PaboError(f"{operand!r} IS NOT A STR, SO IT CANNOT BE USED AS DOCS.")
+        return replace(self, docs=operand)
 
     def __floordiv__(self, operand):
         return self.__truediv__(operand)
 
     @property
     def size(self) -> int:
-        size = self.__size__()
-        if isinstance(size, int):
+        """
+        The size in bytes, if it can be known without any data.
+        """
+
+        return self.sizeof()
+
+    def sizeof(self, ctx: Mapping[str, Any] | None = None) -> int:
+        """
+        The size in bytes, given the values in `ctx` (for example, parsed data).
+        """
+
+        try:
+            size = self._size(Context(ctx or {}))
+        except ContextError as error:
+            raise SizeofError(
+                f"THE SIZE DEPENDS ON OTHER FIELDS: {error.msg}"
+            ) from error
+        if isinstance(size, int) and size >= 0:
             return size
-        raise PaboError("No reasonable size was returned.")
+        raise SizeofError(f"NO REASONABLE SIZE WAS RETURNED (GOT {size!r}).")
 
-    def build(self, data, src=None):
+    def _label(self) -> str:
+        """
+        A short description of this construct, for `describe` (which shows the
+        docs in a column of their own).
+        """
+
+        return self._repr(docs=False)
+
+    def _rows(self, name: str, depth: int, offset: int | None):
+        """
+        Yield the (offset, size, name, depth, label, docs) rows for `describe`.
+        """
+
+        try:
+            size: int | None = self.size
+        except PaboError:
+            size = None
+        yield offset, size, name, depth, self._label(), self.docs
+
+    def describe(self) -> str:
+        """
+        A table of the layout: offsets, sizes, names, types and docs.
+
+        Offsets and sizes that depend on the data are shown as "?".
+        """
+
+        rows = [
+            (
+                "?" if offset is None else str(offset),
+                "?" if size is None else str(size),
+                "  " * depth + name,
+                label,
+                docs,
+            )
+            for offset, size, name, depth, label, docs in self._rows("", 0, 0)
+        ]
+        header = ("offset", "size", "field", "type", "docs")
+        widths = [max(len(row[ix]) for row in [header, *rows]) for ix in range(5)]
+        lines = []
+        for row in [header, *rows]:
+            line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths))
+            lines.append(line.rstrip())
+        return "\n".join(lines)
+
+    def dump(self, src: Source, color: bool = False, **params: Any) -> str:
+        """
+        A hex dump of the data, with the fields that start on each line named at
+        its end, for debugging. With `color=True`, each field's bytes and name
+        are shown in the same terminal colour. Other keyword arguments are
+        parameters, as in `parse`.
+        """
+
+        if isinstance(src, (bytes, bytearray, memoryview)):
+            raw = bytes(src)
+        elif isinstance(src, (str, os.PathLike)):
+            raw = Path(src).read_bytes()
+        else:
+            raw = src.read()
+        fields = _leaves(self.parse(raw, offsets=True, **params))
+        owner: dict[int, int] = {}
+        for ix, (_, start, end) in enumerate(fields):
+            for at in range(start, end):
+                owner.setdefault(at, ix)
+        lines = []
+        for base in range(0, len(raw), 16):
+            chunk = raw[base : base + 16]
+            cells, text = [], []
+            for at, byte in enumerate(chunk, base):
+                char = chr(byte) if 32 <= byte < 127 else "."
+                ix = owner.get(at)
+                if color and ix is not None:
+                    paint = COLORS[ix % len(COLORS)]
+                    cells.append(f"{paint}{byte:02x}{RESET}")
+                    text.append(f"{paint}{char}{RESET}")
+                else:
+                    cells.append(f"{byte:02x}")
+                    text.append(char)
+            names = [
+                f"{COLORS[ix % len(COLORS)]}{name}{RESET}" if color else name
+                for ix, (name, start, _) in enumerate(fields)
+                if base <= start < base + 16
+            ]
+            pad = "   " * (16 - len(chunk))
+            line = f"{base:08x}  {' '.join(cells)}{pad}  {''.join(text)}"
+            pad = " " * (16 - len(chunk))
+            lines.append(f"{line}{pad}  {', '.join(names)}".rstrip())
+        return "\n".join(lines)
+
+    def build(
+        self, data: Any, src: Target = None, append: bool = False, **params: Any
+    ) -> bytes | None:
+        """
+        Build `data` into bytes.
+
+        If `src` is None, the built bytes are returned. If `src` is a path, the
+        file is overwritten (or appended to, if `append` is True). Otherwise,
+        `src` should be a writable binary stream. Other keyword arguments are
+        parameters for the fields, as in `parse`.
+        """
+
+        ctx = Context()
+        if params:
+            ctx.__dict__["_params"] = Container(params)
         if src is None:
-            src = BytesIO()
-            self.__build__(data, src)
-            return src.getvalue()
+            stream = BytesIO()
+            self._build(data, stream, ctx)
+            return stream.getvalue()
         if isinstance(src, (str, Path)):
-            with open(src, "ab") as f:
-                return self.__build__(data, f)
-        return self.__build__(data, src)
+            with open(src, "ab" if append else "wb") as f:
+                self._build(data, f, ctx)
+            return None
+        if hasattr(src, "write"):
+            self._build(data, src, ctx)
+            return None
+        raise PaboError(f"CANNOT BUILD INTO AN OBJECT OF TYPE {type(src).__name__}.")
 
-    def parse(self, dst):
-        if isinstance(dst, bytes):
-            return self.__parse__(BytesIO(dst))
+    def parse(
+        self,
+        dst: Source,
+        trace: bool | Writable = False,
+        strict: bool = False,
+        offsets: bool = False,
+        **params: Any,
+    ) -> T:
+        """
+        Parse data from bytes, a path to a file, or a readable binary stream.
+
+        With `strict=True`, bytes left over after the data raise a `StreamError`
+        (by default they are ignored). With `offsets=True`, every `Container`
+        parsed from a specification gets an `_offsets` attribute: a dict from
+        each field's name to its (start, end) offsets in the stream.
+
+        Other keyword arguments are parameters: values the data depends on but
+        doesn't contain (such as a number of channels known from elsewhere),
+        which fields read as `this._params.name` (or `ctx._params.name`).
+
+        With `trace=True`, every field of every specification is printed to
+        stderr as it is parsed, with a hex dump of its bytes. `trace` may also
+        be a writable text stream to print to.
+
+        Arrays are read without copying, as `np.frombuffer` does: from bytes
+        (or a `bytearray` or `memoryview`), the arrays returned are read-only
+        views of them, which keep them alive. Changing a `bytearray` changes
+        the arrays viewing it, and it cannot be resized while they exist.
+
+        Files given by path are memory-mapped, so their arrays are read-only
+        views of the file too, and lazy fields can still be read after
+        `parse` returns. While such arrays or lazy values are alive the file
+        stays mapped, and on Windows it then cannot be modified or deleted.
+        """
+
+        ctx = Context()
+        ctx.__dict__["_trace"] = trace or None
+        ctx.__dict__["_offsets"] = offsets or None
+        if params:
+            ctx.__dict__["_params"] = Container(params)
+        if isinstance(dst, (bytes, bytearray, memoryview)):
+            if isinstance(dst, memoryview) and not dst.c_contiguous:
+                dst = dst.tobytes()  # such as view[::2], which BytesIO rejects
+            stream = BufferStream(dst)
+            stream.source = dst
+            return self._finish(self._parse(stream, ctx), stream, strict)
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
-                return self.__parse__(f)
-        return self.__parse__(dst)
+                try:
+                    stream = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+                except (OSError, ValueError):
+                    return self._finish(self._parse(f, ctx), f, strict)
+            return self._finish(self._parse(stream, ctx), stream, strict)
+        if hasattr(dst, "read"):
+            return self._finish(self._parse(dst, ctx), dst, strict)
+        raise PaboError(f"CANNOT PARSE FROM AN OBJECT OF TYPE {type(dst).__name__}.")
+
+    def _finish(self, value: Any, stream, strict: bool) -> Any:
+        """
+        Return the parsed value, after checking (if `strict`) that the stream
+        has ended.
+        """
+
+        if strict and stream.read(1):
+            rest = 1 + len(stream.read())
+            raise StreamError(f"{rest} BYTES WERE LEFT OVER AFTER THE DATA.")
+        return value
