@@ -73,10 +73,14 @@ png = pb.Spec(
     },
     endian="big",
 )
-records = pb.Repeat(pb.Spec({"a": pb.u16, "b": pb.u32, "c": pb.f32}), 1000)
+record = pb.Spec({"a": pb.u16, "b": pb.u32, "c": pb.f32})
+records = pb.Repeat(record, 1000)
+table = pb.Array(record, count=1000)
 array = pb.Array(pb.f32le, count=COUNT)
 case("header", "pabo")(lambda: png.parse(HEADER))
 case("records", "pabo")(lambda: records.parse(RECORDS))
+# The same records as one numpy structured array (a view), not 1,000 dicts.
+case("records", "pabo_array")(lambda: table.parse(RECORDS))
 case("array", "pabo")(lambda: array.parse(ARRAY))
 
 
@@ -553,7 +557,7 @@ def _check(group, result):
         last = result[999]
         b = (
             last[1]
-            if isinstance(last, tuple)
+            if isinstance(last, (tuple, np.void))
             else (last["b"] if isinstance(last, dict) else last.b)
         )
         assert b == 999

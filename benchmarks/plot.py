@@ -39,6 +39,7 @@ GROUPS = {
 # How each implementation is named on the plot.
 LABELS = {
     "pabo": "pabo",
+    "pabo_array": "pabo, numpy records",
     "struct": "struct (stdlib)",
     "construct": "construct",
     "construct_compiled": "construct, compiled",
@@ -229,7 +230,8 @@ def plot(
         )
         ys = list(range(len(rows)))[::-1]
         for y, row in zip(ys, rows):
-            color = colors["pabo" if row["implementation"] == "pabo" else "other"]
+            ours = row["implementation"].startswith("pabo")
+            color = colors["pabo" if ours else "other"]
             ax.scatter(
                 [row["median"]],
                 [y],
@@ -245,7 +247,7 @@ def plot(
                 va="center",
                 ha="left",
                 color=colors["ink"],
-                fontweight="bold" if row["implementation"] == "pabo" else "normal",
+                fontweight="bold" if ours else "normal",
             )
         low = min(r["median"] for r in rows)
         high = max(r["median"] for r in rows)
@@ -268,7 +270,7 @@ def plot(
         )
         for label in ax.get_yticklabels():
             label.set_color(colors["ink"])
-            if label.get_text() == "pabo":
+            if label.get_text().startswith("pabo"):
                 label.set_fontweight("bold")
         ax.spines[["top", "right", "left"]].set_visible(False)
         ax.tick_params(axis="y", length=0)

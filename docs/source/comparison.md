@@ -44,10 +44,11 @@ describe.)
 
 ## What pabo does differently
 
-- **Arrays are numpy arrays.** `Array` parses numbers into a numpy array, as a
-  view of the bytes or memory-mapped file being parsed, so a million values take
-  microseconds; values packed into 1, 2 or 4 bits are unpacked in C++. Every other
-  library here returns a list of Python numbers.
+- **Arrays are numpy arrays.** `Array` parses numbers, or records of fixed-size
+  fields, into a numpy array, as a view of the bytes or memory-mapped file being
+  parsed, so a million values take microseconds; values packed into 1, 2 or 4
+  bits are unpacked in C++. Every other library here returns a list of Python
+  numbers or objects.
 - **Fixed-size parts are compiled automatically.** A specification of fixed-size
   fields becomes one `struct` call, and repeats of it are parsed in bulk, without
   a separate `compile()` step (construct), generated code (duckparse, Kaitai) or a

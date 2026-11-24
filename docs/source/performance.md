@@ -6,12 +6,12 @@ Each dot is the median time for one parse, on a log scale.
 
 ```{image} _static/benchmarks/parse-light.svg
 :class: only-light
-:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, five libraries take just under 2 microseconds and pabo 2.8. For the records, pabo is third after struct and bitstruct, about 2.6 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
+:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, and pabo is among six libraries taking 1.6 to 2 microseconds. For the records, pabo's structured array is fastest at about 5 microseconds; as dicts, pabo is fourth, after struct and bitstruct, and about 2.8 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
 ```
 
 ```{image} _static/benchmarks/parse-dark.svg
 :class: only-dark
-:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, five libraries take just under 2 microseconds and pabo 2.8. For the records, pabo is third after struct and bitstruct, about 2.6 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
+:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, and pabo is among six libraries taking 1.6 to 2 microseconds. For the records, pabo's structured array is fastest at about 5 microseconds; as dicts, pabo is fourth, after struct and bitstruct, and about 2.8 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
 ```
 
 ## What is measured
@@ -24,16 +24,18 @@ as the others do it themselves.
 **A PNG header** (24 bytes: an 8-byte magic, a length, a chunk id, a width and a
 height). `struct.unpack` is the floor: it returns a tuple and checks nothing.
 bitstruct is a C extension that does the same at the bit level. The pure-Python
-libraries come next, all within a factor of two or so; pabo compiles a
-specification of fixed-size fields into a single `struct` call, but each parse
-still pays for setting up the context and checking the constants.
+libraries come next, most of them within a few tenths of a microsecond of each
+other; pabo compiles a specification of fixed-size fields into a single `struct`
+call, and checks the constants against its result.
 
 **1,000 records** of a `u16`, a `u32` and a `f32`, parsed into a list of dicts
 (`Repeat` of a `Spec`). pabo parses repeats of fixed-size specifications in bulk,
 with one `struct` call for all of them, so most of its time goes into making the
 1,000 dicts. `struct.iter_unpack` makes tuples instead, and bitstruct unpacks
-in C. binmap and dataclasses-struct have no way to repeat a structure, so they
-are not in this panel.
+in C. With `Array(record)` instead, pabo returns the records as one numpy
+structured array, a view of the bytes, which takes microseconds. binmap and
+dataclasses-struct have no way to repeat a structure, so they are not in this
+panel.
 
 **1,000,000 float32 values.** pabo returns a numpy array that is a view of the
 bytes being parsed, as `np.frombuffer` does, so the time does not grow with the
