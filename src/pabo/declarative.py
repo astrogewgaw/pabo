@@ -5,13 +5,15 @@ Class-based specifications, parsed into typed dataclass instances.
 import dataclasses
 import inspect
 from collections.abc import Mapping
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar
 
 from pabo.base import Construct
 from pabo.context import Container
 from pabo.hints import Endian, Source, Target
 from pabo.specify import Specification
 from pabo.wrappers import Const, Default
+
+S = TypeVar("S", bound="Struct")
 
 
 def _plain(construct: Const | Default) -> bool:
@@ -95,7 +97,7 @@ class Struct:
         cls.__pabo_names__ = tuple(f.name for f in dataclasses.fields(cls))  # type: ignore[arg-type]
 
     @classmethod
-    def fromdict(cls, data: Mapping[str, Any]) -> "Struct":
+    def fromdict(cls: type[S], data: Mapping[str, Any]) -> S:
         """
         Create an instance from a dict of field values (such as a parsed `Container`).
         """
@@ -110,7 +112,7 @@ class Struct:
         return Container({name: getattr(self, name) for name in self.__pabo_names__})
 
     @classmethod
-    def parse(cls, src: Source, **params: Any) -> "Struct":
+    def parse(cls: type[S], src: Source, **params: Any) -> S:
         """
         Parse an instance from bytes, a path or a binary stream (with
         parameters, as in `Construct.parse`).
