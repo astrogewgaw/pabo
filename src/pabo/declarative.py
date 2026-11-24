@@ -40,6 +40,7 @@ class Struct:
 
     __pabo_fields__: ClassVar[dict[str, Construct]] = {}
     __pabo_spec__: ClassVar[Specification]
+    __pabo_names__: ClassVar[tuple[str, ...]] = ()
 
     def __init_subclass__(cls, endian: Endian | None = None, **kwargs: Any):
         super().__init_subclass__(**kwargs)
@@ -70,6 +71,7 @@ class Struct:
                 delattr(cls, name)
         cls.__annotations__ = annotations
         dataclasses.dataclass(cls, kw_only=True)
+        cls.__pabo_names__ = tuple(f.name for f in dataclasses.fields(cls))  # type: ignore[arg-type]
 
     @classmethod
     def fromdict(cls, data: Mapping[str, Any]) -> "Struct":
@@ -77,8 +79,7 @@ class Struct:
         Create an instance from a dict of field values (such as a parsed `Container`).
         """
 
-        names = {f.name for f in dataclasses.fields(cls)}  # type: ignore[arg-type]
-        return cls(**{name: data[name] for name in names if name in data})
+        return cls(**{name: data[name] for name in cls.__pabo_names__ if name in data})
 
     def todict(self) -> Container:
         """
@@ -139,3 +140,16 @@ class StructConstruct(Construct):
 
     def _parse(self, stream, ctx):
         return self.cls.fromdict(self.cls.__pabo_spec__._parse(stream, ctx))
+
+    def _parsemany(self, stream, ctx, count: int) -> list | None:
+        """
+        Parse `count` instances in one go, as `Specification._parsemany` does.
+        """
+
+        unpacked = self.cls.__pabo_spec__._unpackmany(stream, ctx, count)
+        if unpacked is None:
+            return None
+        # A plan covers every field, so its names are those of the dataclass.
+        names, rows = unpacked
+        cls = self.cls
+        return [cls(**dict(zip(names, values))) for values in rows]

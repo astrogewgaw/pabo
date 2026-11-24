@@ -75,9 +75,10 @@ class Specification(Construct[Container]):
 
     # No runtime type check: part of the bulk fast path for `Repeat`.
     @no_type_check
-    def _parsemany(self, stream, ctx, count: int) -> list | None:
+    def _unpackmany(self, stream, ctx, count: int):
         """
-        Parse `count` copies in one go with the compiled plan, or return None.
+        Unpack `count` copies in one go with the compiled plan, as the field names
+        and an iterator of value tuples, or return None.
         """
 
         if ctx.setting("_trace"):
@@ -90,10 +91,20 @@ class Specification(Construct[Container]):
         if len(raw) != plan.struct.size * count:
             stream.seek(start)
             return None
-        names = plan.names
-        return [
-            Container(zip(names, values)) for values in plan.struct.iter_unpack(raw)
-        ]
+        return plan.names, plan.struct.iter_unpack(raw)
+
+    # No runtime type check: part of the bulk fast path for `Repeat`.
+    @no_type_check
+    def _parsemany(self, stream, ctx, count: int) -> list | None:
+        """
+        Parse `count` copies in one go with the compiled plan, or return None.
+        """
+
+        unpacked = self._unpackmany(stream, ctx, count)
+        if unpacked is None:
+            return None
+        names, rows = unpacked
+        return [Container(zip(names, values)) for values in rows]
 
     def _build(self, data, stream, ctx):
         if not isinstance(data, dict):

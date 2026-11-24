@@ -8,10 +8,6 @@ first.
 
 ## Performance
 
-- [ ] **Bulk-parse repeats of class-based `Struct`s.** `Repeat(MyStruct.construct(), 1000)`
-  takes about 3.6 ms, against 0.22 ms for the same fields as a `Spec`: the
-  `Struct` path misses the compiled `_Plan` bulk parsing (or building the
-  dataclasses costs that much). Found by the benchmarks.
 - [ ] **Lower the fixed cost of a parse.** A 24-byte PNG header takes about
   2.8 µs, against 1.7–1.9 µs for Kaitai Struct, structures, construct (compiled),
   duckparse and dissect.cstruct. Most of it is setting up the context and stream,

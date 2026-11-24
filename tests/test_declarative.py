@@ -1,4 +1,5 @@
 import dataclasses
+import io
 
 import pytest
 
@@ -108,3 +109,28 @@ def test_to_and_from_dict():
     header = PNGHeader.parse(PNG)
     assert header.todict()["width"] == 602
     assert PNGHeader.fromdict(header.todict()) == header
+
+
+def test_repeat_of_structs_is_parsed_in_bulk():
+    """
+    A `Repeat` of a fixed-size `Struct` parses all its instances in one go, with
+    the same results as one at a time, and still reports a short stream.
+    """
+    import struct
+
+    class Point(pb.Struct):
+        """
+        A fixed-size struct.
+        """
+
+        x: int = pb.i16
+        y: float = pb.f32
+
+    raw = b"".join(struct.pack("<hf", i, i / 2) for i in range(5))
+    points = pb.Repeat(Point.construct(), 5).parse(raw)
+    assert points == [Point(x=i, y=i / 2) for i in range(5)]
+    assert all(type(p) is Point for p in points)
+    one_by_one = pb.Repeat(Point.construct(), 5).parse(raw, trace=io.StringIO())
+    assert one_by_one == points
+    with pytest.raises(pb.StreamError):
+        pb.Repeat(Point.construct(), 6).parse(raw)
