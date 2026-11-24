@@ -69,7 +69,7 @@ class Struct:
     Constants and `Default`s default to their value, and other fields that can
     be built without a value (`Computed`, `Rebuild`, ...) default to None. A
     class whose fields are all bit fields (`BitInt`, `BitFlag`, `BitPadding`)
-    is a `BitStruct`, with its bit order given in the class statement:
+    is a `BitStruct`, with its bit order given in the class statement::
 
         class VersionIHL(pb.Struct, bitorder="big"):
             version: int = pb.BitInt(4)
