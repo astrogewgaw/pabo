@@ -243,10 +243,11 @@ def test_ipv4_header():
     assert ipv4.parse(withopts).options == b"\x01\x01\x01\x00"
 
 
-def test_gzip_header():
+def test_gzip_file():
     """
-    The header of a file written by `gzip` parses into its flags, modification time
-    and file name; the rest is raw deflate data and a CRC-32/size trailer.
+    A file written by `gzip` parses into its header (flags, modification time and
+    file name), the decompressed data and the CRC-32/size trailer, and builds back
+    to the same bytes, with the trailer filled in.
     """
     import gzip
     import zlib
@@ -269,8 +270,25 @@ def test_gzip_header():
         },
         endian="little",
     )
-    gz = pb.Spec({"header": header, "rest": pb.GreedyBytes()})
-    trailer = pb.Spec({"crc32": pb.u32, "size": pb.u32}, endian="little")
+
+    def deflate(data):
+        compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+        return compressor.compress(data) + compressor.flush()
+
+    gz = pb.Spec(
+        {
+            "header": header,
+            "data": pb.Remaining(
+                pb.Transformed(
+                    pb.GreedyBytes(), lambda raw: zlib.decompress(raw, -15), deflate
+                ),
+                leave=8,
+            ),
+            "crc32": pb.Rebuild(pb.u32, lambda ctx: zlib.crc32(ctx.data)),
+            "size": pb.Rebuild(pb.u32, lambda ctx: len(ctx.data) % 2**32),
+        },
+        endian="little",
+    )
 
     text = b"hello world " * 10
     buffer = BytesIO()
@@ -282,9 +300,9 @@ def test_gzip_header():
     assert data.header.flags == 8 and data.header.name == "hello.txt"
     assert data.header.mtime == datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
     assert data.header.extra is None and data.header.comment is None
-    assert zlib.decompress(data.rest[:-8], -15) == text
-    assert trailer.parse(data.rest[-8:]) == {"crc32": zlib.crc32(text), "size": 120}
-    assert header.build(data.header) + data.rest == raw
+    assert data.data == text
+    assert data.crc32 == zlib.crc32(text) and data.size == 120
+    assert gz.build({"header": data.header, "data": text}) == raw
 
 
 def _zipentry():
@@ -373,6 +391,24 @@ def test_zip_entries():
     assert zlib.decompress(entries[1].data, -15) == b"bravo" * 20
     rebuilt = b"".join(entry.build(e) for e in entries)
     assert raw.startswith(rebuilt)
+
+    # The end of central directory record, read from the end of the archive.
+    end = pb.Spec(
+        {
+            "signature": pb.Const(b"PK\x05\x06", pb.Bytes(4)),
+            "disk": pb.u16,
+            "directory_disk": pb.u16,
+            "disk_entries": pb.u16,
+            "entries": pb.u16,
+            "directory_size": pb.u32,
+            "directory_offset": pb.u32,
+            "comment_length": pb.u16,
+        },
+        endian="little",
+    )
+    record = pb.Pointer(-22, end, whence=2).parse(raw)
+    assert record.entries == 2 and record.directory_offset == len(rebuilt)
+    assert raw[record.directory_offset : record.directory_offset + 4] == b"PK\x01\x02"
 
 
 def test_tar_archive():

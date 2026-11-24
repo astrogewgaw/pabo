@@ -8,10 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Data at the end of the stream**: negative offsets for `Pointer`/`Seek`
-  (from the end, as in construct), and a way to read "everything except the last
-  N bytes" that also builds. Needed for gzip trailers and the ZIP central
-  directory. (construct `Pointer`; found writing the cookbook.)
 - [ ] **Checksums over any earlier data**, not only a check that follows what it
   covers: for example, a checksum before the data, or over several fields. (construct
   `RawCopy` + `Checksum`, structures `Checksum`.)

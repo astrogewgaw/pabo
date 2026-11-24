@@ -93,7 +93,10 @@ class Pointer(Construct):
     """
     Parse/build `wraps` at `offset`, then return to where the stream was.
 
-    Takes no space where it appears, since the data lives elsewhere.
+    `offset` counts from the start of the stream (`whence=0`), the current
+    position (1) or the end (2), as in `io.IOBase.seek`: `Pointer(-8, trailer,
+    whence=2)` reads the last 8 bytes. Takes no space where it appears, since
+    the data lives elsewhere.
     """
 
     offset: Dynamic
@@ -286,3 +289,46 @@ class Lazy(Construct):
             )
         stream.seek(offset + size)
         return LazyValue(self.wraps, stream, offset, ctx)
+
+
+@dataclass
+class Remaining(Construct):
+    """
+    `wraps`, parsed from the rest of the stream except its last `leave` bytes.
+
+    For data that runs up to a trailer of fixed size, such as the compressed
+    data of a gzip file before its 8-byte trailer: the trailer's fields follow
+    it as usual. `wraps` is usually greedy (`GreedyBytes()`, `Array(...)`).
+    Parsing needs a stream that can seek, to find its end. Building simply
+    writes `wraps`, and the fields after it write the rest.
+    """
+
+    wraps: Construct
+    leave: int = 0
+
+    def __post_init__(self):
+        if self.leave < 0:
+            raise PaboError("THE NUMBER OF BYTES TO LEAVE CANNOT BE NEGATIVE.")
+
+    def _omittable(self):
+        return self.wraps._omittable()
+
+    def _size(self, ctx):
+        raise SizeofError("THE SIZE OF Remaining DEPENDS ON THE STREAM.")
+
+    def _build(self, data, stream, ctx):
+        return self.wraps._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        start = tell(stream)
+        if start is None:
+            raise StreamError("Remaining NEEDS A STREAM THAT CAN SEEK.")
+        end = _seek(stream, 0, 2)
+        stream.seek(start)
+        if end - start < self.leave:
+            raise StreamError(
+                f"STREAM ENDED EARLY: EXPECTED AT LEAST {self.leave} BYTES, "
+                f"GOT {end - start}."
+            )
+        raw = readexact(stream, end - start - self.leave)
+        return self.wraps._parse(BytesIO(raw), ctx)

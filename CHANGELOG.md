@@ -31,7 +31,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   any length (with options to keep it, leave it in the stream, or accept the
   end of the stream instead).
 - `FixedSized`, to parse a construct inside a window of a given number of
-  bytes (padding it when building).
+  bytes (padding it when building), and `Remaining`, for the rest of the
+  stream except a trailer of a given size.
 - `BitStruct` with `BitInt`, `BitFlag` and `BitPadding` (fields of any number
   of bits), and a `bitorder` option for bit-packed `Array`s, which support 1, 2
   and 4 bits per value (other widths raise an error).

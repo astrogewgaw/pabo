@@ -175,3 +175,37 @@ def test_parse_empty_file(tmp_path):
     path = tmp_path / "empty.bin"
     path.write_bytes(b"")
     assert pb.GreedyBytes().parse(path) == b""
+
+
+def test_remaining_leaves_a_trailer():
+    """
+    `Remaining` parses everything up to the last `leave` bytes, so a trailer of
+    fixed size can follow it; building writes it and the trailer in order.
+    """
+
+    spec = pb.Spec(
+        {
+            "tag": pb.u8,
+            "body": pb.Remaining(pb.GreedyBytes(), leave=4),
+            "crc": pb.u32,
+        }
+    )
+    raw = b"\x01" + b"payload" + b"\x02\x00\x00\x00"
+    assert spec.parse(raw) == {"tag": 1, "body": b"payload", "crc": 2}
+    assert spec.build({"tag": 1, "body": b"payload", "crc": 2}) == raw
+    assert spec.parse(b"\x01\x02\x00\x00\x00").body == b""
+    with pytest.raises(pb.StreamError, match="AT LEAST 4"):
+        spec.parse(b"\x01\x02\x00")
+    with pytest.raises(pb.SizeofError):
+        spec.size
+    with pytest.raises(pb.PaboError):
+        pb.Remaining(pb.GreedyBytes(), leave=-1)
+
+
+def test_pointer_from_the_end():
+    """
+    `Pointer` with `whence=2` reads at an offset from the end of the stream.
+    """
+
+    spec = pb.Spec({"first": pb.u8, "last": pb.Pointer(-2, pb.u16, whence=2)})
+    assert spec.parse(b"\x01\xaa\xbb\x05\x00") == {"first": 1, "last": 5}

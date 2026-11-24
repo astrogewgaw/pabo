@@ -163,13 +163,21 @@ custom construct can keep (see [](custom.md)).
 
 ## Archives
 
-### gzip header
+### gzip file
 
 Which optional fields follow the fixed ones depends on bits of the flags byte,
 so each is an `If` on a bitwise expression. The modification time is a Unix
-timestamp.
+timestamp. Then comes the compressed data, up to an 8-byte trailer (a CRC-32 and
+the size of the data): `Remaining` reads up to the trailer, `Transformed`
+decompresses it, and `Rebuild` fills in the trailer when building.
 
 ```python
+import zlib
+
+def deflate(data):
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -15)  # raw deflate, as gzip does
+    return compressor.compress(data) + compressor.flush()
+
 header = pb.Spec(
     {
         "magic": pb.Const(b"\x1f\x8b", pb.Bytes(2)),
@@ -185,14 +193,22 @@ header = pb.Spec(
     },
     endian="little",
 )
-gz = pb.Spec({"header": header, "rest": pb.GreedyBytes()})
+gz = pb.Spec(
+    {
+        "header": header,
+        "data": pb.Remaining(
+            pb.Transformed(pb.GreedyBytes(), lambda raw: zlib.decompress(raw, -15), deflate),
+            leave=8,
+        ),
+        "crc32": pb.Rebuild(pb.u32, lambda ctx: zlib.crc32(ctx.data)),
+        "size": pb.Rebuild(pb.u32, lambda ctx: len(ctx.data) % 2**32),
+    },
+    endian="little",
+)
 
-data = gz.parse("notes.txt.gz")
-data.header.name, data.header.mtime
+notes = gz.parse("notes.txt.gz")
+notes.header.name, notes.data
 ```
-
-The rest is raw deflate data followed by an 8-byte trailer (a CRC-32 and the
-uncompressed size): `zlib.decompress(data.rest[:-8], -15)` gives the contents.
 
 ### ZIP entries
 
@@ -245,7 +261,28 @@ for e in pb.Greedy(entry).parse("archive.zip"):
     print(e.name, e.method.name, e.modified)
 ```
 
-Deflated data is decompressed with `zlib.decompress(e.data, -15)`.
+Deflated data is decompressed with `zlib.decompress(e.data, -15)`. The archive
+ends with a 22-byte record (when it has no comment) giving the number of entries
+and where the central directory, the archive's index, starts; a `Pointer` with
+`whence=2` reads it from the end:
+
+```python
+end = pb.Spec(
+    {
+        "signature": pb.Const(b"PK\x05\x06", pb.Bytes(4)),
+        "disk": pb.u16,
+        "directory_disk": pb.u16,
+        "disk_entries": pb.u16,
+        "entries": pb.u16,
+        "directory_size": pb.u32,
+        "directory_offset": pb.u32,
+        "comment_length": pb.u16,
+    },
+    endian="little",
+)
+
+pb.Pointer(-22, end, whence=2).parse("archive.zip").entries
+```
 
 ### tar archive
 

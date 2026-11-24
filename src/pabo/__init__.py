@@ -56,7 +56,17 @@ from pabo.expressions import Expr, This, lenof, this
 from pabo.numeric import Array, Float, Int, VarInt, ZigZag
 from pabo.specify import Embedded, Specification
 from pabo.specify import Specification as Spec
-from pabo.stream import Aligned, AlignedSpec, Lazy, LazyValue, Peek, Pointer, Seek, Tell
+from pabo.stream import (
+    Aligned,
+    AlignedSpec,
+    Lazy,
+    LazyValue,
+    Peek,
+    Pointer,
+    Remaining,
+    Seek,
+    Tell,
+)
 from pabo.strings import CString, GreedyString, Line, PaddedString, PascalString
 from pabo.transforms import Checksummed, Compressed, Transformed
 from pabo.wrappers import (
@@ -122,6 +132,7 @@ __all__ = [
     "Prefixed",
     "Probe",
     "Rebuild",
+    "Remaining",
     "Repeat",
     "RepeatUntil",
     "Seek",
