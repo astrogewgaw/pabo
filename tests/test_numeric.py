@@ -434,7 +434,9 @@ def test_array_copies_inside_prefixed_and_packed():
     are new, writeable arrays, even when parsing bytes.
     """
 
-    prefixed = pb.Prefixed(pb.u8, pb.Array(pb.u16, count=2)).parse(b"\x04\x01\x00\x02\x00")
+    prefixed = pb.Prefixed(pb.u8, pb.Array(pb.u16, count=2)).parse(
+        b"\x04\x01\x00\x02\x00"
+    )
     np.testing.assert_array_equal(prefixed, [1, 2])
     assert prefixed.flags.writeable
     packed = pb.Array(pb.u8, count=4, packing=4).parse(b"\x12\x34")
