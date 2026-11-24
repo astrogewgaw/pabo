@@ -414,3 +414,42 @@ class Select(Construct):
                 errors.append((ix, error))
         stream.seek(start)
         raise self._fail(errors)
+
+
+@dataclass
+class Deferred(Construct):
+    """
+    The construct returned by `func(ctx)`, chosen each time it is parsed or built.
+
+    Use it when a layout is only known from data parsed earlier (such as the
+    columns of a table described by its header), or for recursive layouts,
+    where a construct contains itself:
+
+        node = pb.Spec({
+            "value": pb.u8,
+            "count": pb.Rebuild(pb.u8, pb.lenof(this.children)),
+            "children": pb.Repeat(pb.Deferred(lambda ctx: node), this.count),
+        })
+    """
+
+    func: ContextFunction
+
+    def _choose(self, ctx) -> Construct:
+        chosen = evaluate(self.func, ctx)
+        if not isinstance(chosen, Construct):
+            raise ValidationError(
+                f"THE FUNCTION OF A Deferred MUST RETURN A CONSTRUCT, GOT {chosen!r}."
+            )
+        return chosen
+
+    def _omittable(self):
+        return False
+
+    def _size(self, ctx):
+        return self._choose(ctx)._size(ctx)
+
+    def _build(self, data, stream, ctx):
+        return self._choose(ctx)._build(data, stream, ctx)
+
+    def _parse(self, stream, ctx):
+        return self._choose(ctx)._parse(stream, ctx)

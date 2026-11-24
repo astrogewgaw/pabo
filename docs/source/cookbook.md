@@ -638,9 +638,9 @@ values: `BZERO + BSCALE * image`.
 
 The columns of a FITS table are described by `TFORMn` (a repeat count and a type
 code) and `TTYPEn` (a name) cards, so the layout of a row is only known once the
-header has been read. This takes two steps: parse the header with the table's
-bytes, then make a row specification from the header and parse the rows with it.
-(A `Repeat` of a fixed-size specification is parsed in bulk, so this is fast.)
+header has been read. `Deferred` makes the row specification from the header
+when it gets to the rows. (A `Repeat` of a fixed-size specification is parsed in
+bulk, so this is fast.)
 
 ```python
 TFORM = {"B": pb.u8, "I": pb.i16, "J": pb.i32, "K": pb.i64, "E": pb.f32, "D": pb.f64}
@@ -659,19 +659,19 @@ def rowspec(meta):
         fields[meta.get(f"TTYPE{i}", f"COL{i}")] = field
     return pb.Spec(fields, endian="big")
 
+def rows(ctx):
+    meta = ctx.header.meta
+    return pb.Repeat(rowspec(meta), meta["NAXIS2"])
+
 table = pb.Spec(
     {
         "header": header,  # as in the image recipe
-        "data": pb.Aligned(
-            2880,
-            pb.Bytes(lambda ctx: ctx.header.meta["NAXIS1"] * ctx.header.meta["NAXIS2"]),
-        ),
+        "rows": pb.Aligned(2880, pb.Deferred(rows)),
     }
 )
 
 hdu = table.parse(raw)    # the bytes of a BINTABLE extension
-meta = hdu.header.meta
-rows = pb.Repeat(rowspec(meta), meta["NAXIS2"]).parse(hdu.data)
+hdu.rows[0]["FLUX"]
 ```
 
 This covers the common column types; logical (`L`), bit (`X`), complex (`C`,

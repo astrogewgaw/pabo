@@ -923,9 +923,9 @@ def test_fits_image():
 
 def test_fits_binary_table():
     """
-    A FITS binary table extension, in two steps: the header is parsed first, a row
-    specification is made from its `TFORMn` and `TTYPEn` cards, and the rows are
-    parsed from the table's bytes with it.
+    A FITS binary table extension: `Deferred` makes the row specification from the
+    header's `TFORMn` and `TTYPEn` cards, then the rows are parsed and built with
+    it.
     """
     TFORM = {
         "B": pb.u8,
@@ -950,15 +950,14 @@ def test_fits_binary_table():
             fields[meta.get(f"TTYPE{i}", f"COL{i}")] = field
         return pb.Spec(fields, endian="big")
 
+    def rows(ctx):
+        meta = ctx.header.meta
+        return pb.Repeat(rowspec(meta), meta["NAXIS2"])
+
     table = pb.Spec(
         {
             "header": _fitsheader(),
-            "data": pb.Aligned(
-                2880,
-                pb.Bytes(
-                    lambda ctx: ctx.header.meta["NAXIS1"] * ctx.header.meta["NAXIS2"]
-                ),
-            ),
+            "rows": pb.Aligned(2880, pb.Deferred(rows)),
         }
     )
     cards = _fitscards(
@@ -979,17 +978,15 @@ def test_fits_binary_table():
             ("TFORM3", "1D"),
         ]
     )
-    rows = [{"ID": i, "NAME": f"SRC{i}", "FLUX": 1.5 * i} for i in range(3)]
-    header = _fitsheader()
-    meta = header.parse(header.build({"cards": cards})).meta
-    data = pb.Repeat(rowspec(meta), len(rows)).build(rows)
-    raw = table.build({"header": {"cards": cards}, "data": data})
+    values = [{"ID": i, "NAME": f"SRC{i}", "FLUX": 1.5 * i} for i in range(3)]
+    raw = table.build({"header": {"cards": cards}, "rows": values})
     assert len(raw) == 2 * 2880
+    assert raw[2880:2884] == b"\x00\x00\x00\x00" and raw[2884:2892] == b"SRC0    "
 
     hdu = table.parse(raw)
     meta = hdu.header.meta
     assert meta["XTENSION"] == "BINTABLE" and meta["NAXIS1"] == 20
-    assert pb.Repeat(rowspec(meta), meta["NAXIS2"]).parse(hdu.data) == rows
+    assert hdu.rows == values
 
 
 def test_ccsds_space_packets():

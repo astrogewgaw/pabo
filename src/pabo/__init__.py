@@ -30,6 +30,7 @@ from pabo.context import Container, Context
 from pabo.control import (
     Check,
     Computed,
+    Deferred,
     If,
     Optional,
     Rebuild,
@@ -93,6 +94,7 @@ __all__ = [
     "Container",
     "Context",
     "ContextError",
+    "Deferred",
     "Delimited",
     "Embedded",
     "Enum",

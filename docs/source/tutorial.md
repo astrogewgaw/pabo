@@ -164,6 +164,7 @@ and a height.
 | `Switch(key, cases, default=None)` | Choose a construct by a key (a tagged union). |
 | `Select([a, b, ...])` | The first alternative that parses. |
 | `Union({"name": construct, ...})` | Several views of the same bytes. |
+| `Deferred(func)` | The construct `func(ctx)` returns: for layouts that depend on earlier data, or contain themselves. |
 | `Optional(wraps)` | Parse if possible, else rewind and give None. |
 | `Repeat(wraps, count)` | Repeat a fixed (or context-dependent) number of times. |
 | `RepeatUntil(predicate, wraps)` | Repeat until `predicate(element, ctx)` holds. |

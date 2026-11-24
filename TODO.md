@@ -8,10 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **A construct chosen by a function of the context**, such as
-  `Deferred(lambda ctx: rowspec(ctx.meta))`, so FITS tables can be read in one
-  pass. With a function of nothing, it also gives recursive layouts. (construct
-  `LazyBound`; found writing the FITS cookbook recipe.)
 - [ ] **Data at the end of the stream**: negative offsets for `Pointer`/`Seek`
   (from the end, as in construct), and a way to read "everything except the last
   N bytes" that also builds. Needed for gzip trailers and the ZIP central

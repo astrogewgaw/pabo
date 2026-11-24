@@ -264,3 +264,46 @@ def test_select_takes_the_first_alternative_that_works():
         pb.Select([pb.u8, pb.u16]).size
     with pytest.raises(pb.PaboError):
         pb.Select([])
+
+
+def test_deferred_recursive_layout():
+    """
+    `Deferred` lets a construct contain itself: a tree whose nodes hold a count of
+    children parses and builds to any depth.
+    """
+
+    node = pb.Spec(
+        {
+            "value": pb.u8,
+            "count": pb.Rebuild(pb.u8, pb.lenof(this.children)),
+            "children": pb.Repeat(pb.Deferred(lambda ctx: node), this.count),
+        }
+    )
+    tree = {
+        "value": 1,
+        "children": [
+            {"value": 2, "children": []},
+            {"value": 3, "children": [{"value": 4, "children": []}]},
+        ],
+    }
+    raw = node.build(tree)
+    assert raw == bytes([1, 2, 2, 0, 3, 1, 4, 0])
+    parsed = node.parse(raw)
+    assert parsed.children[1].children[0].value == 4
+
+
+def test_deferred_layout_from_earlier_data():
+    """
+    `Deferred` can choose a construct from fields parsed before it, its size
+    follows the choice, and a function that doesn't return a construct raises.
+    """
+
+    kinds = {1: pb.u8, 2: pb.u16}
+    spec = pb.Spec({"kind": pb.u8, "value": pb.Deferred(lambda ctx: kinds[ctx.kind])})
+    assert spec.parse(b"\x02\x01\x01") == {"kind": 2, "value": 257}
+    assert spec.build({"kind": 1, "value": 5}) == b"\x01\x05"
+    assert spec.sizeof({"kind": 2}) == 3
+    with pytest.raises(pb.ValidationError, match="MUST RETURN A CONSTRUCT"):
+        pb.Deferred(lambda ctx: 42).parse(b"\x00")
+    with pytest.raises(pb.ContextError, match="KeyError"):
+        spec.parse(b"\x07\x00")

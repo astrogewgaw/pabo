@@ -15,7 +15,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   of the context, accepted wherever a count, length, offset or condition is
   expected.
 - Control flow: `Computed`, `Rebuild`, `If`, `Optional`, `Switch`, `Select`,
-  `Union`, `RepeatUntil`, `StopIf`, `Terminated`, `Check` and `Validated`.
+  `Union`, `Deferred`, `RepeatUntil`, `StopIf`, `Terminated`, `Check` and
+  `Validated`.
 - Numbers: integers of any width (`Int(3)`, `Int(16)`), half floats
   (`Float(2)`), `VarInt` (LEB128, or most significant first with
   `order="big"`, as in MIDI) and `ZigZag`, `"native"` endianness, a default
