@@ -25,7 +25,21 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "hypothesis"]
-bench = ["pytest-benchmark", "construct", "ultraplot"]
+bench = [
+  "pytest-benchmark",
+  "ultraplot",
+  # The libraries compared with pabo. (duckparse, only on GitHub, and pystructs
+  # 0.4, which needs Python 3.13, are installed by hand.)
+  "construct",
+  "dissect.cstruct",
+  "kaitaistruct",
+  "bitstruct",
+  "structures",
+  "bread",
+  "bitstring<5",  # bread breaks with bitstring 5
+  "binmap",
+  "dataclasses-struct",
+]
 docs = [
   "sphinx",
   "furo",
@@ -72,7 +86,7 @@ MACOSX_DEPLOYMENT_TARGET = "10.14"
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = ["src/pabo/_version.py", "docs"]
+extend-exclude = ["src/pabo/_version.py", "docs", "benchmarks/kaitai"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

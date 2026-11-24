@@ -120,7 +120,7 @@ For more real examples, check out the [**`priwo`**][priwo] package, which uses
 `pabo` to parse pulsar data from binary files (in fact, many of `pabo`'s
 features are directly motivated by their need in `priwo`!). The
 [**documentation**][docs] has a tutorial, a cookbook of real formats, and a
-comparison with `construct`.
+comparison with `construct` and other libraries, including benchmarks.
 
 <h2>Installation</h2>
 

@@ -40,10 +40,33 @@ GROUPS = {
 LABELS = {
     "pabo": "pabo",
     "struct": "struct (stdlib)",
-    "numpy": "numpy",
     "construct": "construct",
     "construct_compiled": "construct, compiled",
+    "dissect": "dissect.cstruct",
+    "kaitai": "Kaitai Struct",
+    "bitstruct": "bitstruct",
+    "structures": "structures",
+    "bread": "bread",
+    "binmap": "binmap",
+    "duckparse": "duckparse",
+    "pystructs": "pystructs",
+    "dataclasses_struct": "dataclasses-struct",
 }
+
+# The packages whose versions are recorded with the results.
+PACKAGES = (
+    "construct",
+    "dissect.cstruct",
+    "kaitaistruct",
+    "bitstruct",
+    "structures",
+    "bread",
+    "binmap",
+    "duckparse",
+    "pystructs",
+    "dataclasses-struct",
+    "numpy",
+)
 
 # Colors (validated with the dataviz skill's palette checker): pabo is the point
 # of the chart, so it gets the one hue; the alternatives are context, in gray.
@@ -101,7 +124,7 @@ def summarize(raw: Path) -> dict:
     results = []
     for bench in data["benchmarks"]:
         group = bench["group"]
-        impl = bench["name"].removeprefix(f"test_{group}_")
+        impl = bench["extra_info"]["implementation"]
         stats = bench["stats"]
         results.append(
             {
@@ -118,7 +141,7 @@ def summarize(raw: Path) -> dict:
         "cpu": data["machine_info"].get("cpu", {}).get("brand_raw", "unknown"),
         "python": platform.python_version(),
         "commit": _commit(),
-        "versions": {name: _version(name) for name in ("construct", "numpy")},
+        "versions": {name: _version(name) for name in PACKAGES},
         "results": results,
     }
 

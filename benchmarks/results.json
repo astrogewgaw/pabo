@@ -1,92 +1,285 @@
 {
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "cpu": "AMD Ryzen 5 220 w/ Radeon 740M Graphics",
   "python": "3.12.16",
-  "commit": "c60e41d",
+  "commit": "f5d01c1",
   "versions": {
     "construct": "2.10.70",
+    "dissect.cstruct": "4.7",
+    "kaitaistruct": "0.11",
+    "bitstruct": "8.24.0",
+    "structures": "0.9.5",
+    "bread": "3.1.0",
+    "binmap": "1.2.1",
+    "duckparse": "0.0.0",
+    "pystructs": "0.3.0",
+    "dataclasses-struct": "1.5.2",
     "numpy": "2.5.5"
   },
   "results": [
     {
       "group": "header",
       "implementation": "pabo",
-      "median": 2.2051468100016793e-06,
-      "q1": 2.1864204125000695e-06,
-      "q3": 2.2216002675003215e-06,
-      "rounds": 5
+      "median": 2.7652920803440344e-06,
+      "q1": 2.7570727403142095e-06,
+      "q3": 2.9028723959786937e-06,
+      "rounds": 20
     },
     {
       "group": "header",
       "implementation": "struct",
-      "median": 7.987180100008118e-08,
-      "q1": 7.933573249988512e-08,
-      "q3": 8.023891099986712e-08,
-      "rounds": 13
+      "median": 9.982204799985084e-08,
+      "q1": 9.586808149998659e-08,
+      "q3": 1.0254481699985264e-07,
+      "rounds": 11
     },
     {
       "group": "header",
       "implementation": "construct",
-      "median": 4.1226187605540235e-06,
-      "q1": 4.053126115259997e-06,
-      "q3": 4.209942408164176e-06,
+      "median": 4.394173231097207e-06,
+      "q1": 4.343643996163362e-06,
+      "q3": 4.440288166617308e-06,
       "rounds": 20
     },
     {
       "group": "header",
       "implementation": "construct_compiled",
-      "median": 1.7616338849995826e-06,
-      "q1": 1.7576963600004092e-06,
-      "q3": 1.7652883699997802e-06,
+      "median": 1.852881529999877e-06,
+      "q1": 1.8396301200004927e-06,
+      "q3": 1.861816010000439e-06,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "dissect",
+      "median": 1.915374529999099e-06,
+      "q1": 1.9118565400003716e-06,
+      "q3": 1.9376181600000564e-06,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "kaitai",
+      "median": 1.7363225950009564e-06,
+      "q1": 1.6565951600000516e-06,
+      "q3": 1.7863020300001153e-06,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "bitstruct",
+      "median": 2.226598259999264e-07,
+      "q1": 2.1857335974999615e-07,
+      "q3": 2.2339462999997295e-07,
+      "rounds": 5
+    },
+    {
+      "group": "header",
+      "implementation": "structures",
+      "median": 1.7497813350007618e-06,
+      "q1": 1.7354990299986638e-06,
+      "q3": 1.7712761099983255e-06,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "bread",
+      "median": 2.587185950001185e-05,
+      "q1": 2.5710491874991705e-05,
+      "q3": 2.6407270199996444e-05,
+      "rounds": 5
+    },
+    {
+      "group": "header",
+      "implementation": "binmap",
+      "median": 1.7381108500012487e-05,
+      "q1": 1.727009740000085e-05,
+      "q3": 1.743006389999664e-05,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "duckparse",
+      "median": 1.8832693050001126e-06,
+      "q1": 1.868107450000025e-06,
+      "q3": 1.9092639099994814e-06,
+      "rounds": 6
+    },
+    {
+      "group": "header",
+      "implementation": "dataclasses_struct",
+      "median": 3.3477512406906297e-06,
+      "q1": 3.319785359809018e-06,
+      "q3": 3.3560241609008747e-06,
+      "rounds": 20
+    },
+    {
+      "group": "records",
+      "implementation": "pabo",
+      "median": 0.00036701635999975224,
+      "q1": 0.0002575591549998535,
+      "q3": 0.0003733329124997908,
+      "rounds": 20
+    },
+    {
+      "group": "records",
+      "implementation": "struct",
+      "median": 3.655721255207004e-05,
+      "q1": 3.6071357142812375e-05,
+      "q3": 3.713445110957857e-05,
+      "rounds": 20
+    },
+    {
+      "group": "records",
+      "implementation": "construct",
+      "median": 0.0027016579399992222,
+      "q1": 0.0026823256525011626,
+      "q3": 0.0028927241524991133,
+      "rounds": 5
+    },
+    {
+      "group": "records",
+      "implementation": "construct_compiled",
+      "median": 0.0009573197150007217,
+      "q1": 0.0008556912450001163,
+      "q3": 0.001085064630000261,
+      "rounds": 12
+    },
+    {
+      "group": "records",
+      "implementation": "dissect",
+      "median": 0.0018560346449999088,
+      "q1": 0.0018427507199999128,
+      "q3": 0.002056245299997954,
       "rounds": 6
     },
     {
       "group": "records",
-      "implementation": "pabo",
-      "median": 0.0002711681400000998,
-      "q1": 0.00026819695749998116,
-      "q3": 0.00027410909550013685,
-      "rounds": 5
+      "implementation": "kaitai",
+      "median": 0.0010875599299993155,
+      "q1": 0.000895090817499522,
+      "q3": 0.0011463778500001355,
+      "rounds": 13
     },
     {
       "group": "records",
-      "implementation": "numpy",
-      "median": 1.3060521899990362e-07,
-      "q1": 1.3036803400007103e-07,
-      "q3": 1.3208137300000546e-07,
-      "rounds": 8
+      "implementation": "bitstruct",
+      "median": 0.00011656776799986802,
+      "q1": 0.0001162364172499224,
+      "q3": 0.00011876463924988912,
+      "rounds": 9
     },
     {
       "group": "records",
-      "implementation": "construct",
-      "median": 0.0027587633100006315,
-      "q1": 0.0025486044674994444,
-      "q3": 0.0027724017874993477,
-      "rounds": 5
+      "implementation": "structures",
+      "median": 0.0011185441199995693,
+      "q1": 0.0011108221500012406,
+      "q3": 0.0011321697800008223,
+      "rounds": 10
+    },
+    {
+      "group": "records",
+      "implementation": "bread",
+      "median": 0.02559165699994992,
+      "q1": 0.023220409749853843,
+      "q3": 0.037992409000082716,
+      "rounds": 3
+    },
+    {
+      "group": "records",
+      "implementation": "duckparse",
+      "median": 0.001012825810000777,
+      "q1": 0.0009941119800004118,
+      "q3": 0.0012740634100003945,
+      "rounds": 11
     },
     {
       "group": "array",
       "implementation": "pabo",
-      "median": 7.964460750008584e-05,
-      "q1": 7.796518899999682e-05,
-      "q3": 8.017504000008557e-05,
-      "rounds": 14
+      "median": 3.7234705251405326e-06,
+      "q1": 3.7118389423051684e-06,
+      "q3": 3.7353080251442898e-06,
+      "rounds": 20
     },
     {
       "group": "array",
-      "implementation": "numpy",
-      "median": 1.512136000001192e-07,
-      "q1": 1.4904883299999482e-07,
-      "q3": 1.515224480001507e-07,
-      "rounds": 7
+      "implementation": "struct",
+      "median": 0.019286882549999974,
+      "q1": 0.01835020860003169,
+      "q3": 0.019530489599992505,
+      "rounds": 6
     },
     {
       "group": "array",
       "implementation": "construct",
-      "median": 0.33230658499996935,
-      "q1": 0.33230658499996935,
-      "q3": 0.33230658499996935,
-      "rounds": 1
+      "median": 0.2926584060001005,
+      "q1": 0.29256837825028015,
+      "q3": 0.29576456475012947,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "construct_compiled",
+      "median": 0.08544781399996282,
+      "q1": 0.08415592549999928,
+      "q3": 0.09031418674976521,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "dissect",
+      "median": 0.3675359409999146,
+      "q1": 0.35997022225001274,
+      "q3": 0.3835760342500407,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "kaitai",
+      "median": 0.3514552609999555,
+      "q1": 0.350992652000059,
+      "q3": 0.3524979890001987,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "bitstruct",
+      "median": 0.018874994999805494,
+      "q1": 0.018438009000078637,
+      "q3": 0.019811423999726685,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "structures",
+      "median": 0.12968565799974385,
+      "q1": 0.1291802937500961,
+      "q3": 0.1312162362496565,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "bread",
+      "median": 4.356631221000043,
+      "q1": 3.930263748750008,
+      "q3": 4.450986446250226,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "duckparse",
+      "median": 0.30249826999988727,
+      "q1": 0.3000182239998139,
+      "q3": 0.30350048225022874,
+      "rounds": 3
+    },
+    {
+      "group": "array",
+      "implementation": "dataclasses_struct",
+      "median": 0.38824090199977945,
+      "q1": 0.3881082914997478,
+      "q3": 0.3925268459997824,
+      "rounds": 3
     }
   ]
 }

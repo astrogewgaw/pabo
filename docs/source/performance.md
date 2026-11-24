@@ -1,45 +1,53 @@
 # Performance
 
 How long pabo takes to parse three kinds of data, next to the standard library's
-`struct`, numpy, and [construct](https://github.com/construct/construct) (plain and
-compiled). Each dot is the median time for one parse, on a log scale.
+`struct` and other binary parsing libraries for Python (see [](comparison.md)).
+Each dot is the median time for one parse, on a log scale.
 
 ```{image} _static/benchmarks/parse-light.svg
 :class: only-light
-:alt: Dot plots of parsing time per implementation for a PNG header, 1,000 records and 1,000,000 float32 values. pabo is faster than plain construct in all three, and slightly slower than construct's compiled mode for the PNG header.
+:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, five libraries take just under 2 microseconds and pabo 2.8. For the records, pabo is third after struct and bitstruct, about 2.6 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
 ```
 
 ```{image} _static/benchmarks/parse-dark.svg
 :class: only-dark
-:alt: Dot plots of parsing time per implementation for a PNG header, 1,000 records and 1,000,000 float32 values. pabo is faster than plain construct in all three, and slightly slower than construct's compiled mode for the PNG header.
+:alt: Dot plots of parsing time per library for a PNG header, 1,000 records and 1,000,000 float32 values. For the header, struct and bitstruct are fastest, five libraries take just under 2 microseconds and pabo 2.8. For the records, pabo is third after struct and bitstruct, about 2.6 times faster than the next library. For the array, pabo takes microseconds and every other library tens of milliseconds or more.
 ```
 
 ## What is measured
 
+Each library parses the data into whatever it usually returns: a dict, an object
+or a dataclass per header and record, and a list (or for pabo, a numpy array) of
+values. Where a library cannot check constants, the benchmark checks them by hand,
+as the others do it themselves.
+
 **A PNG header** (24 bytes: an 8-byte magic, a length, a chunk id, a width and a
-height) parsed into a dict of fields. pabo compiles a specification of fixed-size
-fields into a single `struct` call, which puts it close to construct's compiled
-mode without a separate compile step. Hand-written `struct.unpack` is the floor:
-it skips everything a parsing library adds, such as checking the constants and
-naming the fields.
+height). `struct.unpack` is the floor: it returns a tuple and checks nothing.
+bitstruct is a C extension that does the same at the bit level. The pure-Python
+libraries come next, all within a factor of two or so; pabo compiles a
+specification of fixed-size fields into a single `struct` call, but each parse
+still pays for setting up the context and checking the constants.
 
 **1,000 records** of a `u16`, a `u32` and a `f32`, parsed into a list of dicts
-(`Repeat` of a `Spec`). pabo parses repeats of fixed-size specifications in bulk.
-numpy's structured `np.frombuffer` is much faster still, because it returns a view
-of the bytes, not 1,000 Python objects; use pabo's `Array` when a numpy array is
-what you need.
+(`Repeat` of a `Spec`). pabo parses repeats of fixed-size specifications in bulk,
+with one `struct` call for all of them, so most of its time goes into making the
+1,000 dicts. `struct.iter_unpack` makes tuples instead, and bitstruct unpacks
+in C. binmap and dataclasses-struct have no way to repeat a structure, so they
+are not in this panel.
 
-**1,000,000 float32 values** as a numpy array (`Array(Float(4))`). Here numpy's
-`np.frombuffer` returns a zero-copy view of bytes already in memory, so it takes
-nanoseconds whatever the size, while pabo reads the bytes from a stream into a new
-array. When parsing a *file* by path, pabo memory-maps it and returns a zero-copy
-view too, so the cost no longer grows with the size of the array. construct builds
-a Python list of a million floats.
+**1,000,000 float32 values.** pabo returns a numpy array that is a view of the
+bytes being parsed, as `np.frombuffer` does, so the time does not grow with the
+size of the array. Every other library builds a list or tuple of a million Python
+floats. binmap has no arrays, so it is not in this panel.
+
+The libraries, and the versions measured, are listed in `benchmarks/results.json`.
+pystructs 0.4 needs Python 3.13, so it is left out of runs on older Pythons.
 
 ## Reproducing
 
 The benchmarks are in `benchmarks/bench_parse.py`. With the `bench` extra
-installed (`pip install -e ".[bench]"`), run:
+installed (`pip install -e ".[bench]"`), and duckparse from GitHub if you want it
+(`pip install git+https://github.com/i64/duckparse`), run:
 
 ```bash
 just bench-plot
@@ -47,5 +55,5 @@ just bench-plot
 
 This runs the benchmarks, summarizes them into `benchmarks/results.json` (which
 records the date, commit, CPU and library versions), and redraws the plots on
-this page. Timings depend on the machine, so compare implementations within one
-run rather than across machines.
+this page. Libraries that are not installed are skipped. Timings depend on the
+machine, so compare libraries within one run rather than across machines.
