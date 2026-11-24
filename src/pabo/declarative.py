@@ -73,8 +73,9 @@ class Struct:
 
         class VersionIHL(pb.Struct, bitorder="big"):
             version: int = pb.BitInt(4)
-            ihl: int = pb.BitInt(4) Subclasses
-    add fields after those of their parents. Use `OtherStruct.construct()` to
+            ihl: int = pb.BitInt(4)
+
+    Subclasses add fields after those of their parents. Use `OtherStruct.construct()` to
     nest one struct in another. The endianness given in the class statement
     applies to the numbers inside that don't set their own. Field names must
     not clash with the methods below (`parse`, `build`, `sizeof`, ...).
