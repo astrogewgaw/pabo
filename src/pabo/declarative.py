@@ -89,19 +89,22 @@ class Struct:
         return Container({name: getattr(self, name) for name in self.__pabo_fields__})
 
     @classmethod
-    def parse(cls, src: Source) -> "Struct":
+    def parse(cls, src: Source, **params: Any) -> "Struct":
         """
-        Parse an instance from bytes, a path or a binary stream.
+        Parse an instance from bytes, a path or a binary stream (with
+        parameters, as in `Construct.parse`).
         """
 
-        return cls.fromdict(cls.__pabo_spec__.parse(src))
+        return cls.fromdict(cls.__pabo_spec__.parse(src, **params))
 
-    def build(self, src: Target = None, append: bool = False) -> bytes | None:
+    def build(
+        self, src: Target = None, append: bool = False, **params: Any
+    ) -> bytes | None:
         """
         Build this instance into bytes (see `Construct.build`).
         """
 
-        return self.__pabo_spec__.build(self.todict(), src, append)
+        return self.__pabo_spec__.build(self.todict(), src, append, **params)
 
     @classmethod
     def sizeof(cls, ctx: Mapping[str, Any] | None = None) -> int:

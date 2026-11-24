@@ -156,6 +156,15 @@ message.build({"payload": b"abc"})    # b'\x03abc'
 `Computed` adds a field that takes no bytes, such as an area computed from a width
 and a height.
 
+Values that the data depends on but doesn't contain, such as a number of channels
+known from another file, can be passed to `parse` and `build` as keyword
+arguments, and read as `this._params.name`:
+
+```python
+frame = pb.Spec({"samples": pb.Array(pb.u8, count=this._params.nchans)})
+frame.parse(raw, nchans=64)
+```
+
 ## Control flow
 
 | Construct | Description |

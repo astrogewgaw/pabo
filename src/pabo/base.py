@@ -10,7 +10,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Generic, TypeVar, no_type_check
 
-from pabo.context import Context
+from pabo.context import Container, Context
 from pabo.errors import ContextError, PaboError, SizeofError, StreamError
 from pabo.hints import BytesLike, Readable, Source, Target, Writable
 
@@ -269,32 +269,40 @@ class Construct(ABC, Generic[T]):
         return "\n".join(lines)
 
     def build(
-        self, data: Any, src: Target = None, append: bool = False
+        self, data: Any, src: Target = None, append: bool = False, **params: Any
     ) -> bytes | None:
         """
         Build `data` into bytes.
 
         If `src` is None, the built bytes are returned. If `src` is a path, the
         file is overwritten (or appended to, if `append` is True). Otherwise,
-        `src` should be a writable binary stream.
+        `src` should be a writable binary stream. Other keyword arguments are
+        parameters for the fields, as in `parse`.
         """
 
+        ctx = Context()
+        if params:
+            ctx.__dict__["_params"] = Container(params)
         if src is None:
             stream = BytesIO()
-            self._build(data, stream, Context())
+            self._build(data, stream, ctx)
             return stream.getvalue()
         if isinstance(src, (str, Path)):
             with open(src, "ab" if append else "wb") as f:
-                self._build(data, f, Context())
+                self._build(data, f, ctx)
             return None
         if hasattr(src, "write"):
-            self._build(data, src, Context())
+            self._build(data, src, ctx)
             return None
         raise PaboError(f"CANNOT BUILD INTO AN OBJECT OF TYPE {type(src).__name__}.")
 
-    def parse(self, dst: Source, trace: bool | Writable = False) -> T:
+    def parse(self, dst: Source, trace: bool | Writable = False, **params: Any) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
+
+        Other keyword arguments are parameters: values the data depends on but
+        doesn't contain (such as a number of channels known from elsewhere),
+        which fields read as `this._params.name` (or `ctx._params.name`).
 
         With `trace=True`, every field of every specification is printed to
         stderr as it is parsed, with a hex dump of its bytes. `trace` may also
@@ -313,6 +321,8 @@ class Construct(ABC, Generic[T]):
 
         ctx = Context()
         ctx.__dict__["_trace"] = trace or None
+        if params:
+            ctx.__dict__["_params"] = Container(params)
         if isinstance(dst, (bytes, bytearray, memoryview)):
             if isinstance(dst, memoryview) and not dst.c_contiguous:
                 dst = dst.tobytes()  # such as view[::2], which BytesIO rejects

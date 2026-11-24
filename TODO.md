@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Parameters passed to `parse`/`build`**, such as `spec.parse(data, nchans=64)`
-  read as `this._params.nchans`, for values known from elsewhere. (construct
-  `parse(data, **contextkw)`.)
 - [ ] **`Default(wraps, value)`**: a field that can be left out when building.
   (construct `Default`.)
 - [ ] **The element index in `Repeat`**, so an element can depend on its position.

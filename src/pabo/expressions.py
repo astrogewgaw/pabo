@@ -169,8 +169,9 @@ class This(Expr):
     """
     A reference to a field, such as `this.length` or `this._.header.size`.
 
-    `this._` steps out to the enclosing specification's context and
-    `this._root` to the outermost one. `this.items[0]` indexes into a parsed
+    `this._` steps out to the enclosing specification's context,
+    `this._root` to the outermost one, and `this._params` to the parameters
+    given to `parse` or `build`. `this.items[0]` indexes into a parsed
     value. `this["name"]` reads a field whose name is not a valid attribute.
     """
 
@@ -202,6 +203,8 @@ class This(Expr):
                     value = value._
                 elif name == "_root":
                     value = value._root
+                elif name == "_params":
+                    value = value._params
                 else:
                     value = value[name]
             except (KeyError, IndexError, AttributeError, TypeError):

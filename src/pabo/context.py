@@ -63,9 +63,10 @@ class Context(Container):
 
     Every specification creates a new context for its own fields. `ctx._` is
     the enclosing context (None at the top level), and `ctx._root` the
-    outermost one. The settings `_endian` (the default endianness, which
+    outermost one. `ctx._params` holds the parameters given to `parse` or
+    `build` (None if there are none). They and the settings `_endian` (the default endianness, which
     `endian` overrides) and `_trace` are attributes, copied from the parent
-    when the context is created, and read with `setting`.
+    when the context is created; settings are read with `setting`.
     """
 
     # No runtime type check: a context is created for every specification parsed,
@@ -80,10 +81,12 @@ class Context(Container):
         if parent is None:
             attrs["_endian"] = endian
             attrs["_trace"] = None
+            attrs["_params"] = None
         else:
             inherited = parent.__dict__
             attrs["_endian"] = endian or inherited.get("_endian")
             attrs["_trace"] = inherited.get("_trace")
+            attrs["_params"] = inherited.get("_params")
 
     @property
     def _root(self) -> "Context":

@@ -224,3 +224,46 @@ def test_repr_shows_docs_only_when_set():
 
     assert repr(Mine()) == "Mine(n=1)"
     assert repr(Mine(docs="mine")) == "Mine(n=1, docs='mine')"
+
+
+def test_parameters_for_parse_and_build():
+    """
+    Keyword arguments to `parse` and `build` are parameters that fields read as
+    `this._params.name` or `ctx._params.name`, at any depth; a missing one raises
+    a `ContextError`.
+    """
+
+    inner = pb.Spec({"values": pb.Array(pb.u8, count=pb.this._params.nchans)})
+    spec = pb.Spec(
+        {
+            "frame": inner,
+            "scaled": pb.Computed(
+                lambda ctx: ctx.frame["values"].sum() * ctx._params.scale
+            ),
+        }
+    )
+    data = spec.parse(b"\x01\x02\x03\x04", nchans=3, scale=2)
+    assert list(data.frame["values"]) == [1, 2, 3] and data.scaled == 12
+    assert (
+        spec.build({"frame": {"values": [1, 2, 3, 9]}}, nchans=3, scale=1)
+        == b"\x01\x02\x03"
+    )
+    with pytest.raises(pb.ContextError, match="_params"):
+        inner.parse(b"\x01")
+
+
+def test_parameters_for_class_based_structs():
+    """
+    `Struct.parse` and `Struct.build` pass parameters on to their fields.
+    """
+
+    class Frame(pb.Struct):
+        """
+        A frame of `n` bytes, given as a parameter.
+        """
+
+        data: bytes = pb.Bytes(pb.this._params.n)
+
+    frame = Frame.parse(b"abcd", n=2)
+    assert frame.data == b"ab"
+    assert frame.build(n=2) == b"ab"
