@@ -172,6 +172,11 @@ class Repeat(Construct[list]):
         count = _int(self.count, ctx)
         if len(data) < count:
             raise ValidationError(f"NOT ENOUGH DATA. NEED AT LEAST {count} ELEMENTS.")
+        many = getattr(self.wraps, "_buildmany", None)
+        if many is not None and count > 0:
+            built = many(data[:count], stream, ctx)
+            if built is not None:
+                return built
         built = []
         for ix in range(count):
             with scope(f"[{ix}]", stream):

@@ -1,3 +1,5 @@
+import io
+
 import pytest
 
 import pabo as pb
@@ -298,3 +300,57 @@ def test_no_plan_for_mixed_or_dynamic_fields():
     assert pb.Spec({"a": pb.u16le, "b": pb.u16be})._plan(pb.Context()) is None
     assert pb.Spec({"n": pb.u8, "d": pb.Bytes(pb.this.n)})._plan(pb.Context()) is None
     assert pb.Spec({})._plan(pb.Context()) is None
+
+
+def test_repeat_builds_in_bulk_like_one_by_one():
+    """
+    A `Repeat` of a fixed-size specification builds every element in one go, with
+    the same bytes and returned values (constants filled in, flags as bools) as
+    building them one at a time; a bad element still raises with its path.
+    """
+    spec = pb.Spec(
+        {
+            "magic": pb.Const(b"PB", pb.Bytes(2)),
+            "flag": pb.Flag(),
+            "n": pb.u16,
+        }
+    )
+    data = [{"flag": 1, "n": i, "extra": "kept"} for i in range(4)]
+    bulk = pb.Repeat(spec, 4)
+    raw = bulk.build(data)
+    assert raw == b"".join(spec.build(element) for element in data)
+    stream = io.BytesIO()
+    built = bulk._build(data, stream, pb.Context())
+    assert built == [
+        {"magic": b"PB", "flag": True, "n": i, "extra": "kept"} for i in range(4)
+    ]
+    assert all(type(element) is pb.Container for element in built)
+    assert bulk.parse(raw) == [{"magic": b"PB", "flag": True, "n": i} for i in range(4)]
+    data[2] = {"flag": 1, "n": -1}
+    with pytest.raises(pb.PaboError) as info:
+        bulk.build(data)
+    assert info.value.where == "[2].n"
+    three = pb.Repeat(spec, 3)
+    assert three.build([*data[:2], {"flag": 0, "n": 7}]) == raw[:10] + b"PB\x00\x07\x00"
+
+
+def test_compiled_plan_on_a_stream_that_cannot_rewind():
+    """
+    A fixed-size specification read from a stream without `tell`/`seek` is parsed
+    field by field, with the same result.
+    """
+
+    class Forward:
+        """
+        A stream that can only read forwards.
+        """
+
+        def __init__(self, raw):
+            self.raw = raw
+
+        def read(self, size=-1):
+            out, self.raw = self.raw[:size], self.raw[size:]
+            return out
+
+    spec = pb.Spec({"a": pb.u16, "b": pb.Const(b"!", pb.Bytes(1))})
+    assert spec.parse(Forward(b"\x01\x00!")) == {"a": 1, "b": b"!"}

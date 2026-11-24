@@ -40,9 +40,7 @@ class Specification(Construct[Container]):
     # No runtime type check: runs for every specification parsed or built.
     @no_type_check
     def _child(self, data, parent) -> Context:
-        child = Context(data, parent=parent)
-        child.__dict__["_endian"] = self.endian
-        return child
+        return Context(data, parent, self.endian)
 
     def _size(self, ctx):
         return self._sizefields(self._child(ctx, ctx._))
@@ -65,7 +63,8 @@ class Specification(Construct[Container]):
     @no_type_check
     def _plan(self, ctx) -> "_Plan | None":
         """
-        The compiled plan for the endianness in effect, or None if there is none.
+        The compiled plan for the endianness in effect (this specification's, or
+        that of `ctx`, the enclosing context), or None if there is none.
         """
 
         endian = self.endian or ctx.setting("_endian") or "little"
@@ -83,7 +82,7 @@ class Specification(Construct[Container]):
 
         if ctx.setting("_trace"):
             return None
-        plan = self._plan(self._child((), ctx))
+        plan = self._plan(ctx)
         if plan is None or plan.consts or tell(stream) is None:
             return None
         start = stream.tell()
@@ -106,16 +105,44 @@ class Specification(Construct[Container]):
         names, rows = unpacked
         return [Container(zip(names, values)) for values in rows]
 
+    # No runtime type check: part of the bulk fast path for `Repeat`.
+    @no_type_check
+    def _buildmany(self, data, stream, ctx) -> list | None:
+        """
+        Build every element of `data` with the compiled plan and write them in one
+        go, or return None (having written nothing) if any of them can't be.
+        """
+
+        plan = self._plan(ctx)
+        if plan is None:
+            return None
+        chunks, built = [], []
+        names = plan.names
+        for element in data:
+            packed = plan.pack(element) if isinstance(element, dict) else None
+            if packed is None:
+                return None
+            raw, values = packed
+            chunks.append(raw)
+            result = Container(element)
+            result.update(zip(names, values))
+            built.append(result)
+        stream.write(b"".join(chunks))
+        return built
+
     def _build(self, data, stream, ctx):
         if not isinstance(data, dict):
             raise PaboError(f"EXPECTED A DICT OF FIELDS, GOT {type(data).__name__}.")
-        child = self._child(data, ctx)
-        plan = self._plan(child)
+        plan = self._plan(ctx)
         if plan is not None:
-            raw = plan.pack(child)
-            if raw is not None:
+            packed = plan.pack(data)
+            if packed is not None:
+                raw, values = packed
                 stream.write(raw)
-                return Container(child)
+                built = Container(data)
+                built.update(zip(plan.names, values))
+                return built
+        child = self._child(data, ctx)
         try:
             self._buildfields(stream, child)
         except Stop:
@@ -141,15 +168,13 @@ class Specification(Construct[Container]):
                 child[name] = member._build(value, stream, child)
 
     def _parse(self, stream, ctx):
+        if not ctx.setting("_trace"):
+            plan = self._plan(ctx)
+            if plan is not None:
+                values = plan.unpack(stream)
+                if values is not None:
+                    return Container(zip(plan.names, values))
         child = self._child((), ctx)
-        if not child.setting("_trace"):
-            plan = self._plan(child)
-            if (
-                plan is not None
-                and tell(stream) is not None
-                and plan.unpack(stream, child)
-            ):
-                return Container(child)
         try:
             self._parsefields(stream, child)
         except Stop:
@@ -263,6 +288,11 @@ class _Plan:
         self.struct = struct_
         self.consts = consts
         self.lengths = lengths
+        self.flags = "?" in layout
+        # The positions of the constants among the values, and their values.
+        self.checks = [
+            (ix, consts[name]) for ix, name in enumerate(names) if name in consts
+        ]
 
     @classmethod
     def compile(cls, fields: dict, endian: Endian) -> "_Plan | None":
@@ -304,36 +334,48 @@ class _Plan:
 
     # No runtime type check: the compiled fast path, which exists only for speed.
     @no_type_check
-    def unpack(self, stream, ctx: Context) -> bool:
-        start = stream.tell()
+    def unpack(self, stream) -> tuple | None:
+        """
+        Read the values of every field, in order, or return None having moved
+        nothing.
+        """
+
+        try:
+            start = stream.tell()
+        except (AttributeError, OSError, ValueError):
+            return None  # the stream cannot rewind, so parse field by field
         raw = stream.read(self.struct.size)
         if len(raw) != self.struct.size:
             stream.seek(start)
-            return False
+            return None
         values = self.struct.unpack(raw)
-        for name, value in zip(self.names, values):
-            if name in self.consts and value != self.consts[name]:
+        for ix, value in self.checks:
+            if values[ix] != value:
                 stream.seek(start)
-                return False
-        ctx.update(zip(self.names, values))
-        return True
+                return None
+        return values
 
     # No runtime type check: the compiled fast path, which exists only for speed.
     @no_type_check
-    def pack(self, ctx: Context) -> bytes | None:
+    def pack(self, data) -> tuple[bytes, list] | None:
+        """
+        The bytes for the field values in `data` (a dict), and the values written
+        (with constants filled in and flags as bools), or None.
+        """
+
         values = []
+        consts, lengths = self.consts, self.lengths
         for name in self.names:
-            if name in ctx and ctx[name] is not None:
-                value = ctx[name]
-                if name in self.consts and value != self.consts[name]:
+            value = data.get(name)
+            if value is not None:
+                if name in consts and value != consts[name]:
                     return None
-            elif name in self.consts:
-                value = self.consts[name]
+            elif name in consts:
+                value = consts[name]
             else:
                 return None
-            if name in self.lengths and (
-                not isinstance(value, (bytes, bytearray))
-                or len(value) != self.lengths[name]
+            if name in lengths and (
+                not isinstance(value, (bytes, bytearray)) or len(value) != lengths[name]
             ):
                 return None
             values.append(value)
@@ -341,6 +383,9 @@ class _Plan:
             raw = self.struct.pack(*values)
         except struct.error:
             return None
-        for name, code, value in zip(self.names, self.layout, values):
-            ctx[name] = bool(value) if code == "?" else value
-        return raw
+        if self.flags:
+            values = [
+                bool(value) if code == "?" else value
+                for code, value in zip(self.layout, values)
+            ]
+        return raw, values

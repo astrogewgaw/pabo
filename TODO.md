@@ -8,14 +8,6 @@ first.
 
 ## Performance
 
-- [ ] **Lower the fixed cost of a parse.** A 24-byte PNG header takes about
-  2.8 µs, against 1.7–1.9 µs for Kaitai Struct, structures, construct (compiled),
-  duckparse and dissect.cstruct. Most of it is setting up the context and stream,
-  and checking constants, not the `struct` call (about 0.1 µs).
-- [ ] **Make `Container`s cheaper for the garbage collector.** Python does not
-  track plain dicts that hold only numbers, but always tracks dict subclasses, so
-  with GC on (as in real programs) 1,000 `Container`s cost about 280 µs against
-  200 µs for dicts.
 - [ ] **Structured arrays for fixed-size specifications**, such as
   `Array(record_spec, count=n)` returning a numpy structured array (a view, like
   `np.frombuffer`), for tables of records. Their `_Plan` already has the format.

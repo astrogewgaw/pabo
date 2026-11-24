@@ -63,16 +63,27 @@ class Context(Container):
 
     Every specification creates a new context for its own fields. `ctx._` is
     the enclosing context (None at the top level), and `ctx._root` the
-    outermost one. Settings such as the default endianness are attributes
-    that are looked up through the parents with `setting`.
+    outermost one. The settings `_endian` (the default endianness, which
+    `endian` overrides) and `_trace` are attributes, copied from the parent
+    when the context is created, and read with `setting`.
     """
 
     # No runtime type check: a context is created for every specification parsed,
     # and the forward reference in the hint is slow for beartype to resolve.
     @no_type_check
-    def __init__(self, data: Any = (), parent: "Context | None" = None):
-        super().__init__(data)
-        self.__dict__["_"] = parent
+    def __init__(
+        self, data: Any = (), parent: "Context | None" = None, endian: Any = None
+    ):
+        dict.__init__(self, data)
+        attrs = self.__dict__
+        attrs["_"] = parent
+        if parent is None:
+            attrs["_endian"] = endian
+            attrs["_trace"] = None
+        else:
+            inherited = parent.__dict__
+            attrs["_endian"] = endian or inherited.get("_endian")
+            attrs["_trace"] = inherited.get("_trace")
 
     @property
     def _root(self) -> "Context":
@@ -86,13 +97,8 @@ class Context(Container):
     @no_type_check
     def setting(self, name: str, default: Any = None) -> Any:
         """
-        Look up an attribute on this context or the nearest parent that has it.
+        The value of a setting such as `_endian`, or `default` if it is not set.
         """
 
-        ctx = self
-        while ctx is not None:
-            value = ctx.__dict__.get(name)
-            if value is not None:
-                return value
-            ctx = ctx._
-        return default
+        value = self.__dict__.get(name)
+        return default if value is None else value

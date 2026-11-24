@@ -68,17 +68,13 @@ class BufferStream(BytesIO):
     """
     A stream over bytes in memory that keeps the original buffer as `source`.
 
-    `parse` reads `bytes`, `bytearray` and `memoryview` through one, so that
-    `Array` can return a read-only view of the buffer instead of a copy, just
-    as `np.frombuffer` does. A non-contiguous `memoryview` (such as `view[::2]`)
-    is copied first, and `source` is then None.
+    `parse` reads `bytes`, `bytearray` and contiguous `memoryview`s through one
+    (setting `source` after creating it), so that `Array` can return a
+    read-only view of the buffer instead of a copy, just as `np.frombuffer`
+    does. The view itself is only made when an array asks for it.
     """
 
-    def __init__(self, data: BytesLike):
-        view = memoryview(data)
-        contiguous = view.c_contiguous
-        super().__init__(data if contiguous else view.tobytes())
-        self.source = view.cast("B").toreadonly() if contiguous else None
+    __slots__ = ("source",)
 
 
 def buffer(stream) -> "mmap.mmap | memoryview | None":
@@ -90,7 +86,7 @@ def buffer(stream) -> "mmap.mmap | memoryview | None":
     if isinstance(stream, mmap.mmap):
         return stream
     if isinstance(stream, BufferStream):
-        return stream.source
+        return memoryview(stream.source).cast("B").toreadonly()
     return None
 
 
@@ -308,7 +304,11 @@ class Construct(ABC, Generic[T]):
         ctx = Context()
         ctx.__dict__["_trace"] = trace or None
         if isinstance(dst, (bytes, bytearray, memoryview)):
-            return self._parse(BufferStream(dst), ctx)
+            if isinstance(dst, memoryview) and not dst.c_contiguous:
+                dst = dst.tobytes()  # such as view[::2], which BytesIO rejects
+            stream = BufferStream(dst)
+            stream.source = dst
+            return self._parse(stream, ctx)
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
                 try:
