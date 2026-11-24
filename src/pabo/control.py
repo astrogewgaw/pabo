@@ -438,7 +438,7 @@ class Deferred(Construct):
 
     Use it when a layout is only known from data parsed earlier (such as the
     columns of a table described by its header), or for recursive layouts,
-    where a construct contains itself:
+    where a construct contains itself::
 
         node = pb.Spec({
             "value": pb.u8,
