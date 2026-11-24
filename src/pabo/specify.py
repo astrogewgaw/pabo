@@ -374,6 +374,36 @@ class Embedded(Construct[Container]):
         return self.wraps._parse(stream, ctx)
 
 
+@dataclass
+class Focused(Construct):
+    """
+    One field of a specification: the whole specification is parsed, and the
+    value of the field `name` returned (such as the payload after a header).
+
+    When building, the given value is that field's, so the other fields must
+    be ones that build without a value (constants, padding, `Rebuild`, ...).
+    """
+
+    wraps: Specification
+    name: str
+
+    def __post_init__(self):
+        if self.name not in self.wraps.fields or self.name.startswith("_"):
+            raise PaboError(
+                f"{self.name!r} IS NOT A FIELD OF THE SPECIFICATION (OR IS HIDDEN)."
+            )
+
+    def _size(self, ctx):
+        return self.wraps._size(ctx)
+
+    def _build(self, data, stream, ctx):
+        self.wraps._build({self.name: data}, stream, ctx)
+        return data
+
+    def _parse(self, stream, ctx):
+        return self.wraps._parse(stream, ctx)[self.name]
+
+
 def _differs(a, b) -> bool:
     """
     Whether two values differ (also for numpy arrays, whose `!=` is elementwise).

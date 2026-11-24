@@ -51,7 +51,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   the checksum after or before the data).
 - Class-based specifications with `Struct`, which parse into dataclasses (also
   for bit fields, as a `BitStruct`).
-- `Embedded`, to merge one specification into another.
+- `Embedded`, to merge one specification into another, and `Focused`, to
+  return just one of its fields.
 - Results are `Container`s: dicts whose keys are also attributes.
 - Errors say which field failed (`header.sizes[2]`), at what offset, and give
   the field's docs. There is a hierarchy of errors under `PaboError`:

@@ -377,3 +377,24 @@ def test_fields_starting_with_an_underscore_are_left_out():
     assert dynamic.build({"_n": 2, "data": b"ab"}) == b"\x02ab"
     outer = pb.Spec({"x": pb.u8, "_": pb.Embedded(fixed)})
     assert outer.parse(b"\x09\x01\x00\x00\x02") == {"x": 9, "a": 1, "b": 2}
+
+
+def test_focused_returns_one_field():
+    """
+    `Focused` parses a whole specification but returns one field, and builds the
+    specification from that field's value; it rejects names that aren't fields.
+    """
+
+    packet = pb.Spec(
+        {
+            "magic": pb.Const(b"PK", pb.Bytes(2)),
+            "length": pb.Rebuild(pb.u8, pb.lenof(pb.this.payload)),
+            "payload": pb.Bytes(pb.this.length),
+        }
+    )
+    c = pb.Focused(packet, "payload")
+    assert c.parse(b"PK\x03abc") == b"abc"
+    assert c.build(b"hi") == b"PK\x02hi"
+    assert pb.Repeat(c, 2).parse(b"PK\x01aPK\x01b") == [b"a", b"b"]
+    with pytest.raises(pb.PaboError, match="NOT A FIELD"):
+        pb.Focused(packet, "missing")

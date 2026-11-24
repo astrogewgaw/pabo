@@ -11,7 +11,7 @@
 
 ```{eval-rst}
 .. automodule:: pabo.specify
-   :members: Specification, Embedded
+   :members: Specification, Embedded, Focused
 
 .. automodule:: pabo.declarative
    :members: Struct, StructConstruct

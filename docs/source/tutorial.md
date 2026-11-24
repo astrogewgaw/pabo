@@ -110,9 +110,11 @@ header.build({"version": 1, "count": 3})      # b'PB\x01\x00\x03'
 Fields whose names start with an underscore, such as `"_reserved": pb.Padding(4)`,
 are parsed and built as usual (and later fields can refer to them), but are left
 out of the result. `Const` values can be left out when building, and they are
-checked when parsing. Fields wrapped in `Default(construct, value)` can be left out too, and
-are built with `value` (or `value(ctx)`, if it is a function). Specifications nest, and `Embedded` puts the fields of one specification
-straight into another.
+checked when parsing. Fields wrapped in `Default(construct, value)` can be left
+out too, and are built with `value` (or `value(ctx)`, if it is a function).
+Specifications nest, `Embedded` puts the fields of one specification straight into
+another, and `Focused(spec, "name")` parses a specification but returns just one
+of its fields.
 
 ## Fields that depend on other fields
 

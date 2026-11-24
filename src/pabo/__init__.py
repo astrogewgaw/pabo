@@ -54,7 +54,7 @@ from pabo.errors import (
 )
 from pabo.expressions import Expr, This, lenof, this
 from pabo.numeric import Array, Float, Int, VarInt, ZigZag
-from pabo.specify import Embedded, Specification
+from pabo.specify import Embedded, Focused, Specification
 from pabo.specify import Specification as Spec
 from pabo.stream import (
     Aligned,
@@ -117,6 +117,7 @@ __all__ = [
     "Flag",
     "FlagsEnum",
     "Float",
+    "Focused",
     "Greedy",
     "GreedyBytes",
     "GreedyString",
