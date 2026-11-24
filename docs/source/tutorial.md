@@ -183,7 +183,7 @@ frame.parse(raw, nchans=64)
 | `Optional(wraps)` | Parse if possible, else rewind and give None. |
 | `Repeat(wraps, count)` | Repeat a fixed (or context-dependent) number of times. |
 | `RepeatUntil(predicate, wraps)` | Repeat until `predicate(element, ctx)` holds. |
-| `Greedy(wraps)` | Repeat until parsing fails. |
+| `Greedy(wraps, minimum=0, maximum=None)` | Repeat until parsing fails (or `maximum` is reached). |
 | `StopIf(cond)` | End the enclosing specification early. |
 | `Terminated()` | Check that the stream has ended. |
 | `Check(func)`, `Validated(wraps, predicate)` | Validate values. |

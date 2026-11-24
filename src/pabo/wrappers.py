@@ -99,15 +99,38 @@ class Greedy(Construct[list]):
     Represents a binary construct that builds/parses greedily.
 
     Parsing stops at the first element that fails to parse, and the stream is
-    rewound to where that element started.
+    rewound to where that element started, or after `maximum` elements (if
+    given). Fewer than `minimum` elements raise a `ValidationError`, when
+    parsing and when building, as do more than `maximum` when building.
     """
 
     wraps: Construct
+    minimum: int = 0
+    maximum: int | None = None
+
+    def __post_init__(self):
+        if self.minimum < 0 or (
+            self.maximum is not None and self.maximum < self.minimum
+        ):
+            raise PaboError(
+                f"INVALID BOUNDS: minimum={self.minimum}, maximum={self.maximum}."
+            )
 
     def _size(self, ctx):
         raise SizeofError("A GREEDY CONSTRUCT HAS NO FIXED SIZE.")
 
+    def _bounds(self, count: int) -> None:
+        if count < self.minimum:
+            raise ValidationError(
+                f"EXPECTED AT LEAST {self.minimum} ELEMENTS, GOT {count}."
+            )
+        if self.maximum is not None and count > self.maximum:
+            raise ValidationError(
+                f"EXPECTED AT MOST {self.maximum} ELEMENTS, GOT {count}."
+            )
+
     def _build(self, data, stream, ctx):
+        self._bounds(len(data))
         attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
         try:
             for ix, element in enumerate(data):
@@ -122,7 +145,7 @@ class Greedy(Construct[list]):
         data = []
         attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
         try:
-            while True:
+            while self.maximum is None or len(data) < self.maximum:
                 attrs["_index"] = len(data)
                 start = stream.tell()
                 try:
@@ -135,6 +158,7 @@ class Greedy(Construct[list]):
                 data.append(element)
         finally:
             attrs["_index"] = previous
+        self._bounds(len(data))
         return data
 
 

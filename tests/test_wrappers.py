@@ -418,3 +418,21 @@ def test_repeat_index():
     ]
     with pytest.raises(pb.ContextError):
         pb.Bytes(this._index).parse(b"")
+
+
+def test_greedy_bounds():
+    """
+    `Greedy` stops after `maximum` elements, and raises for fewer than `minimum`
+    (or, when building, more than `maximum`).
+    """
+
+    c = pb.Greedy(pb.u8, minimum=2, maximum=3)
+    spec = pb.Spec({"items": c, "rest": pb.GreedyBytes()})
+    assert spec.parse(b"\x01\x02\x03\x04") == {"items": [1, 2, 3], "rest": b"\x04"}
+    with pytest.raises(pb.ValidationError, match="AT LEAST 2"):
+        c.parse(b"\x01")
+    assert c.build([1, 2]) == b"\x01\x02"
+    with pytest.raises(pb.ValidationError, match="AT MOST 3"):
+        c.build([1, 2, 3, 4])
+    with pytest.raises(pb.PaboError):
+        pb.Greedy(pb.u8, minimum=3, maximum=2)

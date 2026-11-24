@@ -15,7 +15,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - `Default`, for fields that can be left out when building, and
   `Rebuild(..., check=True)`, to check computed fields when parsing.
 - The elements of `Repeat`, `RepeatUntil` and `Greedy` can read their
-  position as `this._index`.
+  position as `this._index`, and `Greedy` takes a minimum and maximum count.
 - Fields that depend on other fields: `this.name`, `this._.name`, expressions
   such as `this.n * 2`, `this.kind == 3` or `lenof(this.data)`, or any function
   of the context, accepted wherever a count, length, offset or condition is
