@@ -216,9 +216,10 @@ ip_first_byte = pb.BitStruct({"version": pb.BitInt(4), "ihl": pb.BitInt(4)})
 ip_first_byte.parse(b"\x45")    # Container({'version': 4, 'ihl': 5})
 ```
 
-`BitFlag` is a single bit as a boolean, and `BitPadding` skips bits. A `Struct`
-class (see below) whose fields are all bit fields is a `BitStruct` too, parsing
-into a dataclass.
+`BitFlag` is a single bit as a boolean, and `BitPadding` skips bits. The fields
+take as many whole bytes as they need: three bits take one byte, with the other
+five ignored. A `Struct` class (see below) whose fields are all bit fields is a
+`BitStruct` too, parsing into a dataclass.
 
 ## Moving around the stream
 

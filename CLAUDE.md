@@ -39,16 +39,19 @@ src/pabo/
   bits.py       Bits (one 0/1 byte per bit), BitStruct with BitInt/BitFlag/BitPadding
   bytes.py      Bytes, GreedyBytes, Flag, Padding
   strings.py    CString, Line, PaddedString, PascalString, GreedyString
-  wrappers.py   Const, Greedy, Sequential, Repeat, Adapted, Prefixed, Padded
-  specify.py    Specification (named fields -> Container), Embedded, _Plan (compiled
+  wrappers.py   Const, Default, Greedy, Sequential, Repeat, PrefixedArray, Adapted,
+                Prefixed, Delimited, FixedSized, Padded
+  specify.py    Specification (named fields -> Container), Embedded, Focused, _Plan (compiled
                 fixed-size specs: one struct call, bulk parsing in Repeat)
   declarative.py Struct (class-based specs -> dataclasses), StructConstruct
   aliases.py    u8, u16be, i32le, f64, ... (unsuffixed ones inherit endianness)
   transforms.py Transformed, Compressed, Checksummed
-  debug.py      Probe
-  control.py    Computed, Rebuild, If, Optional, Switch, RepeatUntil, StopIf, Check, ...
+  debug.py      Probe, Debug (pdb where a construct fails)
+  control.py    Computed, Rebuild, If, Optional, Switch, Select, Union, Deferred,
+                RepeatUntil, StopIf, Check, ...
   adapters.py   Enum, FlagsEnum, Timestamp
-  stream.py     Seek, Tell, Pointer, Peek, Aligned, Lazy/LazyValue
+  stream.py     Seek, Tell, Pointer, Peek, Aligned, AlignedSpec, CSpec, Remaining,
+                Lazy/LazyValue
   packing.py    packbits/unpackbits for 1, 2 or 4 bits (C++); other widths are rejected
   packed.cpp    nanobind C++ extension `pabo.packed`: pack()/unpack() for 1/2/4-bit data
   packed.pyi    type stub for it (regenerate with `python -m nanobind.stubgen -m pabo.packed`)

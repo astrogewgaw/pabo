@@ -99,12 +99,14 @@ class BitStruct(Construct[Container]):
     """
     Named integer fields narrower than a byte, packed together.
 
-    The fields (`BitInt`, `BitFlag`, `BitPadding`) must add up to a whole
-    number of bytes. With `bitorder="big"` (network order, as in IP and most
-    file formats), the bytes are read as a big-endian integer and the first
-    field takes its most significant bits. With `bitorder="little"` (C bit
-    fields on little-endian machines), the bytes are read as a little-endian
-    integer and the first field takes its least significant bits.
+    The fields (`BitInt`, `BitFlag`, `BitPadding`) take as many whole bytes as
+    they need: if they don't fill the last one, the bits left over come after
+    them, and are zero when building and ignored when parsing. With
+    `bitorder="big"` (network order, as in IP and most file formats), the
+    bytes are read as a big-endian integer and the first field takes its most
+    significant bits. With `bitorder="little"` (C bit fields on little-endian
+    machines), the bytes are read as a little-endian integer and the first
+    field takes its least significant bits.
     """
 
     fields: dict[str, BitInt | BitFlag | BitPadding]
@@ -112,26 +114,30 @@ class BitStruct(Construct[Container]):
 
     def __post_init__(self):
         _checkbitorder(self.bitorder)
-        total = sum(spec.nbits for spec in self.fields.values())
-        if total % 8:
-            raise PaboError(
-                f"THE BIT FIELDS ADD UP TO {total} BITS, WHICH IS NOT A WHOLE NUMBER OF BYTES."
-            )
+        if not self.fields:
+            raise PaboError("A BitStruct NEEDS AT LEAST ONE FIELD.")
 
     def _layout(self):
         """
         Yield (name, spec, shift) for every field.
         """
 
-        total = sum(spec.nbits for spec in self.fields.values())
+        total = 8 * self._nbytes()
         used = 0
         for name, spec in self.fields.items():
             shift = total - used - spec.nbits if self.bitorder == "big" else used
             used += spec.nbits
             yield name, spec, shift
 
+    def _nbytes(self) -> int:
+        """
+        The number of whole bytes the fields take.
+        """
+
+        return -(-sum(spec.nbits for spec in self.fields.values()) // 8)
+
     def _size(self, ctx):
-        return sum(spec.nbits for spec in self.fields.values()) // 8
+        return self._nbytes()
 
     def _build(self, data, stream, ctx):
         value = 0

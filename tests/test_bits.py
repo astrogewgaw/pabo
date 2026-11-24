@@ -106,13 +106,13 @@ def test_bitstruct_little_bitorder():
 
 def test_bitstruct_errors():
     """
-    `BitStruct` rejects fields that are not a whole number of bytes and `BitInt(0)`,
-    raises `ValidationError` for out-of-range unsigned and signed values, `PaboError`
-    for a missing field and `StreamError` for empty input.
+    `BitStruct` rejects no fields and `BitInt(0)`, raises `ValidationError` for
+    out-of-range unsigned and signed values, `PaboError` for a missing field and
+    `StreamError` for empty input.
     """
 
     with pytest.raises(pb.PaboError):
-        pb.BitStruct({"a": pb.BitInt(3)})
+        pb.BitStruct({})
     with pytest.raises(pb.PaboError):
         pb.BitInt(0)
     c = pb.BitStruct({"a": pb.BitInt(4), "b": pb.BitInt(4, signed=True)})
@@ -164,3 +164,22 @@ def test_bitstruct_roundtrip_property(widths, data):
             for name, f in fields.items()
         }
         assert c.parse(c.build(values)) == values
+
+
+def test_bitstruct_that_does_not_fill_its_last_byte():
+    """
+    Bit fields that don't add up to whole bytes take the bytes they need; the
+    bits left over come after them (in either bit order), are zero when building
+    and are ignored when parsing.
+    """
+
+    big = pb.BitStruct({"a": pb.BitInt(3), "b": pb.BitInt(7)})
+    assert big.size == 2
+    assert big.build({"a": 5, "b": 100}) == bytes([0b10111001, 0b00000000])
+    assert big.parse(bytes([0b10111001, 0b00111111])) == {"a": 5, "b": 100}
+    little = pb.BitStruct({"a": pb.BitInt(3), "b": pb.BitInt(7)}, bitorder="little")
+    raw = little.build({"a": 5, "b": 100})
+    assert int.from_bytes(raw, "little") == 5 | 100 << 3
+    assert little.parse(raw) == {"a": 5, "b": 100}
+    spec = pb.Spec({"flags": pb.BitStruct({"on": pb.BitFlag()}), "n": pb.u8})
+    assert spec.parse(b"\x80\x07") == {"flags": {"on": True}, "n": 7}

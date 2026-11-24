@@ -43,8 +43,9 @@ This release is a rewrite. Code that defines its own constructs needs updating
   bytes (padding it when building), and `Remaining`, for the rest of the
   stream except a trailer of a given size.
 - `BitStruct` with `BitInt`, `BitFlag` and `BitPadding` (fields of any number
-  of bits), and a `bitorder` option for bit-packed `Array`s, which support 1, 2
-  and 4 bits per value (other widths raise an error).
+  of bits, which need not fill the last byte), and a `bitorder` option for
+  bit-packed `Array`s, which support 1, 2 and 4 bits per value (other widths
+  raise an error).
 - Stream positioning: `Seek`, `Tell`, `Pointer`, `Peek`, `Aligned`,
   `AlignedSpec`, `CSpec` (C struct layout) and `Lazy`.
 - `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed` (with
