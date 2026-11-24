@@ -59,6 +59,7 @@ from pabo.specify import Specification as Spec
 from pabo.stream import (
     Aligned,
     AlignedSpec,
+    CSpec,
     Lazy,
     LazyValue,
     Peek,
@@ -95,6 +96,7 @@ __all__ = [
     "BitStruct",
     "Bits",
     "Bytes",
+    "CSpec",
     "CString",
     "Check",
     "Checksummed",

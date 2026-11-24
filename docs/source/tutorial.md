@@ -223,11 +223,12 @@ into a dataclass.
 ## Moving around the stream
 
 `Seek`, `Tell`, `Pointer` (parse at an offset, from the start, the current
-position or the end, and come back), `Peek` (look ahead), `Remaining` (the rest
-of the stream, except a trailer of so many bytes), `Aligned` and `AlignedSpec`
-(pad to a multiple of some bytes), `FixedSized` (parse inside a window of so many
-bytes, skipping what isn't used), and `Lazy` (skip a field and parse it when
-asked for) handle formats with offsets and alignment.
+position or the end, and come back), `Peek` (look ahead), `Remaining` (the rest of
+the stream, except a trailer of so many bytes), `Aligned` and `AlignedSpec` (pad
+to a multiple of some bytes), `CSpec` (lay fields out as a C compiler does),
+`FixedSized` (parse inside a window of so many bytes, skipping what isn't used),
+and `Lazy` (skip a field and parse it when asked for) handle formats with offsets
+and alignment.
 
 ## Transforms and adapters
 

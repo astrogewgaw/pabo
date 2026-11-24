@@ -7,11 +7,14 @@ from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, readexact, tell
+from pabo.bytes import Padding
 from pabo.context import Context
 from pabo.errors import PaboError, SizeofError, StreamError
 from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Endian, Whence
-from pabo.specify import Specification
+from pabo.numeric import Array, Float, Int
+from pabo.specify import Embedded, Specification
+from pabo.wrappers import Const
 
 
 def _offset(value, ctx) -> int:
@@ -202,6 +205,61 @@ def AlignedSpec(
         {name: Aligned(modulus, member) for name, member in fields.items()},
         endian=endian,
     )
+
+
+def _alignment(construct: Construct) -> int:
+    """
+    The alignment a C compiler gives a field: a number's size, an array's
+    element's, a specification's largest; 1 for bytes and anything else.
+    """
+
+    if isinstance(construct, Const):
+        return _alignment(construct.wraps)
+    if isinstance(construct, (Int, Float)):
+        return construct.width if construct.width in (1, 2, 4, 8) else 1
+    if isinstance(construct, Array):
+        return _alignment(construct.dtype)
+    if isinstance(construct, Specification):
+        members = [
+            _alignment(member.wraps if isinstance(member, Embedded) else member)
+            for member in construct.fields.values()
+        ]
+        return max(members, default=1)
+    return 1
+
+
+def CSpec(fields: dict[str, Construct], endian: Endian | None = None) -> Specification:
+    """
+    A specification laid out as a C compiler lays out a struct.
+
+    Each field is aligned to its own alignment (a number's size, an array's
+    element's, a nested specification's largest field's), and the whole is
+    padded to a multiple of the largest. The padding goes into fields named
+    `_pad0`, `_pad1`, ..., which are left out of the result. Every field must
+    have a fixed size. (Compilers may differ for unusual targets; this is the
+    usual layout on x86 and ARM.)
+    """
+
+    laid: dict[str, Construct] = {}
+    offset, largest, pads = 0, 1, 0
+    for name, member in fields.items():
+        alignment = _alignment(member)
+        try:
+            size = member.size
+        except PaboError:
+            raise PaboError(
+                f"C ALIGNMENT NEEDS FIELDS OF FIXED SIZE, BUT {name!r} HAS NONE."
+            ) from None
+        gap = -offset % alignment
+        if gap:
+            laid[f"_pad{pads}"] = Padding(gap)
+            pads += 1
+        laid[name] = member
+        offset += gap + size
+        largest = max(largest, alignment)
+    if -offset % largest:
+        laid[f"_pad{pads}"] = Padding(-offset % largest)
+    return Specification(laid, endian=endian)
 
 
 class LazyValue:

@@ -46,7 +46,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
   of bits), and a `bitorder` option for bit-packed `Array`s, which support 1, 2
   and 4 bits per value (other widths raise an error).
 - Stream positioning: `Seek`, `Tell`, `Pointer`, `Peek`, `Aligned`,
-  `AlignedSpec` and `Lazy`.
+  `AlignedSpec`, `CSpec` (C struct layout) and `Lazy`.
 - `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed` (with
   the checksum after or before the data).
 - Class-based specifications with `Struct`, which parse into dataclasses (also

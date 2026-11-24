@@ -209,3 +209,57 @@ def test_pointer_from_the_end():
 
     spec = pb.Spec({"first": pb.u8, "last": pb.Pointer(-2, pb.u16, whence=2)})
     assert spec.parse(b"\x01\xaa\xbb\x05\x00") == {"first": 1, "last": 5}
+
+
+def test_cspec_matches_ctypes():
+    """
+    `CSpec` pads fields as a C compiler does, which `ctypes` shows for this
+    platform: the offsets and the size match, also for nested structs and arrays,
+    and the padding is left out of the result.
+    """
+    import ctypes
+
+    class Inner(ctypes.Structure):
+        """
+        A char and a double.
+        """
+
+        _fields_ = [("c", ctypes.c_uint8), ("d", ctypes.c_double)]
+
+    class Outer(ctypes.Structure):
+        """
+        Fields of mixed alignment.
+        """
+
+        _fields_ = [
+            ("a", ctypes.c_uint8),
+            ("b", ctypes.c_uint32),
+            ("c", ctypes.c_uint16),
+            ("inner", Inner),
+            ("vals", ctypes.c_int16 * 3),
+            ("last", ctypes.c_uint8),
+        ]
+
+    inner = pb.CSpec({"c": pb.u8, "d": pb.f64})
+    outer = pb.CSpec(
+        {
+            "a": pb.u8,
+            "b": pb.u32,
+            "c": pb.u16,
+            "inner": inner,
+            "vals": pb.Array(pb.i16, count=3),
+            "last": pb.u8,
+        }
+    )
+    assert inner.size == ctypes.sizeof(Inner)
+    assert outer.size == ctypes.sizeof(Outer)
+    value = Outer(1, 2, 3, Inner(4, 5.5), (ctypes.c_int16 * 3)(6, 7, 8), 9)
+    raw = bytes(value)
+    data = outer.parse(raw, offsets=True)
+    for name in ("a", "b", "c", "inner", "vals", "last"):
+        assert data._offsets[name][0] == getattr(Outer, name).offset
+    assert data.b == 2 and data.inner == {"c": 4, "d": 5.5} and data.last == 9
+    assert list(data.vals) == [6, 7, 8]
+    assert outer.build(data) == raw  # ctypes zeroes its padding too
+    with pytest.raises(pb.PaboError, match="FIXED SIZE"):
+        pb.CSpec({"name": pb.CString()})

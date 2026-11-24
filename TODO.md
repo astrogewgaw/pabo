@@ -11,5 +11,3 @@ first.
 - [ ] **Bit fields anywhere**, not only inside a `BitStruct` that adds up to
   whole bytes. This needs the stream to keep track of a bit position. (Kaitai `b3`,
   bitstruct, bread, duckparse `Bits[n]`.)
-- [ ] **C alignment**: pad every field to its natural alignment, as a C compiler
-  does, for reading memory dumps. (dissect.cstruct `align=True`.)
