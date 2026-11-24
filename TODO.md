@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Checksums over any earlier data**, not only a check that follows what it
-  covers: for example, a checksum before the data, or over several fields. (construct
-  `RawCopy` + `Checksum`, structures `Checksum`.)
 - [ ] **Parameters passed to `parse`/`build`**, such as `spec.parse(data, nchans=64)`
   read as `this._params.nchans`, for values known from elsewhere. (construct
   `parse(data, **contextkw)`.)

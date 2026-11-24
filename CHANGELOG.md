@@ -38,7 +38,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
   and 4 bits per value (other widths raise an error).
 - Stream positioning: `Seek`, `Tell`, `Pointer`, `Peek`, `Aligned`,
   `AlignedSpec` and `Lazy`.
-- `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed`.
+- `Transformed`, `Compressed` (zlib, gzip, bz2, lzma) and `Checksummed` (with
+  the checksum after or before the data).
 - Class-based specifications with `Struct`, which parse into dataclasses.
 - `Embedded`, to merge one specification into another.
 - Results are `Container`s: dicts whose keys are also attributes.

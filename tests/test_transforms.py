@@ -129,3 +129,19 @@ def test_failing_checksum_function_raises_validation_error():
         c.build(b"ab")
     with pytest.raises(pb.ValidationError, match="RuntimeError"):
         c.parse(b"ab\x00")
+
+
+def test_checksummed_with_the_checksum_first():
+    """
+    With `first=True`, the checksum comes before the data it covers (here several
+    fields), and is checked once the data has been read.
+    """
+
+    body = pb.Spec({"a": pb.u16, "text": pb.PascalString(pb.u8, "ascii")})
+    c = pb.Checksummed(body, pb.u32, "crc32", first=True)
+    payload = b"\x05\x00\x02hi"
+    raw = zlib.crc32(payload).to_bytes(4, "little") + payload
+    assert c.build({"a": 5, "text": "hi"}) == raw
+    assert c.parse(raw) == {"a": 5, "text": "hi"}
+    with pytest.raises(pb.ValidationError, match="CHECKSUM MISMATCH"):
+        c.parse(b"\x00\x00\x00\x00" + payload)

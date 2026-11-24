@@ -107,17 +107,20 @@ def _hasher(algorithm: str | Callable[[bytes], Any]) -> Callable[[bytes], Any]:
 @dataclass
 class Checksummed(Construct):
     """
-    `wraps`, followed by a checksum of its bytes stored as `check`.
+    `wraps`, followed by a checksum of its bytes stored as `check` (or preceded
+    by it, with `first=True`).
 
     `algorithm` is "crc32" or "adler32" (giving ints, so use an `Int(4)`), a
     hashlib name such as "md5" or "sha256" (giving digest bytes, so use a
     `Bytes`), or a function from bytes to the checksum. Parsing checks the
-    checksum and returns the value of `wraps`; building computes it.
+    checksum and returns the value of `wraps`; building computes it. To cover
+    several fields, make `wraps` a specification of them.
     """
 
     wraps: Construct
     check: Construct
     algorithm: str | Callable[[bytes], Any] = "crc32"
+    first: bool = False
 
     def __post_init__(self):
         _hasher(self.algorithm)
@@ -132,17 +135,24 @@ class Checksummed(Construct):
         buffer = BytesIO()
         built = self.wraps._build(data, buffer, ctx)
         raw = buffer.getvalue()
+        checksum = attempt(_hasher(self.algorithm), raw)
+        if self.first:
+            self.check._build(checksum, stream, ctx)
         stream.write(raw)
-        self.check._build(attempt(_hasher(self.algorithm), raw), stream, ctx)
+        if not self.first:
+            self.check._build(checksum, stream, ctx)
         return built
 
     def _parse(self, stream, ctx):
+        if self.first:
+            stored = self.check._parse(stream, ctx)
         start = stream.tell()
         value = self.wraps._parse(stream, ctx)
         end = stream.tell()
         stream.seek(start)
         raw = readexact(stream, end - start)
-        stored = self.check._parse(stream, ctx)
+        if not self.first:
+            stored = self.check._parse(stream, ctx)
         computed = attempt(_hasher(self.algorithm), raw)
         if stored != computed:
             raise ValidationError(
