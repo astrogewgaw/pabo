@@ -436,3 +436,23 @@ def test_greedy_bounds():
         c.build([1, 2, 3, 4])
     with pytest.raises(pb.PaboError):
         pb.Greedy(pb.u8, minimum=3, maximum=2)
+
+
+def test_prefixedarray():
+    """
+    `PrefixedArray` reads a count and then that many elements (in bulk for
+    fixed-size specifications), and builds the count of the list it is given.
+    """
+
+    c = pb.PrefixedArray(pb.u8, pb.u16)
+    assert c.parse(b"\x02\x01\x00\x02\x00") == [1, 2]
+    assert c.build([1, 2, 3]) == b"\x03\x01\x00\x02\x00\x03\x00"
+    assert c.build([]) == b"\x00"
+    points = pb.PrefixedArray(pb.VarInt(), pb.Spec({"x": pb.u8, "y": pb.u8}))
+    raw = points.build([{"x": 1, "y": 2}, {"x": 3, "y": 4}])
+    assert raw == b"\x02\x01\x02\x03\x04"
+    assert points.parse(raw) == [{"x": 1, "y": 2}, {"x": 3, "y": 4}]
+    with pytest.raises(pb.ValidationError, match="NON-NEGATIVE"):
+        pb.PrefixedArray(pb.i8, pb.u8).parse(b"\xff")
+    with pytest.raises(pb.SizeofError):
+        c.size

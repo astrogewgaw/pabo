@@ -35,6 +35,7 @@ This release is a rewrite. Code that defines its own constructs needs updating
   array (a view of the data, like other arrays).
 - `GreedyBytes`, `GreedyString`, and a configurable pad character and side for
   `Padded` and `PaddedString`.
+- `PrefixedArray`, a list prefixed by its number of elements.
 - `Delimited`, for bytes, strings or anything else ending in a terminator of
   any length (with options to keep it, leave it in the stream, or accept the
   end of the stream instead).

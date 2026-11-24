@@ -226,8 +226,8 @@ class Repeat(Construct[list]):
 
     `count` may depend on other fields (`Repeat(pb.u16, this.n)`). Each element
     can read its position in the list as `this._index` (or `ctx._index`), as in
-    `Greedy` and `RepeatUntil`. For numbers,
-    `Array` is faster and gives a numpy array instead.
+    `Greedy` and `RepeatUntil`. For numbers, `Array` is faster and gives a
+    numpy array instead.
     """
 
     wraps: Construct
@@ -240,39 +240,82 @@ class Repeat(Construct[list]):
         count = _int(self.count, ctx)
         if len(data) < count:
             raise ValidationError(f"NOT ENOUGH DATA. NEED AT LEAST {count} ELEMENTS.")
-        many = getattr(self.wraps, "_buildmany", None)
-        if many is not None and count > 0:
-            built = many(data[:count], stream, ctx)
-            if built is not None:
-                return built
-        built = []
-        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
-        try:
-            for ix in range(count):
-                attrs["_index"] = ix
-                with scope(f"[{ix}]", stream):
-                    built.append(self.wraps._build(data[ix], stream, ctx))
-        finally:
-            attrs["_index"] = previous
-        return built
+        return _buildcount(self.wraps, data, count, stream, ctx)
 
     def _parse(self, stream, ctx):
-        count = _int(self.count, ctx)
-        many = getattr(self.wraps, "_parsemany", None)
-        if many is not None and count > 0:
-            data = many(stream, ctx, count)
-            if data is not None:
-                return data
-        data = []
-        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
-        try:
-            for ix in range(count):
-                attrs["_index"] = ix
-                with scope(f"[{ix}]", stream):
-                    data.append(self.wraps._parse(stream, ctx))
-        finally:
-            attrs["_index"] = previous
-        return data
+        return _parsecount(self.wraps, _int(self.count, ctx), stream, ctx)
+
+
+def _buildcount(wraps: Construct, data, count: int, stream, ctx) -> list:
+    """
+    Build the first `count` elements of `data` (in bulk if `wraps` can).
+    """
+
+    many = getattr(wraps, "_buildmany", None)
+    if many is not None and count > 0:
+        built = many(data[:count], stream, ctx)
+        if built is not None:
+            return built
+    built = []
+    attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+    try:
+        for ix in range(count):
+            attrs["_index"] = ix
+            with scope(f"[{ix}]", stream):
+                built.append(wraps._build(data[ix], stream, ctx))
+    finally:
+        attrs["_index"] = previous
+    return built
+
+
+def _parsecount(wraps: Construct, count: int, stream, ctx) -> list:
+    """
+    Parse `count` elements (in bulk if `wraps` can).
+    """
+
+    many = getattr(wraps, "_parsemany", None)
+    if many is not None and count > 0:
+        data = many(stream, ctx, count)
+        if data is not None:
+            return data
+    data = []
+    attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+    try:
+        for ix in range(count):
+            attrs["_index"] = ix
+            with scope(f"[{ix}]", stream):
+                data.append(wraps._parse(stream, ctx))
+    finally:
+        attrs["_index"] = previous
+    return data
+
+
+@dataclass
+class PrefixedArray(Construct[list]):
+    """
+    Represents a list of `wraps`, prefixed by the number of elements.
+
+    `pre` is the construct holding the count (such as `pb.u16`, or
+    `pb.VarInt()`). When building, the count is that of the list given.
+    """
+
+    pre: Construct
+    wraps: Construct
+
+    def _size(self, ctx):
+        raise SizeofError("A PrefixedArray HAS NO FIXED SIZE.")
+
+    def _build(self, data, stream, ctx):
+        self.pre._build(len(data), stream, ctx)
+        return _buildcount(self.wraps, data, len(data), stream, ctx)
+
+    def _parse(self, stream, ctx):
+        count = self.pre._parse(stream, ctx)
+        if not isinstance(count, int) or count < 0:
+            raise ValidationError(
+                f"THE COUNT PREFIX MUST BE A NON-NEGATIVE INT, GOT {count!r}."
+            )
+        return _parsecount(self.wraps, count, stream, ctx)
 
 
 @dataclass

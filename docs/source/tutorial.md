@@ -185,6 +185,7 @@ frame.parse(raw, nchans=64)
 | `Deferred(func)` | The construct `func(ctx)` returns: for layouts that depend on earlier data, or contain themselves. |
 | `Optional(wraps)` | Parse if possible, else rewind and give None. |
 | `Repeat(wraps, count)` | Repeat a fixed (or context-dependent) number of times. |
+| `PrefixedArray(pre, wraps)` | A count, then that many elements. |
 | `RepeatUntil(predicate, wraps)` | Repeat until `predicate(element, ctx)` holds. |
 | `Greedy(wraps, minimum=0, maximum=None)` | Repeat until parsing fails (or `maximum` is reached). |
 | `StopIf(cond)` | End the enclosing specification early. |

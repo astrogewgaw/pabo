@@ -78,6 +78,7 @@ from pabo.wrappers import (
     Greedy,
     Padded,
     Prefixed,
+    PrefixedArray,
     Repeat,
     Sequential,
 )
@@ -133,6 +134,7 @@ __all__ = [
     "Peek",
     "Pointer",
     "Prefixed",
+    "PrefixedArray",
     "Probe",
     "Rebuild",
     "Remaining",

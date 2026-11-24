@@ -119,7 +119,8 @@ parsers for file formats.
 | --- | --- |
 | `Struct("a" / Int16ub, "b" / Bytes(this.a))` | `Spec({"a": pb.u16be, "b": pb.Bytes(this.a)})` |
 | `Array(this.n, Int32sl)` | `pb.Array(pb.i32le, count=this.n)` (numpy) or `pb.Repeat(pb.i32le, this.n)` (list) |
-| `PrefixedArray(Int8ub, Byte)` | `pb.Prefixed(pb.u8, pb.Array(pb.u8))` (the prefix is a length in bytes) |
+| `PrefixedArray(Int8ub, Byte)` | `pb.PrefixedArray(pb.u8, pb.u8)` |
+| `Prefixed(Int8ub, GreedyBytes)` | `pb.Prefixed(pb.u8, pb.GreedyBytes())` (the prefix is a length in bytes) |
 | `PascalString(Int8ub, "utf8")` | `pb.PascalString(pb.u8)` |
 | `CString("utf8")` | `pb.CString()` |
 | `Const(b"MAGIC")` | `pb.Const(b"MAGIC", pb.Bytes(5))` |
