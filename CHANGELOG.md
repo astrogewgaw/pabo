@@ -26,6 +26,9 @@ This release is a rewrite. Code that defines its own constructs needs updating
   array (a view of the data, like other arrays).
 - `GreedyBytes`, `GreedyString`, and a configurable pad character and side for
   `Padded` and `PaddedString`.
+- `Delimited`, for bytes, strings or anything else ending in a terminator of
+  any length (with options to keep it, leave it in the stream, or accept the
+  end of the stream instead).
 - `BitStruct` with `BitInt`, `BitFlag` and `BitPadding` (fields of any number
   of bits), and a `bitorder` option for bit-packed `Array`s, which support 1, 2
   and 4 bits per value (other widths raise an error).

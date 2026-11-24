@@ -7,8 +7,15 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
 
-from pabo.base import Construct, Stop, readexact, scope
-from pabo.errors import ConstError, PaboError, SizeofError, ValidationError, attempt
+from pabo.base import Construct, Stop, readexact, scope, tell
+from pabo.errors import (
+    ConstError,
+    PaboError,
+    SizeofError,
+    StreamError,
+    ValidationError,
+    attempt,
+)
 from pabo.expressions import evaluate
 from pabo.hints import Dynamic, Side, Target
 
@@ -254,6 +261,95 @@ class Prefixed(Construct):
                 f"THE LENGTH PREFIX MUST BE A NON-NEGATIVE INT, GOT {size!r}."
             )
         return self.wraps._parse(BytesIO(readexact(stream, size)), ctx)
+
+
+def _readto(stream, term: bytes) -> tuple[bytes, bool]:
+    """
+    Read up to and past the first `term`, and return the bytes before it and
+    whether it was found (if not, the stream is left at its end).
+
+    Seekable streams are searched in chunks; others are read byte by byte.
+    """
+
+    start = tell(stream)
+    if start is None:
+        data = bytearray()
+        while not data.endswith(term):
+            byte = stream.read(1)
+            if not byte:
+                return bytes(data), False
+            data += byte
+        return bytes(data[: -len(term)]), True
+    data = bytearray()
+    while True:
+        chunk = stream.read(4096)
+        if not chunk:
+            return bytes(data), False
+        searched = max(0, len(data) - len(term) + 1)
+        data += chunk
+        found = data.find(term, searched)
+        if found >= 0:
+            stream.seek(start + found + len(term))
+            return bytes(data[:found]), True
+
+
+@dataclass
+class Delimited(Construct):
+    """
+    Represents a binary construct ending at the first `term` (one or more bytes).
+
+    When parsing, the bytes before the terminator are read and `wraps` is
+    parsed from them, so it is usually greedy: `GreedyBytes()`, or
+    `GreedyString()` for text. `include` keeps the terminator at the end of
+    those bytes, `consume=False` leaves it in the stream for the next field,
+    and `eos=True` lets the end of the stream stand in for the terminator.
+
+    When building, the terminator is written after `wraps` (unless
+    `consume=False`: then the next field writes it), and the data may not
+    contain it. With `include`, the data must end with it.
+    """
+
+    wraps: Construct
+    term: bytes = b"\x00"
+    include: bool = False
+    consume: bool = True
+    eos: bool = False
+
+    def __post_init__(self):
+        if not self.term:
+            raise PaboError("THE TERMINATOR MUST BE AT LEAST ONE BYTE.")
+
+    def _size(self, ctx):
+        raise SizeofError("A DELIMITED CONSTRUCT HAS NO FIXED SIZE.")
+
+    def _build(self, data, stream, ctx):
+        buffer = BytesIO()
+        built = self.wraps._build(data, buffer, ctx)
+        raw = buffer.getvalue()
+        if self.include:
+            if not raw.endswith(self.term):
+                raise ValidationError(
+                    f"THE DATA MUST END WITH THE TERMINATOR {self.term!r}."
+                )
+            raw = raw[: -len(self.term)]
+        if self.term in raw:
+            raise ValidationError(f"THE DATA CONTAINS THE TERMINATOR {self.term!r}.")
+        stream.write(raw + self.term if self.consume else raw)
+        return built
+
+    def _parse(self, stream, ctx):
+        if not self.consume and tell(stream) is None:
+            raise StreamError(
+                "CANNOT LEAVE THE TERMINATOR ON A STREAM THAT CANNOT SEEK."
+            )
+        raw, found = _readto(stream, self.term)
+        if not found and not self.eos:
+            raise StreamError(f"THE STREAM ENDED BEFORE THE TERMINATOR {self.term!r}.")
+        if found and not self.consume:
+            stream.seek(stream.tell() - len(self.term))
+        if found and self.include:
+            raw += self.term
+        return self.wraps._parse(BytesIO(raw), ctx)
 
 
 @dataclass

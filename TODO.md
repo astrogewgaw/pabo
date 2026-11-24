@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Bytes and strings ending in any terminator**, not just a null (`CString`)
-  or CRLF (`Line`), with options to keep or consume it. (Kaitai `terminator`,
-  `include`, `consume`; construct `NullTerminated(term=...)`.)
 - [ ] **A fixed-size window**, `FixedSized(length, wraps)`: parse `wraps` inside
   `length` bytes and skip what it doesn't use (C structs with reserved tails).
   `Padded` adds a number of bytes instead of padding to a total. (construct

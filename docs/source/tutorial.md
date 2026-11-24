@@ -83,6 +83,7 @@ points["x"].mean(), points[0]["id"]
 | `PaddedString(length, code="utf-8", pad="\x00", side="right")` | A fixed-length padded string. |
 | `GreedyString(code="utf-8")` | A string running to the end of the stream. |
 | `Line(code="utf-8")` | A string ending in CRLF. |
+| `Delimited(wraps, term=b"\x00", include=False, consume=True, eos=False)` | `wraps`, ending at the first `term`, e.g. `Delimited(GreedyString(), term=b";")`. |
 
 ## Specifications
 

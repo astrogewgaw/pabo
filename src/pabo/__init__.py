@@ -56,7 +56,16 @@ from pabo.specify import Specification as Spec
 from pabo.stream import Aligned, AlignedSpec, Lazy, LazyValue, Peek, Pointer, Seek, Tell
 from pabo.strings import CString, GreedyString, Line, PaddedString, PascalString
 from pabo.transforms import Checksummed, Compressed, Transformed
-from pabo.wrappers import Adapted, Const, Greedy, Padded, Prefixed, Repeat, Sequential
+from pabo.wrappers import (
+    Adapted,
+    Const,
+    Delimited,
+    Greedy,
+    Padded,
+    Prefixed,
+    Repeat,
+    Sequential,
+)
 from pabo.wrappers import Sequential as Seq
 
 __all__ = [
@@ -81,6 +90,7 @@ __all__ = [
     "Container",
     "Context",
     "ContextError",
+    "Delimited",
     "Embedded",
     "Enum",
     "Expr",

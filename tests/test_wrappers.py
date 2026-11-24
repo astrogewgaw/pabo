@@ -232,3 +232,88 @@ def test_greedy_stops_when_an_adapter_fails():
     digit = pb.Adapted(pb.Bytes(1), lambda raw: int(raw.decode()), str)
     c = pb.Seq([pb.Greedy(digit), pb.GreedyBytes()])
     assert c.parse(b"123x5") == [[1, 2, 3], b"x5"]
+
+
+def test_delimited_bytes_and_strings():
+    """
+    `Delimited` reads up to a terminator of any length, parses what came before
+    it, and moves past it; it builds the data followed by the terminator.
+    """
+
+    line = pb.Delimited(pb.GreedyString("ascii"), term=b";")
+    spec = pb.Spec({"a": line, "b": line, "rest": pb.GreedyBytes()})
+    assert spec.parse(b"hello;world;!") == {"a": "hello", "b": "world", "rest": b"!"}
+    assert spec.build({"a": "hello", "b": "world", "rest": b"!"}) == b"hello;world;!"
+    crlf = pb.Delimited(pb.GreedyBytes(), term=b"\r\n")
+    assert crlf.parse(b"one\r\ntwo") == b"one"
+    long = b"x" * 10000 + b"END"
+    assert (
+        pb.Delimited(pb.GreedyBytes(), term=b"END").parse(long + b"tail")
+        == b"x" * 10000
+    )
+
+
+def test_delimited_options():
+    """
+    `include` keeps the terminator, `consume=False` leaves it for the next field,
+    and `eos` accepts the end of the stream in its place.
+    """
+
+    keep = pb.Delimited(pb.GreedyBytes(), term=b"\n", include=True)
+    assert keep.parse(b"a\nb") == b"a\n"
+    assert keep.build(b"a\n") == b"a\n"
+    leave = pb.Spec(
+        {
+            "a": pb.Delimited(pb.GreedyBytes(), term=b"|", consume=False),
+            "sep": pb.Const(b"|", pb.Bytes(1)),
+            "b": pb.GreedyBytes(),
+        }
+    )
+    assert leave.parse(b"x|y") == {"a": b"x", "sep": b"|", "b": b"y"}
+    assert leave.build({"a": b"x", "b": b"y"}) == b"x|y"
+    lenient = pb.Delimited(pb.GreedyBytes(), term=b"\n", eos=True)
+    assert lenient.parse(b"last line") == b"last line"
+
+
+def test_delimited_errors():
+    """
+    A missing terminator, data containing it, data not ending with it (with
+    `include`) and an empty terminator all raise.
+    """
+
+    c = pb.Delimited(pb.GreedyBytes(), term=b";")
+    with pytest.raises(pb.StreamError, match="BEFORE THE TERMINATOR"):
+        c.parse(b"no end")
+    with pytest.raises(pb.ValidationError, match="CONTAINS THE TERMINATOR"):
+        c.build(b"a;b")
+    with pytest.raises(pb.ValidationError, match="MUST END WITH"):
+        pb.Delimited(pb.GreedyBytes(), term=b";", include=True).build(b"ab")
+    with pytest.raises(pb.PaboError):
+        pb.Delimited(pb.GreedyBytes(), term=b"")
+    with pytest.raises(pb.SizeofError):
+        c.size
+
+
+def test_delimited_on_a_stream_that_cannot_seek():
+    """
+    On a stream that can only read forwards, `Delimited` reads byte by byte, and
+    refuses `consume=False`.
+    """
+
+    class Forward:
+        """
+        A stream that can only read forwards.
+        """
+
+        def __init__(self, raw):
+            self.raw = raw
+
+        def read(self, size=-1):
+            out, self.raw = self.raw[:size], self.raw[size:]
+            return out
+
+    c = pb.Delimited(pb.GreedyBytes(), term=b"\r\n")
+    stream = Forward(b"ab\r\ncd")
+    assert c.parse(stream) == b"ab" and stream.raw == b"cd"
+    with pytest.raises(pb.StreamError, match="CANNOT SEEK"):
+        pb.Delimited(pb.GreedyBytes(), term=b";", consume=False).parse(Forward(b"a;"))
