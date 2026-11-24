@@ -128,8 +128,9 @@ message = pb.Spec(
 message.parse(b"\x03abc")    # Container({'length': 3, 'payload': b'abc'})
 ```
 
-`this._.name` refers to a field of the enclosing specification, and `this._root.name`
-to one at the top level. References combine into **expressions**, evaluated when
+`this._.name` refers to a field of the enclosing specification, `this._root.name`
+to one at the top level, and `this._index` to the position of the element being
+parsed in a `Repeat`, `RepeatUntil` or `Greedy`. References combine into **expressions**, evaluated when
 the field is parsed or built: arithmetic (`this.n * 2`), bitwise operators
 (`this.flags & 0x80`), comparisons (`this.kind == 3`), indexing (`this.items[0]`)
 and `lenof(this.data)` all work.

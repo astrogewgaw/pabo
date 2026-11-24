@@ -170,8 +170,9 @@ class This(Expr):
     A reference to a field, such as `this.length` or `this._.header.size`.
 
     `this._` steps out to the enclosing specification's context,
-    `this._root` to the outermost one, and `this._params` to the parameters
-    given to `parse` or `build`. `this.items[0]` indexes into a parsed
+    `this._root` to the outermost one, `this._params` to the parameters given
+    to `parse` or `build`, and `this._index` to the position of the element in
+    the nearest enclosing repeat. `this.items[0]` indexes into a parsed
     value. `this["name"]` reads a field whose name is not a valid attribute.
     """
 
@@ -203,14 +204,20 @@ class This(Expr):
                     value = value._
                 elif name == "_root":
                     value = value._root
-                elif name == "_params":
-                    value = value._params
+                elif name in ("_params", "_index"):
+                    value = getattr(value, name)
                 else:
                     value = value[name]
             except (KeyError, IndexError, AttributeError, TypeError):
                 raise ContextError(f"CANNOT RESOLVE {self!r}.") from None
             if value is None and name in ("_", "_root"):
                 raise ContextError(f"CANNOT RESOLVE {self!r}: THERE IS NO PARENT.")
+            if value is None and name == "_params":
+                raise ContextError(
+                    f"CANNOT RESOLVE {self!r}: NO PARAMETERS WERE GIVEN."
+                )
+            if value is None and name == "_index":
+                raise ContextError(f"CANNOT RESOLVE {self!r}: THIS IS NOT IN A REPEAT.")
         return value
 
     def __repr__(self) -> str:

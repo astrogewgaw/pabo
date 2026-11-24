@@ -108,23 +108,33 @@ class Greedy(Construct[list]):
         raise SizeofError("A GREEDY CONSTRUCT HAS NO FIXED SIZE.")
 
     def _build(self, data, stream, ctx):
-        for ix, element in enumerate(data):
-            with scope(f"[{ix}]", stream):
-                self.wraps._build(element, stream, ctx)
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            for ix, element in enumerate(data):
+                attrs["_index"] = ix
+                with scope(f"[{ix}]", stream):
+                    self.wraps._build(element, stream, ctx)
+        finally:
+            attrs["_index"] = previous
         return data
 
     def _parse(self, stream, ctx):
         data = []
-        while True:
-            start = stream.tell()
-            try:
-                element = self.wraps._parse(stream, ctx)
-            except PaboError:
-                stream.seek(start)
-                break
-            if stream.tell() == start:
-                break
-            data.append(element)
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            while True:
+                attrs["_index"] = len(data)
+                start = stream.tell()
+                try:
+                    element = self.wraps._parse(stream, ctx)
+                except PaboError:
+                    stream.seek(start)
+                    break
+                if stream.tell() == start:
+                    break
+                data.append(element)
+        finally:
+            attrs["_index"] = previous
         return data
 
 
@@ -190,7 +200,9 @@ class Repeat(Construct[list]):
     """
     Represents a binary construct repeated `count` times, as a list.
 
-    `count` may depend on other fields (`Repeat(pb.u16, this.n)`). For numbers,
+    `count` may depend on other fields (`Repeat(pb.u16, this.n)`). Each element
+    can read its position in the list as `this._index` (or `ctx._index`), as in
+    `Greedy` and `RepeatUntil`. For numbers,
     `Array` is faster and gives a numpy array instead.
     """
 
@@ -210,9 +222,14 @@ class Repeat(Construct[list]):
             if built is not None:
                 return built
         built = []
-        for ix in range(count):
-            with scope(f"[{ix}]", stream):
-                built.append(self.wraps._build(data[ix], stream, ctx))
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            for ix in range(count):
+                attrs["_index"] = ix
+                with scope(f"[{ix}]", stream):
+                    built.append(self.wraps._build(data[ix], stream, ctx))
+        finally:
+            attrs["_index"] = previous
         return built
 
     def _parse(self, stream, ctx):
@@ -223,9 +240,14 @@ class Repeat(Construct[list]):
             if data is not None:
                 return data
         data = []
-        for ix in range(count):
-            with scope(f"[{ix}]", stream):
-                data.append(self.wraps._parse(stream, ctx))
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            for ix in range(count):
+                attrs["_index"] = ix
+                with scope(f"[{ix}]", stream):
+                    data.append(self.wraps._parse(stream, ctx))
+        finally:
+            attrs["_index"] = previous
         return data
 
 

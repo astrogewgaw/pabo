@@ -184,24 +184,34 @@ class RepeatUntil(Construct[list]):
 
     def _build(self, data, stream, ctx):
         built = []
-        for ix, element in enumerate(data):
-            with scope(f"[{ix}]", stream):
-                value = self.wraps._build(element, stream, ctx)
-            built.append(value)
-            if attempt(self.predicate, value, ctx):
-                return built
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            for ix, element in enumerate(data):
+                attrs["_index"] = ix
+                with scope(f"[{ix}]", stream):
+                    value = self.wraps._build(element, stream, ctx)
+                built.append(value)
+                if attempt(self.predicate, value, ctx):
+                    return built
+        finally:
+            attrs["_index"] = previous
         raise ValidationError(
             "NO ELEMENT SATISFIES THE PREDICATE, SO NOTHING ENDS THE LIST."
         )
 
     def _parse(self, stream, ctx):
         data = []
-        while True:
-            with scope(f"[{len(data)}]", stream):
-                element = self.wraps._parse(stream, ctx)
-            data.append(element)
-            if attempt(self.predicate, element, ctx):
-                return data
+        attrs, previous = ctx.__dict__, ctx.__dict__.get("_index")
+        try:
+            while True:
+                attrs["_index"] = len(data)
+                with scope(f"[{len(data)}]", stream):
+                    element = self.wraps._parse(stream, ctx)
+                data.append(element)
+                if attempt(self.predicate, element, ctx):
+                    return data
+        finally:
+            attrs["_index"] = previous
 
 
 @dataclass

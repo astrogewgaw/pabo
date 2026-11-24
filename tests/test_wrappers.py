@@ -2,6 +2,7 @@ import pytest
 from beartype.roar import BeartypeCallHintParamViolation
 
 import pabo as pb
+from pabo import this
 
 
 def test_sequential():
@@ -377,3 +378,43 @@ def test_default_in_a_struct():
 
     assert Header(length=4).version == 3
     assert Header(length=4).build() == b"\x03\x04\x00"
+
+
+def test_repeat_index():
+    """
+    Elements of `Repeat`, `RepeatUntil` and `Greedy` can read their position as
+    `this._index`, also from inside a nested specification, and nested repeats
+    each see their own.
+    """
+
+    sized = pb.Spec({"data": pb.Bytes(this._index + 1)})
+    raw = b"a" + b"bb" + b"ccc"
+    assert pb.Repeat(sized, 3).parse(raw) == [
+        {"data": b"a"},
+        {"data": b"bb"},
+        {"data": b"ccc"},
+    ]
+    assert (
+        pb.Repeat(sized, 3).build([{"data": b"a"}, {"data": b"bb"}, {"data": b"ccc"}])
+        == raw
+    )
+    until = pb.RepeatUntil(lambda e, ctx: e == b"ccc", pb.Bytes(this._index + 1))
+    assert until.parse(raw) == [b"a", b"bb", b"ccc"]
+    greedy = pb.Greedy(pb.Bytes(this._index + 1))
+    assert greedy.parse(raw) == [b"a", b"bb", b"ccc"]
+    table = pb.Repeat(
+        pb.Spec(
+            {
+                "row": pb.Computed(this._index),
+                "cells": pb.Repeat(pb.Computed(lambda ctx: ctx._index), 2),
+                "again": pb.Computed(this._index),
+            }
+        ),
+        2,
+    )
+    assert table.parse(b"") == [
+        {"row": 0, "cells": [0, 1], "again": 0},
+        {"row": 1, "cells": [0, 1], "again": 1},
+    ]
+    with pytest.raises(pb.ContextError):
+        pb.Bytes(this._index).parse(b"")

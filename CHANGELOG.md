@@ -13,6 +13,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Parameters: keyword arguments to `parse` and `build`, read by fields as
   `this._params.name`.
 - `Default`, for fields that can be left out when building.
+- The elements of `Repeat`, `RepeatUntil` and `Greedy` can read their
+  position as `this._index`.
 - Fields that depend on other fields: `this.name`, `this._.name`, expressions
   such as `this.n * 2`, `this.kind == 3` or `lenof(this.data)`, or any function
   of the context, accepted wherever a count, length, offset or condition is

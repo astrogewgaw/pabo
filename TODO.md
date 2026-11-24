@@ -8,8 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **The element index in `Repeat`**, so an element can depend on its position.
-  (construct `_index`.)
 - [ ] **Enums that keep unknown values**, such as `Enum(..., strict=False)`
   returning the plain int, for formats that add values over time. (construct-typing
   `EnumBase`, structures and bread enum defaults.)
