@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **`Union`**: several views of the same bytes, moving on by the largest.
-  And `Select`: the first of several alternatives that parses. (construct
-  `Union`/`Select`, dissect.cstruct `union`.)
 - [ ] **A construct chosen by a function of the context**, such as
   `Deferred(lambda ctx: rowspec(ctx.meta))`, so FITS tables can be read in one
   pass. With a function of nothing, it also gives recursive layouts. (construct

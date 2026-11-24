@@ -34,9 +34,11 @@ from pabo.control import (
     Optional,
     Rebuild,
     RepeatUntil,
+    Select,
     StopIf,
     Switch,
     Terminated,
+    Union,
     Validated,
 )
 from pabo.debug import Probe
@@ -121,6 +123,7 @@ __all__ = [
     "Repeat",
     "RepeatUntil",
     "Seek",
+    "Select",
     "Seq",
     "Sequential",
     "SizeofError",
@@ -136,6 +139,7 @@ __all__ = [
     "This",
     "Timestamp",
     "Transformed",
+    "Union",
     "Validated",
     "ValidationError",
     "VarInt",

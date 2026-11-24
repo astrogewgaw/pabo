@@ -208,3 +208,59 @@ def test_failing_predicates_raise_validation_errors():
     valid = pb.Validated(pb.u8, lambda v, ctx: v.startswith("a"))
     with pytest.raises(pb.ValidationError, match="AttributeError"):
         valid.parse(b"\x01")
+
+
+def test_union_parses_every_view_of_the_same_bytes():
+    """
+    A `Union` parses each field from the same start, moves past the longest, and
+    builds the first field given, padded to the largest size.
+    """
+
+    union = pb.Union({"word": pb.u32, "half": pb.u16, "bytes": pb.Bytes(4)})
+    spec = pb.Spec({"u": union, "next": pb.u8})
+    data = spec.parse(b"\x01\x02\x03\x04\x05")
+    assert data.u == {"word": 0x04030201, "half": 0x0201, "bytes": b"\x01\x02\x03\x04"}
+    assert data.next == 5
+    assert union.size == 4
+    assert union.build({"half": 0x0201}) == b"\x01\x02\x00\x00"
+    assert union.build({"word": 1, "half": None}) == b"\x01\x00\x00\x00"
+    with pytest.raises(pb.ValidationError, match="NONE OF THE FIELDS"):
+        union.build({})
+    with pytest.raises(pb.PaboError):
+        pb.Union({})
+
+
+def test_union_fields_can_refer_to_earlier_ones():
+    """
+    A field of a `Union` can depend on a field before it, and a union of fields
+    of varying size moves past the longest one actually parsed.
+    """
+
+    union = pb.Union({"n": pb.u8, "text": pb.PascalString(pb.u8, "ascii")})
+    data = pb.Spec({"u": union, "rest": pb.GreedyBytes()}).parse(b"\x02hi!")
+    assert data == {"u": {"n": 2, "text": "hi"}, "rest": b"!"}
+    with pytest.raises(pb.SizeofError):
+        union.size
+
+
+def test_select_takes_the_first_alternative_that_works():
+    """
+    `Select` returns the first alternative that parses, rewinding after each that
+    fails, builds with the first that accepts the value, and reports every
+    failure when none works.
+    """
+
+    magic = pb.Const(b"PB", pb.Bytes(2))
+    c = pb.Select([magic, pb.u16])
+    assert c.parse(b"PB") == b"PB"
+    assert c.parse(b"\x01\x00") == 1
+    assert c.build(b"PB") == b"PB" and c.build(7) == b"\x07\x00"
+    assert c.size == 2
+    s = pb.Select([pb.Const(b"A", pb.Bytes(1)), pb.Const(b"B", pb.Bytes(1))])
+    with pytest.raises(pb.ValidationError, match="NO ALTERNATIVE WORKED") as info:
+        s.parse(b"C")
+    assert "0:" in str(info.value) and "1:" in str(info.value)
+    with pytest.raises(pb.SizeofError):
+        pb.Select([pb.u8, pb.u16]).size
+    with pytest.raises(pb.PaboError):
+        pb.Select([])

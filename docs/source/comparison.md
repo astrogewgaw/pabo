@@ -65,8 +65,8 @@ describe.)
 ## The libraries
 
 **construct** is the most complete declarative library, and the one pabo is
-modelled on. It has more constructs than pabo (such as `Union`, `Select`,
-`LazyBound` for recursive layouts and `RawCopy`), and can compile a layout into
+modelled on. It has more constructs than pabo (such as `LazyBound` for recursive
+layouts and `RawCopy`), and can compile a layout into
 Python code for speed. pabo has fewer, plainer constructs, numpy arrays, and
 automatic compilation. [construct-typing](https://github.com/timrid/construct-typing)
 adds type hints and dataclasses to it.

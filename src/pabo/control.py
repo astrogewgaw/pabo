@@ -3,9 +3,11 @@ Control flow: computed, conditional, switched and validated fields.
 """
 
 from dataclasses import dataclass, field
+from io import BytesIO
 from typing import Any
 
 from pabo.base import Construct, Stop, scope, tell
+from pabo.context import Container, Context
 from pabo.errors import (
     PaboError,
     SizeofError,
@@ -307,3 +309,108 @@ class Validated(Construct):
 
     def _parse(self, stream, ctx):
         return self._check(self.wraps._parse(stream, ctx), ctx)
+
+
+@dataclass
+class Union(Construct[Container]):
+    """
+    Several views of the same bytes: every field is parsed from the same start.
+
+    Parsing gives a `Container` with every field, and moves past the longest
+    of them. Building writes the first field that is given (not None), padded
+    with null bytes to the size of the largest field when the sizes are fixed.
+    Fields can refer to the fields before them, as in a specification.
+    """
+
+    fields: dict[str, Construct]
+
+    def __post_init__(self):
+        if not self.fields:
+            raise PaboError("A UNION NEEDS AT LEAST ONE FIELD.")
+
+    def _size(self, ctx):
+        return max(member._size(ctx) for member in self.fields.values())
+
+    def _build(self, data, stream, ctx):
+        if not isinstance(data, dict):
+            raise PaboError(f"EXPECTED A DICT OF FIELDS, GOT {type(data).__name__}.")
+        given = [name for name in self.fields if data.get(name) is not None]
+        if not given:
+            raise ValidationError(
+                f"NONE OF THE FIELDS OF THE UNION WAS GIVEN: {list(self.fields)}."
+            )
+        name = given[0]
+        member = self.fields[name]
+        buffer = BytesIO()
+        with scope(name, stream, member.docs):
+            built = member._build(data[name], buffer, Context(data, ctx))
+        raw = buffer.getvalue()
+        try:
+            size = self._size(Context(data, ctx))
+        except PaboError:
+            size = len(raw)
+        stream.write(raw + b"\x00" * (size - len(raw)))
+        return Container({name: built})
+
+    def _parse(self, stream, ctx):
+        start = stream.tell()
+        end = start
+        child = Context((), ctx)
+        for name, member in self.fields.items():
+            stream.seek(start)
+            with scope(name, stream, member.docs):
+                child[name] = member._parse(stream, child)
+            end = max(end, stream.tell())
+        stream.seek(end)
+        return Container(child)
+
+
+@dataclass
+class Select(Construct):
+    """
+    The first of several alternatives that parses (or builds) without an error.
+
+    Each alternative that fails is undone (the stream is rewound) before the
+    next is tried. If none works, the error says why each one failed.
+    """
+
+    alternatives: list[Construct]
+
+    def __post_init__(self):
+        if not self.alternatives:
+            raise PaboError("A Select NEEDS AT LEAST ONE ALTERNATIVE.")
+
+    def _size(self, ctx):
+        sizes = {alternative._size(ctx) for alternative in self.alternatives}
+        if len(sizes) != 1:
+            raise SizeofError("THE ALTERNATIVES OF THIS Select DIFFER IN SIZE.")
+        return sizes.pop()
+
+    def _fail(self, errors: list) -> ValidationError:
+        reasons = "; ".join(f"{ix}: {error.msg}" for ix, error in errors)
+        return ValidationError(f"NO ALTERNATIVE WORKED ({reasons})")
+
+    def _build(self, data, stream, ctx):
+        errors = []
+        for ix, alternative in enumerate(self.alternatives):
+            buffer = BytesIO()
+            try:
+                built = alternative._build(data, buffer, ctx)
+            except PaboError as error:
+                errors.append((ix, error))
+                continue
+            stream.write(buffer.getvalue())
+            return built
+        raise self._fail(errors)
+
+    def _parse(self, stream, ctx):
+        start = stream.tell()
+        errors = []
+        for ix, alternative in enumerate(self.alternatives):
+            stream.seek(start)
+            try:
+                return alternative._parse(stream, ctx)
+            except PaboError as error:
+                errors.append((ix, error))
+        stream.seek(start)
+        raise self._fail(errors)
