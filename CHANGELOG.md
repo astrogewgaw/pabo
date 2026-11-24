@@ -42,8 +42,9 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - Docs attached with `/` are shown in `repr`, error messages and `describe()`.
 - `describe()`, `parse(..., trace=True)` and `Probe` for debugging, and
   `sizeof(ctx)` for sizes that depend on the data.
-- Files are memory-mapped when parsed from a path, and arrays parsed from them
-  are zero-copy views.
+- Arrays are parsed without copying, like `np.frombuffer`: from bytes (or a
+  `bytearray` or `memoryview`) they are read-only views of them, and files
+  parsed from a path are memory-mapped and viewed in the same way.
 - `pabo.__version__`, `py.typed`, and a type stub for the C++ extension.
 - Strict type hints (`pabo.hints`) on every construct and public function, so
   beartype rejects bad arguments as soon as a construct is created.

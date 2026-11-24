@@ -86,9 +86,11 @@ expressions such as `this.n * 2` or `lenof(this.data)`, or any `lambda ctx: ...`
 starts as a copy of the full input dict. Composite constructs wrap each child in
 `with scope(name, stream):` so errors carry the field path and offset.
 
-`parse(path)` memory-maps the file, so the stream may be an `mmap.mmap`; `Array`
-uses that to return zero-copy views, and `Lazy` values stay readable after
-`parse` returns. Don't assume the stream is a regular file object.
+`parse(path)` memory-maps the file, so the stream may be an `mmap.mmap`, and
+`parse(bytes)` uses a `BufferStream` (a `BytesIO` that keeps the caller's buffer).
+`Array` gets the memory behind either with `base.buffer(stream)` and returns
+read-only zero-copy views, as `np.frombuffer` does; `Lazy` values stay readable
+after `parse` returns. Don't assume the stream is a regular file object.
 
 The public `parse()`, `build()` and `size` live on the base class and handle the
 input/output types: `bytes`/`bytearray`/`memoryview`, a `str`/`Path`, or a file-like

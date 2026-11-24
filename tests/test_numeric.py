@@ -386,6 +386,61 @@ def test_array_reads_into_new_buffer():
         pb.Array(pb.Int(2), count=4).parse(BytesIO(b"\x00" * 7))
 
 
+def test_array_views_bytes_without_copying():
+    """
+    Parsing an `Array` from bytes returns a read-only view of them, like
+    `np.frombuffer`, from where the array starts, and moves on past it; a
+    greedy array views the rest.
+    """
+
+    raw = b"\xff" + np.arange(4, dtype="<u2").tobytes() + b"rest"
+    spec = pb.Spec(
+        {"tag": pb.u8, "values": pb.Array(pb.u16, count=4), "tail": pb.Bytes(4)}
+    )
+    data = spec.parse(raw)
+    np.testing.assert_array_equal(data["values"], [0, 1, 2, 3])
+    assert data["tail"] == b"rest"
+    assert np.shares_memory(data["values"], np.frombuffer(raw, np.uint8))
+    assert not data["values"].flags.writeable
+    greedy = pb.Spec({"tag": pb.u8, "values": pb.Array(pb.u16)}).parse(raw[:9])
+    assert np.shares_memory(greedy["values"], np.frombuffer(raw[:9], np.uint8)) is False
+    np.testing.assert_array_equal(greedy["values"], [0, 1, 2, 3])
+    with pytest.raises(pb.StreamError, match="EXPECTED 10 BYTES, GOT 8"):
+        pb.Array(pb.u16, count=5).parse(raw[1:9])
+    with pytest.raises(pb.StreamError, match="WHOLE NUMBER"):
+        pb.Array(pb.u16).parse(b"\x00\x01\x02")
+
+
+def test_array_views_bytearray_and_memoryview():
+    """
+    A `bytearray` or contiguous `memoryview` is viewed too: the array is read-only,
+    and sees changes made to the buffer. A non-contiguous `memoryview` is copied.
+    """
+
+    raw = bytearray(np.arange(4, dtype="<u2").tobytes())
+    values = pb.Array(pb.u16, count=4).parse(raw)
+    assert not values.flags.writeable
+    raw[0] = 9
+    assert values[0] == 9
+    view = pb.Array(pb.u16, count=2).parse(memoryview(raw)[4:])
+    np.testing.assert_array_equal(view, [2, 3])
+    strided = memoryview(bytes(range(8)))[::2]
+    np.testing.assert_array_equal(pb.Array(pb.u8, count=4).parse(strided), [0, 2, 4, 6])
+
+
+def test_array_copies_inside_prefixed_and_packed():
+    """
+    Arrays read from a stream of their own (inside `Prefixed`) and packed arrays
+    are new, writeable arrays, even when parsing bytes.
+    """
+
+    prefixed = pb.Prefixed(pb.u8, pb.Array(pb.u16, count=2)).parse(b"\x04\x01\x00\x02\x00")
+    np.testing.assert_array_equal(prefixed, [1, 2])
+    assert prefixed.flags.writeable
+    packed = pb.Array(pb.u8, count=4, packing=4).parse(b"\x12\x34")
+    assert packed.flags.writeable
+
+
 def test_array_reads_from_short_reads():
     """
     `Array` keeps calling `readinto` until it has the whole array when the stream

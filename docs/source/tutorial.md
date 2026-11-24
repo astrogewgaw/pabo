@@ -31,7 +31,9 @@ u16.build(258, "out.bin")                 # overwrite out.bin
 u16.build(259, "out.bin", append=True)    # append to it
 ```
 
-Files given by path are memory-mapped, so large arrays are read without copying.
+Files given by path are memory-mapped. Either way, large arrays are not copied:
+like `np.frombuffer`, `parse` returns read-only views of the bytes or the file
+(call `.copy()` for an array you can change).
 
 ## Numbers
 
@@ -231,7 +233,8 @@ All errors are subclasses of `PaboError`: `StreamError`, `SizeofError`,
 ## Performance
 
 Specifications made only of fixed-size numbers, bytes and constants are compiled
-into a single `struct` call, and repeats of them are parsed in bulk. Arrays are read
-straight into numpy, without copies when parsing a file. Runtime type checking of
+into a single `struct` call, and repeats of them are parsed in bulk. Arrays are
+views of the bytes or file being parsed, as with `np.frombuffer`, and are read
+straight into numpy from other streams. Runtime type checking of
 pabo's own functions (by beartype) can be turned off with the environment variable
 `PABOROAR=0`.

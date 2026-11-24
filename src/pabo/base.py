@@ -64,6 +64,36 @@ def hexdump(raw: BytesLike, offset: int = 0) -> str:
     return "\n".join(lines)
 
 
+class BufferStream(BytesIO):
+    """
+    A stream over bytes in memory that keeps the original buffer as `source`.
+
+    `parse` reads `bytes`, `bytearray` and `memoryview` through one, so that
+    `Array` can return a read-only view of the buffer instead of a copy, just
+    as `np.frombuffer` does. A non-contiguous `memoryview` (such as `view[::2]`)
+    is copied first, and `source` is then None.
+    """
+
+    def __init__(self, data: BytesLike):
+        view = memoryview(data)
+        contiguous = view.c_contiguous
+        super().__init__(data if contiguous else view.tobytes())
+        self.source = view.cast("B").toreadonly() if contiguous else None
+
+
+def buffer(stream) -> "mmap.mmap | memoryview | None":
+    """
+    The memory behind a stream, if arrays can be viewed in it without copying:
+    the map of a memory-mapped file, or the buffer behind a `BufferStream`.
+    """
+
+    if isinstance(stream, mmap.mmap):
+        return stream
+    if isinstance(stream, BufferStream):
+        return stream.source
+    return None
+
+
 class scope:
     """
     Add `name` to the path (and the start offset) of any `PaboError` raised inside.
@@ -264,17 +294,21 @@ class Construct(ABC, Generic[T]):
         stderr as it is parsed, with a hex dump of its bytes. `trace` may also
         be a writable text stream to print to.
 
-        Files given by path are memory-mapped, so large arrays are read without
-        copying (the arrays returned are read-only views of the file), and lazy
-        fields can still be read after `parse` returns. While such arrays or
-        lazy values are alive the file stays mapped, and on Windows it then
-        cannot be modified or deleted.
+        Arrays are read without copying, as `np.frombuffer` does: from bytes
+        (or a `bytearray` or `memoryview`), the arrays returned are read-only
+        views of them, which keep them alive. Changing a `bytearray` changes
+        the arrays viewing it, and it cannot be resized while they exist.
+
+        Files given by path are memory-mapped, so their arrays are read-only
+        views of the file too, and lazy fields can still be read after
+        `parse` returns. While such arrays or lazy values are alive the file
+        stays mapped, and on Windows it then cannot be modified or deleted.
         """
 
         ctx = Context()
         ctx.__dict__["_trace"] = trace or None
         if isinstance(dst, (bytes, bytearray, memoryview)):
-            return self._parse(BytesIO(dst), ctx)
+            return self._parse(BufferStream(dst), ctx)
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
                 try:

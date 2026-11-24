@@ -10,7 +10,7 @@ from typing import Literal
 
 import numpy as np
 
-from pabo.base import Construct, T, readexact
+from pabo.base import Construct, T, buffer, readexact
 from pabo.context import Context
 from pabo.errors import PaboError, SizeofError, StreamError, ValidationError
 from pabo.expressions import evaluate
@@ -250,6 +250,11 @@ class Array(Construct[np.ndarray]):
     decides whether the first element sits in the most ("big") or least
     ("little") significant bits of each byte, and the values are returned as
     `dtype`. Packing uses the C++ extension; see `pabo.packing` for the layout.
+
+    Like `np.frombuffer`, parsing bytes in memory (or a memory-mapped file)
+    returns a read-only view of them, not a copy; call `.copy()` on it for an
+    array you can change. Packed arrays, and arrays read from other streams,
+    are new arrays.
     """
 
     dtype: Int | Float
@@ -289,15 +294,15 @@ class Array(Construct[np.ndarray]):
             return count * self.dtype.width
         return -(-count * self.packing // 8)
 
-    def _parsemapped(
-        self, stream: mmap.mmap, count: int, dtype: np.dtype
+    def _parseview(
+        self, stream, memory: "mmap.mmap | memoryview", count: int, dtype: np.dtype
     ) -> np.ndarray:
         """
-        Return a read-only view of the memory-mapped file, without copying.
+        Return a read-only view of the memory behind the stream, without copying.
         """
 
         start = stream.tell()
-        available = len(stream) - start
+        available = len(memory) - start
         nbytes = self._nbytes(count) if count >= 0 else available
         if nbytes > available:
             raise StreamError(
@@ -308,8 +313,9 @@ class Array(Construct[np.ndarray]):
                 f"{nbytes} BYTES IS NOT A WHOLE NUMBER OF {dtype.itemsize}-BYTE ELEMENTS."
             )
         array = np.frombuffer(
-            stream, dtype=dtype, count=nbytes // dtype.itemsize, offset=start
+            memory, dtype=dtype, count=nbytes // dtype.itemsize, offset=start
         )
+        array.flags.writeable = False
         stream.seek(start + nbytes)
         return array
 
@@ -368,8 +374,9 @@ class Array(Construct[np.ndarray]):
 
     def _parse(self, stream, ctx):
         count = self._count(ctx)
-        if self.packing is None and isinstance(stream, mmap.mmap):
-            return self._parsemapped(stream, count, self.dtypefor(ctx))
+        memory = buffer(stream) if self.packing is None else None
+        if memory is not None:
+            return self._parseview(stream, memory, count, self.dtypefor(ctx))
         if self.packing is None and count >= 0 and hasattr(stream, "readinto"):
             return self._parseinto(stream, count, self.dtypefor(ctx))
         raw = readexact(stream, self._nbytes(count)) if count >= 0 else stream.read()
