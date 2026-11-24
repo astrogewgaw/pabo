@@ -8,8 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Fields left out of the result**, such as padding and reserved bytes, which
-  now show up in every `Container`. (construct unnamed fields, binmap.)
 - [ ] **A 100-nanosecond unit for `Timestamp`**, as used by Windows `FILETIME` and
   .NET ticks. (Found writing the SER cookbook recipe.)
 

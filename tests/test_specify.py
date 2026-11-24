@@ -354,3 +354,26 @@ def test_compiled_plan_on_a_stream_that_cannot_rewind():
 
     spec = pb.Spec({"a": pb.u16, "b": pb.Const(b"!", pb.Bytes(1))})
     assert spec.parse(Forward(b"\x01\x00!")) == {"a": 1, "b": b"!"}
+
+
+def test_fields_starting_with_an_underscore_are_left_out():
+    """
+    Fields whose names start with an underscore are parsed (and can be referred
+    to) but left out of the result, on every path: compiled, field by field, in
+    bulk, embedded and when building.
+    """
+
+    fixed = pb.Spec({"a": pb.u8, "_reserved": pb.Padding(2), "b": pb.u8})
+    assert fixed.parse(b"\x01\x00\x00\x02") == {"a": 1, "b": 2}
+    assert fixed.build({"a": 1, "b": 2}) == b"\x01\x00\x00\x02"
+    assert fixed._build({"a": 1, "b": 2}, io.BytesIO(), pb.Context()) == {
+        "a": 1,
+        "b": 2,
+    }
+    assert pb.Repeat(fixed, 2).parse(b"\x01\x00\x00\x02" * 2) == [{"a": 1, "b": 2}] * 2
+    assert pb.Repeat(fixed, 2).build([{"a": 1, "b": 2}] * 2) == b"\x01\x00\x00\x02" * 2
+    dynamic = pb.Spec({"_n": pb.u8, "data": pb.Bytes(pb.this._n)})
+    assert dynamic.parse(b"\x02ab") == {"data": b"ab"}
+    assert dynamic.build({"_n": 2, "data": b"ab"}) == b"\x02ab"
+    outer = pb.Spec({"x": pb.u8, "_": pb.Embedded(fixed)})
+    assert outer.parse(b"\x09\x01\x00\x00\x02") == {"x": 9, "a": 1, "b": 2}

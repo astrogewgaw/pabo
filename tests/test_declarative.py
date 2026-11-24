@@ -151,3 +151,25 @@ def test_default_with_a_mutable_value_in_a_struct():
 
     assert Frame().samples is None
     assert Frame().build() == b"\x01\x02"
+
+
+def test_struct_fields_starting_with_an_underscore():
+    """
+    Fields of a `Struct` whose names start with an underscore are not dataclass
+    fields; they are parsed (also in bulk) and built without a value.
+    """
+
+    class Packet(pb.Struct):
+        """
+        Two fields with reserved bytes between them.
+        """
+
+        a: int = pb.u8
+        _reserved: bytes = pb.Padding(2)
+        b: int = pb.u8
+
+    raw = b"\x01\x00\x00\x02"
+    assert [f.name for f in dataclasses.fields(Packet)] == ["a", "b"]
+    assert Packet.parse(raw) == Packet(a=1, b=2)
+    assert Packet(a=1, b=2).build() == raw
+    assert pb.Repeat(Packet.construct(), 2).parse(raw * 2) == [Packet(a=1, b=2)] * 2

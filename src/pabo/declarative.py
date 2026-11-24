@@ -65,6 +65,9 @@ class Struct:
             for name, value in vars(cls).items()
             if isinstance(value, Construct)
         }
+        # Fields starting with an underscore are left out of the result, so they
+        # are not dataclass fields either (and must build without a value).
+        hidden = {name for name in own if name.startswith("_")}
         fields.update(own)
         cls.__pabo_fields__ = fields
         if endian is None and inherited is not None:
@@ -75,8 +78,12 @@ class Struct:
             hints = inspect.get_annotations(cls)
         except NameError:
             hints = {}
-        annotations = {name: hints.get(name, Any) for name in own}
+        annotations = {name: hints.get(name, Any) for name in own if name not in hidden}
+        for name in hidden:
+            delattr(cls, name)
         for name, value in own.items():
+            if name in hidden:
+                continue
             if isinstance(value, (Const, Default)) and _plain(value):
                 setattr(cls, name, dataclasses.field(default=value.value))
             elif value._omittable():
@@ -100,7 +107,7 @@ class Struct:
         The field values, as a `Container`.
         """
 
-        return Container({name: getattr(self, name) for name in self.__pabo_fields__})
+        return Container({name: getattr(self, name) for name in self.__pabo_names__})
 
     @classmethod
     def parse(cls, src: Source, **params: Any) -> "Struct":
@@ -166,7 +173,11 @@ class StructConstruct(Construct):
         unpacked = self.cls.__pabo_spec__._unpackmany(stream, ctx, count)
         if unpacked is None:
             return None
-        # A plan covers every field, so its names are those of the dataclass.
         names, rows = unpacked
         cls = self.cls
-        return [cls(**dict(zip(names, values))) for values in rows]
+        if len(names) == len(cls.__pabo_names__):
+            return [cls(**dict(zip(names, values))) for values in rows]
+        # Some fields are left out of the result (their names start with "_").
+        keep = [ix for ix, name in enumerate(names) if not name.startswith("_")]
+        kept = [names[ix] for ix in keep]
+        return [cls(**dict(zip(kept, [values[ix] for ix in keep]))) for values in rows]

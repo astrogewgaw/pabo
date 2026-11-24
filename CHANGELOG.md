@@ -81,6 +81,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 - `Int`, `Float` and specifications default to inheriting their endianness
   (little-endian at the top level).
 - `construct / "docs"` returns a copy instead of changing the construct.
+- Fields whose names start with an underscore are left out of parsed results
+  (and of `Struct` dataclasses), for padding and reserved bytes.
 - Specifications made of fixed-size fields are compiled into a single `struct`
   call, and repeats of them (including class-based `Struct`s) are parsed and
   built in bulk.

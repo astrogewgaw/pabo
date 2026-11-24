@@ -47,6 +47,10 @@ class Specification(Construct[Container]):
 
     `endian` sets the default endianness of the numbers inside (including
     nested specifications) that don't give their own.
+
+    Fields whose names start with an underscore (such as `"_reserved":
+    pb.Padding(4)`) are parsed and built as usual, and later fields can refer
+    to them, but they are left out of the result.
     """
 
     fields: dict[str, Construct]
@@ -54,6 +58,7 @@ class Specification(Construct[Container]):
     _plans: dict = field(default_factory=dict, init=False, repr=False, compare=False)
     _entries: list = field(default_factory=list, init=False, repr=False, compare=False)
     _checks: list | None = field(default=None, init=False, repr=False, compare=False)
+    _hidden: bool | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _checkendian(self.endian)
@@ -72,6 +77,34 @@ class Specification(Construct[Container]):
                 for name, member in self.fields.items()
             ]
         return self._entries
+
+    # No runtime type check: runs for every specification parsed or built.
+    @no_type_check
+    def _result(self, values: Container) -> Container:
+        """
+        The result to return: `values` without the fields whose names start with
+        an underscore, if there are any.
+        """
+
+        if self._hidden is None:
+            self._hidden = any(
+                member.wraps._hashidden() if embedded else name.startswith("_")
+                for name, member, embedded in self._members()
+            )
+        if not self._hidden:
+            return values
+        return Container(
+            (key, value) for key, value in values.items() if not key.startswith("_")
+        )
+
+    def _hashidden(self) -> bool:
+        """
+        Whether any field (including embedded ones) is left out of the result.
+        """
+
+        if self._hidden is None:
+            self._result(Container())
+        return bool(self._hidden)
 
     # No runtime type check: runs for every specification parsed or built.
     @no_type_check
@@ -139,6 +172,8 @@ class Specification(Construct[Container]):
         if unpacked is None:
             return None
         names, rows = unpacked
+        if self._hashidden():
+            return [self._result(Container(zip(names, values))) for values in rows]
         return [Container(zip(names, values)) for values in rows]
 
     # No runtime type check: part of the bulk fast path for `Repeat`.
@@ -154,6 +189,7 @@ class Specification(Construct[Container]):
             return None
         chunks, built = [], []
         names = plan.names
+        hidden = self._hashidden()
         for element in data:
             packed = plan.pack(element) if isinstance(element, dict) else None
             if packed is None:
@@ -162,7 +198,7 @@ class Specification(Construct[Container]):
             chunks.append(raw)
             result = Container(element)
             result.update(zip(names, values))
-            built.append(result)
+            built.append(self._result(result) if hidden else result)
         stream.write(b"".join(chunks))
         return built
 
@@ -177,13 +213,13 @@ class Specification(Construct[Container]):
                 stream.write(raw)
                 built = Container(data)
                 built.update(zip(plan.names, values))
-                return built
+                return self._result(built)
         child = self._child(data, ctx)
         try:
             self._buildfields(stream, child)
         except Stop:
             pass
-        return Container(child)
+        return self._result(Container(child))
 
     # No runtime type check: the per-field loop of every build; internal only.
     @no_type_check
@@ -209,7 +245,7 @@ class Specification(Construct[Container]):
             if plan is not None:
                 values = plan.unpack(stream)
                 if values is not None:
-                    return Container(zip(plan.names, values))
+                    return self._result(Container(zip(plan.names, values)))
         child = self._child((), ctx)
         try:
             self._parsefields(stream, child)
@@ -217,7 +253,7 @@ class Specification(Construct[Container]):
             pass
         if self._checks is None or self._checks:
             self._checkrebuilds(stream, child)
-        return Container(child)
+        return self._result(Container(child))
 
     def _checkrebuilds(self, stream, child: Context) -> None:
         """
