@@ -10,10 +10,6 @@ first.
 
 ## API and typing
 
-- [ ] **An option to reject bytes left over after parsing**, such as
-  `parse(data, strict=True)`, or a note in the tutorial pointing to `Terminated`.
-  (pystructs `trailing_data`.)
-
 ## Debugging
 
 - [ ] **Record each field's offset and size in the parsed result**, for hex viewers

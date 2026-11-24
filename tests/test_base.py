@@ -267,3 +267,22 @@ def test_parameters_for_class_based_structs():
     frame = Frame.parse(b"abcd", n=2)
     assert frame.data == b"ab"
     assert frame.build(n=2) == b"ab"
+
+
+def test_strict_parse_rejects_leftover_bytes(tmp_path):
+    """
+    `parse(..., strict=True)` raises a `StreamError` for bytes left over after
+    the data, from bytes, files and streams; by default they are ignored.
+    """
+
+    c = pb.Spec({"a": pb.u16})
+    assert c.parse(b"\x01\x00extra") == {"a": 1}
+    assert c.parse(b"\x01\x00", strict=True) == {"a": 1}
+    with pytest.raises(pb.StreamError, match="5 BYTES WERE LEFT OVER"):
+        c.parse(b"\x01\x00extra", strict=True)
+    path = tmp_path / "data.bin"
+    path.write_bytes(b"\x01\x00!")
+    with pytest.raises(pb.StreamError, match="1 BYTES"):
+        c.parse(path, strict=True)
+    with pytest.raises(pb.StreamError):
+        c.parse(BytesIO(b"\x01\x00!"), strict=True)

@@ -296,9 +296,18 @@ class Construct(ABC, Generic[T]):
             return None
         raise PaboError(f"CANNOT BUILD INTO AN OBJECT OF TYPE {type(src).__name__}.")
 
-    def parse(self, dst: Source, trace: bool | Writable = False, **params: Any) -> T:
+    def parse(
+        self,
+        dst: Source,
+        trace: bool | Writable = False,
+        strict: bool = False,
+        **params: Any,
+    ) -> T:
         """
         Parse data from bytes, a path to a file, or a readable binary stream.
+
+        With `strict=True`, bytes left over after the data raise a `StreamError`
+        (by default they are ignored).
 
         Other keyword arguments are parameters: values the data depends on but
         doesn't contain (such as a number of channels known from elsewhere),
@@ -328,14 +337,25 @@ class Construct(ABC, Generic[T]):
                 dst = dst.tobytes()  # such as view[::2], which BytesIO rejects
             stream = BufferStream(dst)
             stream.source = dst
-            return self._parse(stream, ctx)
+            return self._finish(self._parse(stream, ctx), stream, strict)
         if isinstance(dst, (str, Path)):
             with open(dst, "rb") as f:
                 try:
                     stream = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
                 except (OSError, ValueError):
-                    return self._parse(f, ctx)
-            return self._parse(stream, ctx)
+                    return self._finish(self._parse(f, ctx), f, strict)
+            return self._finish(self._parse(stream, ctx), stream, strict)
         if hasattr(dst, "read"):
-            return self._parse(dst, ctx)
+            return self._finish(self._parse(dst, ctx), dst, strict)
         raise PaboError(f"CANNOT PARSE FROM AN OBJECT OF TYPE {type(dst).__name__}.")
+
+    def _finish(self, value: Any, stream, strict: bool) -> Any:
+        """
+        Return the parsed value, after checking (if `strict`) that the stream
+        has ended.
+        """
+
+        if strict and stream.read(1):
+            rest = 1 + len(stream.read())
+            raise StreamError(f"{rest} BYTES WERE LEFT OVER AFTER THE DATA.")
+        return value

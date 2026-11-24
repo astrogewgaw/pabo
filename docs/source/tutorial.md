@@ -31,7 +31,8 @@ u16.build(258, "out.bin")                 # overwrite out.bin
 u16.build(259, "out.bin", append=True)    # append to it
 ```
 
-Files given by path are memory-mapped. Either way, large arrays are not copied:
+Bytes left over after the data are ignored, unless you pass `strict=True`. Files
+given by path are memory-mapped. Either way, large arrays are not copied:
 like `np.frombuffer`, `parse` returns read-only views of the bytes or the file
 (call `.copy()` for an array you can change).
 

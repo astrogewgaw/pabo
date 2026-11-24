@@ -11,7 +11,8 @@ This release is a rewrite. Code that defines its own constructs needs updating
 ### Added
 
 - Parameters: keyword arguments to `parse` and `build`, read by fields as
-  `this._params.name`.
+  `this._params.name`, and `parse(..., strict=True)`, which rejects bytes left
+  over after the data.
 - `Default`, for fields that can be left out when building, and
   `Rebuild(..., check=True)`, to check computed fields when parsing.
 - The elements of `Repeat`, `RepeatUntil` and `Greedy` can read their
