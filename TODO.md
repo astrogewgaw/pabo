@@ -10,11 +10,6 @@ first.
 
 ## API and typing
 
-- [ ] **Let type checkers accept `Struct` fields.** pyright rejects
-  `width: int = pb.u32`, since a construct is not an `int`. `typing.dataclass_transform`
-  (with constructs as field specifiers) may fix this, though probably not for the
-  ready-made aliases such as `pb.u32`, which are instances rather than calls. (Found
-  while making `Struct.parse()` return the subclass.)
 - [ ] **An option to reject bytes left over after parsing**, such as
   `parse(data, strict=True)`, or a note in the tutorial pointing to `Terminated`.
   (pystructs `trailing_data`.)

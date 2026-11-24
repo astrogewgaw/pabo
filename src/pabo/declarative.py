@@ -4,6 +4,7 @@ Class-based specifications, parsed into typed dataclass instances.
 
 import dataclasses
 import inspect
+import sys
 from collections.abc import Mapping
 from typing import Any, ClassVar, TypeVar
 
@@ -14,6 +15,17 @@ from pabo.specify import Specification
 from pabo.wrappers import Const, Default
 
 S = TypeVar("S", bound="Struct")
+
+if sys.version_info >= (3, 11):
+    from typing import dataclass_transform
+else:  # Python 3.10 has no dataclass_transform; it only informs type checkers.
+
+    def dataclass_transform(**kwargs: Any):
+        """
+        Stand-in for `typing.dataclass_transform`, which Python 3.10 lacks.
+        """
+
+        return lambda cls: cls
 
 
 def _plain(construct: Const | Default) -> bool:
@@ -30,6 +42,9 @@ def _plain(construct: Const | Default) -> bool:
     return not callable(value) and type(value).__hash__ is not None
 
 
+# Tells type checkers that subclasses are (keyword-only) dataclasses, so they know
+# the arguments of `PNGHeader(width=..., ...)`.
+@dataclass_transform(kw_only_default=True)
 class Struct:
     """
     Base class for specifications written as classes.
@@ -52,6 +67,10 @@ class Struct:
     nest one struct in another. The endianness given in the class statement
     applies to the numbers inside that don't set their own. Field names must
     not clash with the methods below (`parse`, `build`, `sizeof`, ...).
+
+    Type checkers know the arguments of the constructor and the type returned
+    by `parse`, but flag each field line (a construct is not an `int`): add
+    `# type: ignore[assignment]` to those lines if that matters to you.
     """
 
     __pabo_fields__: ClassVar[dict[str, Construct]] = {}
