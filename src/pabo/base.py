@@ -39,6 +39,8 @@ def readexact(stream: Readable, size: int) -> bytes:
     return data
 
 
+# No runtime type check (see `context.py`): called for every field parsed or built.
+@no_type_check
 def tell(stream) -> int | None:
     """
     Return the stream position, or None if the stream cannot tell.

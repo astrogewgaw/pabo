@@ -6,7 +6,7 @@ import mmap
 import struct
 import sys
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, no_type_check
 
 import numpy as np
 
@@ -34,6 +34,8 @@ def _checkbitorder(bitorder: str) -> None:
         raise PaboError(f"INVALID BIT ORDER {bitorder!r}. MUST BE 'big' OR 'little'.")
 
 
+# No runtime type check (see `context.py`): runs for every number parsed or built.
+@no_type_check
 def resolveendian(endian: Endian | None, ctx: Context) -> Endian:
     """
     Return `endian`, or the default set by an enclosing specification, or "little".
@@ -71,10 +73,25 @@ class _Fixed(Construct[T]):
     def _size(self, ctx):
         return self.width
 
+    def _codec(self, ctx):
+        """
+        The compiled `struct.Struct` for the endianness in effect, made once per
+        endianness and kept on the instance.
+        """
+
+        endian = self.endian or ctx.setting("_endian") or "little"
+        codecs = getattr(self, "_codecs", None)
+        if codecs is None:
+            codecs = {}
+            setattr(self, "_codecs", codecs)  # noqa: B010 (not a dataclass field)
+        codec = codecs.get(endian)
+        if codec is None:
+            codec = codecs[endian] = struct.Struct(self.formatfor(endian))
+        return codec
+
     def _build(self, data, stream, ctx):
-        fmt = self.formatfor(resolveendian(self.endian, ctx))
         try:
-            stream.write(struct.pack(fmt, data))
+            stream.write(self._codec(ctx).pack(data))
         except struct.error as error:
             raise ValidationError(
                 f"CANNOT BUILD {data!r} AS {self!r}: {error}."
@@ -82,8 +99,7 @@ class _Fixed(Construct[T]):
         return data
 
     def _parse(self, stream, ctx):
-        fmt = self.formatfor(resolveendian(self.endian, ctx))
-        return struct.unpack(fmt, readexact(stream, self.width))[0]
+        return self._codec(ctx).unpack(readexact(stream, self.width))[0]
 
 
 @dataclass

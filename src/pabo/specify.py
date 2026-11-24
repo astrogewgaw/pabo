@@ -33,9 +33,25 @@ class Specification(Construct[Container]):
     fields: dict[str, Construct]
     endian: Endian | None = field(default=None, kw_only=True)
     _plans: dict = field(default_factory=dict, init=False, repr=False, compare=False)
+    _entries: list = field(default_factory=list, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _checkendian(self.endian)
+
+    # No runtime type check: runs for every specification parsed field by field.
+    @no_type_check
+    def _members(self) -> list:
+        """
+        The fields as (name, construct, is it `Embedded`) triples, worked out once
+        (like the compiled plans) since `isinstance` on constructs is slow.
+        """
+
+        if not self._entries and self.fields:
+            self._entries = [
+                (name, member, isinstance(member, Embedded))
+                for name, member in self.fields.items()
+            ]
+        return self._entries
 
     # No runtime type check: runs for every specification parsed or built.
     @no_type_check
@@ -152,8 +168,8 @@ class Specification(Construct[Container]):
     # No runtime type check: the per-field loop of every build; internal only.
     @no_type_check
     def _buildfields(self, stream, child: Context) -> None:
-        for name, member in self.fields.items():
-            if isinstance(member, Embedded):
+        for name, member, embedded in self._members():
+            if embedded:
                 member.wraps._buildfields(stream, child)
                 continue
             with scope(name, stream, member.docs):
@@ -185,8 +201,8 @@ class Specification(Construct[Container]):
     @no_type_check
     def _parsefields(self, stream, child: Context) -> None:
         trace = child.setting("_trace")
-        for name, member in self.fields.items():
-            if isinstance(member, Embedded):
+        for name, member, embedded in self._members():
+            if embedded:
                 member.wraps._parsefields(stream, child)
                 continue
             start = tell(stream) if trace else None
