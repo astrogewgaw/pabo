@@ -8,9 +8,6 @@ first.
 
 ## Constructs
 
-- [ ] **Check `Rebuild` values when parsing**, such as `Rebuild(..., check=True)`,
-  so a stored length or count that doesn't match raises. (binmap
-  `calculatedfield`.)
 - [ ] **Repeats with a minimum and maximum count.** (structures `Repeat(start, stop)`.)
 - [ ] **Fields left out of the result**, such as padding and reserved bytes, which
   now show up in every `Container`. (construct unnamed fields, binmap.)

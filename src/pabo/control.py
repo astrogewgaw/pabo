@@ -51,10 +51,15 @@ class Rebuild(Construct):
     Parsing reads the value as usual. Building ignores any given value and
     writes `func(ctx)` instead, for example a length prefix computed from the
     payload after it: `Rebuild(Int(2), lambda ctx: len(ctx.payload))`.
+
+    With `check=True`, the value read is also compared with `func(ctx)` once
+    the enclosing specification has parsed all its fields (so `func` can use
+    the fields after it), and a mismatch raises a `ValidationError`.
     """
 
     wraps: Construct
     func: ContextFunction
+    check: bool = False
 
     def _omittable(self):
         return True

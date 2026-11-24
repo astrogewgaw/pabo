@@ -12,7 +12,8 @@ import numpy as np
 from pabo.base import Construct, Stop, hexdump, scope, tell
 from pabo.bytes import Bytes, Flag
 from pabo.context import Container, Context
-from pabo.errors import PaboError
+from pabo.errors import PaboError, ValidationError
+from pabo.expressions import evaluate
 from pabo.hints import Endian
 from pabo.numeric import ENDIANS, INT_CODES, Float, Int, _checkendian
 from pabo.wrappers import Const
@@ -52,6 +53,7 @@ class Specification(Construct[Container]):
     endian: Endian | None = field(default=None, kw_only=True)
     _plans: dict = field(default_factory=dict, init=False, repr=False, compare=False)
     _entries: list = field(default_factory=list, init=False, repr=False, compare=False)
+    _checks: list | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _checkendian(self.endian)
@@ -213,7 +215,33 @@ class Specification(Construct[Container]):
             self._parsefields(stream, child)
         except Stop:
             pass
+        if self._checks is None or self._checks:
+            self._checkrebuilds(stream, child)
         return Container(child)
+
+    def _checkrebuilds(self, stream, child: Context) -> None:
+        """
+        Compare the fields that are `Rebuild(..., check=True)` with what they
+        would be built as, now that every field has been parsed.
+        """
+
+        if self._checks is None:
+            self._checks = [
+                (name, member, embedded)
+                for name, member, embedded in self._members()
+                if embedded or getattr(member, "check", False) is True
+            ]
+        for name, member, embedded in self._checks:
+            if embedded:
+                member.wraps._checkrebuilds(stream, child)
+            elif name in child:
+                with scope(name, stream, member.docs):
+                    expected = evaluate(member.func, child)
+                    if _differs(child[name], expected):
+                        raise ValidationError(
+                            f"THE VALUE {child[name]!r} DOES NOT MATCH THE "
+                            f"{expected!r} IT WOULD BE BUILT AS."
+                        )
 
     # No runtime type check: the per-field loop of every parse; internal only.
     @no_type_check
@@ -297,6 +325,16 @@ class Embedded(Construct[Container]):
 
     def _parse(self, stream, ctx):
         return self.wraps._parse(stream, ctx)
+
+
+def _differs(a, b) -> bool:
+    """
+    Whether two values differ (also for numpy arrays, whose `!=` is elementwise).
+    """
+
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        return not np.array_equal(a, b)
+    return a != b
 
 
 def _tracefield(

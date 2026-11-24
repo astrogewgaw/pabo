@@ -307,3 +307,28 @@ def test_deferred_layout_from_earlier_data():
         pb.Deferred(lambda ctx: 42).parse(b"\x00")
     with pytest.raises(pb.ContextError, match="KeyError"):
         spec.parse(b"\x07\x00")
+
+
+def test_rebuild_checked_when_parsing():
+    """
+    With `check=True`, a `Rebuild` field is compared with its computed value once
+    its specification has been parsed (so it can depend on later fields), also
+    inside an embedded specification; without it, a mismatch is accepted.
+    """
+
+    def spec(check):
+        return pb.Spec(
+            {
+                "length": pb.Rebuild(pb.u8, pb.lenof(this.payload), check=check),
+                "payload": pb.GreedyBytes(),
+            }
+        )
+
+    assert spec(True).parse(b"\x03abc") == {"length": 3, "payload": b"abc"}
+    with pytest.raises(pb.ValidationError, match="DOES NOT MATCH") as info:
+        spec(True).parse(b"\x05abc")
+    assert info.value.where == "length"
+    assert spec(False).parse(b"\x05abc").length == 5
+    outer = pb.Spec({"tag": pb.u8, "_": pb.Embedded(spec(True))})
+    with pytest.raises(pb.ValidationError, match="DOES NOT MATCH"):
+        outer.parse(b"\x01\x05abc")

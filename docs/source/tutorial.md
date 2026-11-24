@@ -155,6 +155,10 @@ message = pb.Spec(
 message.build({"payload": b"abc"})    # b'\x03abc'
 ```
 
+With `Rebuild(..., check=True)`, parsing also checks that the stored value is the
+one it would be built as (once the fields after it have been parsed), so a wrong
+length raises an error.
+
 `Computed` adds a field that takes no bytes, such as an area computed from a width
 and a height.
 
